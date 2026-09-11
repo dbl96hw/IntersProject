@@ -35,3 +35,4 @@ Runs each app's own ESLint config via `--workspaces`. This same command is what 
 - `main` — promoted from `stg`; this is production
 
 All three branches require a pull request, at least one approval, and a passing lint check before merging — no direct pushes. See the team's release pipeline guide for the full CI/branch-protection/deploy setup.
+Edit for pr test
