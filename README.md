@@ -34,4 +34,7 @@ Runs each app's own ESLint config via `--workspaces`. This same command is what 
 - `stg` — promoted from `dev` when it's ready to test
 - `main` — promoted from `stg`; this is production
 
+## Test
+- Delete later
+
 All three branches require a pull request, at least one approval, and a passing lint check before merging — no direct pushes. See the team's release pipeline guide for the full CI/branch-protection/deploy setup.
