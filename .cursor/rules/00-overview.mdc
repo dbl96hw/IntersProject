@@ -1,0 +1,36 @@
+---
+description: Monorepo overview for interns — apps, run commands, scope.
+alwaysApply: true
+---
+
+# Interns Project Overview
+
+This is an npm workspaces monorepo for learning frontend and backend.
+
+## Apps
+
+- `apps/intersfrontend` — React + Vite (UI in the browser)
+- `apps/intersbackend` — Node.js + Express (API)
+
+## Where to change code
+
+- UI / React work → `apps/intersfrontend`
+- API / server work → `apps/intersbackend`
+- Do not mix FE and BE concerns in one file. Keep them separate.
+
+## How to run (from repo root)
+
+- `npm install` once at the root
+- `npm run dev:backend` → http://localhost:3000
+- `npm run dev:frontend` → http://localhost:5173 (open this in the browser)
+- For full-stack work, run both (two terminals)
+
+## Stack rules
+
+- Frontend: JavaScript + React + Vite (not Next.js; not TypeScript unless the team decides later)
+- Backend: JavaScript + Express
+- Prefer simple, readable code over new libraries or patterns
+
+## Linting
+
+- From the root: `npm run lint`

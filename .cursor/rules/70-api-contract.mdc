@@ -1,0 +1,39 @@
+---
+description: Consistent JSON API responses and HTTP status codes.
+globs: apps/intersbackend/**/*.{js}
+alwaysApply: false
+---
+
+# API Contract
+
+- Always return JSON from API routes.
+- Use clear, consistent response shapes for the same endpoint.
+- Prefer specific fields over vague wrappers when possible (e.g. `{ healthy: true }`).
+
+## Status codes
+
+| Situation | Code |
+|-----------|------|
+| Success read | 200 |
+| Created | 201 |
+| Bad input / validation | 400 |
+| Not found | 404 |
+| Server error | 500 |
+
+## Errors
+
+Return a predictable error shape:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Name is required",
+    "field": "name"
+  }
+}
+```
+
+- Use specific `code` values when you can
+- Include `field` for validation failures
+- Do not leak stack traces to the client in responses

@@ -1,0 +1,36 @@
+---
+description: Prefer reusing and composing shared React components before creating new ones.
+globs: apps/intersfrontend/**/*.{js,jsx,css}
+alwaysApply: false
+---
+
+# Component Reuse
+
+## Before creating a new component
+
+1. Check whether something similar already exists under:
+   - `apps/intersfrontend/src/components/`
+   - the current feature folder
+2. Prefer reusing or composing an existing component over copying JSX.
+3. Extract a shared component only when the same UI is used in **two or more** places (or a mentor asks you to).
+
+## Where components live
+
+| Kind | Location |
+|------|----------|
+| Reusable UI (Button, Spinner, ErrorMessage) | `src/components/` |
+| Feature-specific UI used once | next to the feature (e.g. under `src/` or a feature folder) |
+| App shell / page | `App.jsx` or route-level files |
+
+## Composition rules
+
+- Keep shared components focused on one job (display a button, show an error, etc.).
+- Pass data and callbacks via props; do not hardcode feature-specific API calls inside shared UI.
+- Prefer composition (`<Card><UserName /></Card>`) over giant prop bags.
+- Do not invent a design system library; plain React components are enough.
+
+## Do not
+
+- Duplicate the same button/form/status markup across files — extract instead.
+- Create a new shared component for a one-off layout.
+- Add UI libraries (MUI, Chakra, etc.) unless a mentor asks.
