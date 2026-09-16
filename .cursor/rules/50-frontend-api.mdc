@@ -1,0 +1,29 @@
+---
+description: How the frontend should call the backend API.
+globs: apps/intersfrontend/**/*.{js,jsx}
+alwaysApply: false
+---
+
+# Frontend API Usage
+
+- Base URL: `import.meta.env.VITE_API_URL` with fallback `http://localhost:3000`
+- See `apps/intersfrontend/.env.example` for local env setup
+- Use `fetch` unless the team introduces a shared API helper later
+- Always handle network failures (`.catch` or try/catch) and show a user-readable message
+- Parse JSON only after a successful response when needed; check `res.ok` for non-2xx
+- Do not hardcode production URLs in components
+- Keep API calls out of deeply nested UI when possible — fetch in the parent or a small helper
+
+## Example pattern
+
+```javascript
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+fetch(`${API_URL}/health`)
+  .then((res) => {
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  })
+  .then((data) => { /* update state */ })
+  .catch(() => { /* set error message in UI */ });
+```

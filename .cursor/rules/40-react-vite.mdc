@@ -1,0 +1,17 @@
+---
+description: React + Vite standards for the intern frontend.
+globs: apps/intersfrontend/**/*.{js,jsx,css}
+alwaysApply: false
+---
+
+# React + Vite
+
+- Use functional components with the `function` keyword.
+- Keep components small: one main job per component.
+- Use `useState` for local UI state; do not add Redux/Zustand unless asked.
+- Use `useEffect` only for side effects (fetch, subscriptions); clean up when needed.
+- Always consider loading, empty, and error UI when calling the API.
+- Colocate simple styles with the feature (`App.css`) or shared `index.css`; do not introduce Tailwind or CSS-in-JS unless asked.
+- Prefer composition: smaller components over one giant file when the UI grows.
+- Lists need a stable `key` prop (prefer real ids over array index when available).
+- Do not use Next.js APIs (`Image`, `Link`, App Router, Server Components) — this app is Vite.

@@ -1,0 +1,49 @@
+---
+description: Centralize reusable constants per app; avoid magic strings and scattered config.
+alwaysApply: true
+---
+
+# Shared Constants
+
+Put reusable values in a constants module instead of scattering magic strings/numbers.
+
+## Where constants live
+
+| App | Folder |
+|-----|--------|
+| Frontend | `apps/intersfrontend/src/constants/` |
+| Backend | `apps/intersbackend/src/constants/` |
+
+- Export named constants from small files (e.g. `api.js`, `messages.js`, `status.js`).
+- Re-export from `index.js` when it helps imports stay short.
+- This monorepo does **not** share one constants package across FE and BE yet. Keep app-specific values in that app. Only introduce a shared package if a mentor asks.
+
+## Naming
+
+- Use `UPPER_SNAKE_CASE` for true constants: `API_BASE_URL`, `DEFAULT_PAGE_SIZE`, `HEALTH_PATH`
+- Group related values in one object when useful: `export const HTTP_STATUS = { OK: 200, NOT_FOUND: 404 }`
+
+## What belongs in constants
+
+- API path segments used in more than one place (`/health`, `/users`)
+- Default limits, timeouts, page sizes
+- User-facing status/error message strings reused in UI
+- Enum-like sets of allowed values (`ROLES`, `ORDER_STATUS`)
+
+## What does not belong
+
+- Secrets or API keys (use `.env` / `process.env` / `import.meta.env`)
+- One-off strings used in a single line of one file
+- React components or business logic (those are not constants)
+
+## Usage
+
+```javascript
+// apps/intersfrontend/src/constants/api.js
+export const HEALTH_PATH = '/health';
+
+// apps/intersbackend/src/constants/paths.js
+export const HEALTH_PATH = '/health';
+```
+
+Import from the constants folder; do not redefine the same literal in multiple files.

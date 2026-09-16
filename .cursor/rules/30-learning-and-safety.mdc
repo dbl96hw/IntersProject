@@ -1,0 +1,16 @@
+---
+description: Guardrails for junior developers learning FE and BE.
+alwaysApply: true
+---
+
+# Learning Guardrails
+
+- Solve the task with the simplest change that works.
+- Do not add new frameworks, ORMs, auth systems, or UI libraries unless a mentor asks.
+- Before a large rewrite, explain the plan in short steps.
+- If unsure FE vs BE: UI/display → frontend; data/API/server → backend.
+- Match existing file style in the folder you edit.
+- Run lint when relevant: `npm run lint` from the root.
+- Never commit `.env` files, passwords, tokens, or API keys.
+- Prefer editing existing files over creating many new ones for small features.
+- Ask for help when stuck for more than a short time — do not invent architecture to compensate.
