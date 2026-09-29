@@ -8,9 +8,8 @@
 }
 
 .site-footer__text {
-  margin: 0;
+  margin: 0 auto;
   max-width: 36rem;
-  margin-inline: auto;
   font-family: 'Space Grotesk', sans-serif;
   font-size: 0.9rem;
   line-height: 1.5;

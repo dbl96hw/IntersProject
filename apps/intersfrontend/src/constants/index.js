@@ -1,7 +1,2 @@
-/**
- * Re-export frontend constants for shorter imports.
- * Example: import { HEALTH_PATH } from '../constants';
- */
-
-export { HEALTH_PATH } from './api.js';
-export { INTERNS, LANDING_TITLE } from './interns.js';
+export { API_BASE_URL, HEALTH_PATH } from './api.js';
+export { BACKEND_STATUS, LANDING_SUBTITLE, LANDING_TITLE } from './messages.js';
