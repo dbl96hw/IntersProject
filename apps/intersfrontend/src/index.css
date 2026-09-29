@@ -4,6 +4,15 @@
 
 body {
   margin: 0;
-  background: #f9fafb;
-  color: #111827;
+  min-height: 100vh;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  color: #1a1c22;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(42, 168, 184, 0.16), transparent 55%),
+    linear-gradient(165deg, #f7fafb 0%, #eef6f7 45%, #f5f8f9 100%);
+  background-attachment: fixed;
+}
+
+#root {
+  min-height: 100vh;
 }

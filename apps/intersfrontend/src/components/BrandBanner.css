@@ -1,0 +1,15 @@
+.brand-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 1.75rem 1.5rem;
+  background: linear-gradient(180deg, #ffffff 0%, #f3fbfc 100%);
+  border-bottom: 1px solid rgba(42, 168, 184, 0.18);
+}
+
+.brand-banner__logo {
+  display: block;
+  width: min(420px, 86vw);
+  height: auto;
+}
