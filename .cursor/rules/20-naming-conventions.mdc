@@ -1,0 +1,26 @@
+---
+description: Naming conventions for React frontend and Express backend.
+alwaysApply: true
+---
+
+# Naming Conventions
+
+## General
+
+- PascalCase for components and React files that export a component (e.g. `App.jsx`, `UserCard.jsx`)
+- camelCase for variables, functions, methods, hooks, props, and most JS modules
+- kebab-case for CSS class names when writing new styles
+- UPPERCASE for environment variables and true constants
+
+## Patterns
+
+- Event handlers: prefix with `handle` — `handleClick`, `handleSubmit`
+- Booleans: prefix with `is`, `has`, `can`, or `should` — `isLoading`, `hasError`
+- Custom hooks: prefix with `use` — `useHealthStatus`
+- Express handlers may use `req` and `res`
+
+## Clarity
+
+- Prefer clear names over abbreviations (except common ones: `err`, `req`, `res`, `props`, `ref`, `id`, `url`)
+- Avoid vague names like `data`, `item`, or `temp` when a better name exists
+- Keep the same concept named the same way across FE and BE when possible

@@ -1,0 +1,16 @@
+---
+description: Express backend standards for the intern API.
+globs: apps/intersbackend/**/*.{js}
+alwaysApply: false
+---
+
+# Express API
+
+- Keep routes thin: validate input → do work → return JSON.
+- Use `express.json()` when accepting JSON bodies.
+- Prefer small modules (`routes/`, helpers) when `index.js` grows; do not over-engineer early.
+- Use environment variables for config (`process.env.PORT`, etc.); never hardcode secrets.
+- Keep `/health` working — the frontend uses it for local checks.
+- Log useful startup and error messages; never log passwords or tokens.
+- Do not block the event loop with heavy sync work in request handlers.
+- Export the app or keep listen logic clear so routes stay easy to find.

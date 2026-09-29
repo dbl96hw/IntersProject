@@ -1,4 +1,5 @@
 import express from 'express';
+import { HEALTH_PATH } from './constants/index.js';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -23,7 +24,7 @@ app.get('/', (req, res) => {
   });
 });
 
-app.get('/health', (req, res) => {
+app.get(HEALTH_PATH, (req, res) => {
   res.json({ healthy: true });
 });
 

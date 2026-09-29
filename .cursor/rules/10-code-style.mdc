@@ -1,0 +1,16 @@
+---
+description: Shared code style for junior FE and BE work.
+alwaysApply: true
+---
+
+# Code Style
+
+- Write clean, readable code. Prefer clarity over cleverness.
+- Keep functions and components small and focused on one job.
+- Prefer consistency with existing files over introducing a new style.
+- Avoid deep nesting; early returns are fine.
+- No unused variables, imports, or dead code.
+- Comments explain *why*, not *what*. Skip obvious comments.
+- Do not leave `console.log` debugging noise in finished work (startup/error logs on the server are OK).
+- Match indentation and quote style of the file you edit.
+- Prefer named exports for helpers; default export for the main React page/component when that matches existing files.

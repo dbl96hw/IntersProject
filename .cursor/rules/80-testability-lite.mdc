@@ -1,0 +1,26 @@
+---
+description: Lightweight testability habits for FE and BE (no full QA suite).
+alwaysApply: true
+---
+
+# Testability Lite
+
+Make features easy to try and debug — without a full QA framework.
+
+## Frontend
+
+- Add `data-testid` on interactive elements and important status messages
+  - Example: `data-testid="health-status"`, `data-testid="submit-button"`
+- Prefer semantic names that describe purpose, not styles
+- Loading and error states should be visible in the UI (not only in the console)
+
+## Backend
+
+- Return clear error messages and codes (see API contract rule)
+- Keep `/health` accurate so local and CI checks can detect a live server
+- Log enough context to debug a failure (route, reason) without secrets
+
+## Before you say "done"
+
+- Can someone open the UI and see success vs failure clearly?
+- Can someone call the API and understand the JSON without reading the source?
