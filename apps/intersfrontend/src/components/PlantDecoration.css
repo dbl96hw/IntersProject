@@ -1,0 +1,30 @@
+.plant-decoration {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 0;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.plant-decoration__stem {
+  fill: none;
+  stroke: var(--color-decor-brown);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.plant-decoration__leaf--green {
+  fill: var(--color-decor-leaf);
+}
+
+.plant-decoration__leaf--brown {
+  fill: var(--color-decor-brown);
+}
+
+.plant-decoration__fruit {
+  fill: var(--color-logo-terracotta);
+}

@@ -1,0 +1,113 @@
+.edit-modal__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: var(--color-overlay);
+}
+
+.edit-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: min(100%, 520px);
+  max-height: 100%;
+  padding: 1.5rem;
+  overflow-y: auto;
+  border-radius: 16px;
+  background: var(--color-card-bg);
+  box-shadow: 0 16px 40px var(--color-shadow);
+}
+
+.edit-modal__title {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-text-main);
+}
+
+.edit-modal__candidate-id {
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+.edit-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.edit-modal__field label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.edit-modal__field input,
+.edit-modal__field select,
+.edit-modal__field textarea {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--color-divider);
+  border-radius: 10px;
+  background: var(--color-page-bg);
+  color: var(--color-text-main);
+}
+
+.edit-modal__field textarea {
+  resize: vertical;
+}
+
+.edit-modal__field input:focus-visible,
+.edit-modal__field select:focus-visible,
+.edit-modal__field textarea:focus-visible {
+  outline: 2px solid var(--color-logo-terracotta);
+  outline-offset: 1px;
+}
+
+.edit-modal__error {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--color-rejected-text);
+}
+
+.edit-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.edit-modal__button {
+  padding: 0.6rem 1.1rem;
+  border: 1px solid var(--color-divider);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--color-text-main);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.edit-modal__button:hover {
+  background: var(--color-page-bg);
+}
+
+.edit-modal__button--primary {
+  border-color: var(--color-sidebar-main);
+  background: var(--color-sidebar-main);
+  color: var(--color-card-bg);
+}
+
+.edit-modal__button--primary:hover {
+  background: var(--color-sidebar-secondary);
+}
+
+.edit-modal__button:focus-visible {
+  outline: 2px solid var(--color-logo-terracotta);
+  outline-offset: 2px;
+}

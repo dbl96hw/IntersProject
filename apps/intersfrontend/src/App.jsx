@@ -1,7 +1,7 @@
-import LandingPage from './pages/LandingPage';
+import Workspace from './pages/Workspace';
 
 function App() {
-  return <LandingPage />;
+  return <Workspace />;
 }
 
 export default App;
