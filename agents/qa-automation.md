@@ -27,8 +27,13 @@ Day-to-day commands:
 - The behaviours that matter most for the demo come from `gendd/specs/uc4-use-case.md`: a colour with
   a reason for every candidate, a breeder override that is logged, and the engine colour never
   changed by an override.
-- Frontend elements to target already carry `data-testid` (`landing-title`, `health-status`,
-  `brand-banner`, `site-footer`); new UI must follow `.cursor/rules/80-testability-lite.mdc`.
+- The frontend (PR #7) is a breeder workspace running on mock data. Its elements already carry
+  `data-testid`s, for example `upload-dropzone`, `triage-section-<green|amber|red>`,
+  `candidate-row-<candidate_id>`, `edit-candidate-modal`, `edit-save-button` and `chat-input`. The
+  full list is in `context/quality-assurance.md`. New UI must follow `.cursor/rules/80-testability-lite.mdc`.
+- Breeder corrections (crop, mean yield, justification) are an accepted product decision but not built
+  in the engine yet (`gendd/specs/feature-roadmap.md`, F1.4). When they land, they need the same
+  guarantees as overrides.
 
 ## Key Areas
 
@@ -44,7 +49,10 @@ Day-to-day commands:
 - Add a test in `test_engine.py` for a contract field from `services/data-engine/docs/CONTRACTS.md`
   that is not yet asserted.
 - Add an API-level test for the error contract (400 `VALIDATION_ERROR` with `field`, 404 `NOT_FOUND`).
-- Propose (in a ticket) a frontend test setup and a first test for `health-status` states.
+- Propose (in a ticket) a frontend test setup and a first test for the edit modal: validation
+  errors, and a required override reason when the status changes.
+- Add a pytest asserting that `POST /overrides` with reason `OTHER` and no comment returns 400
+  `VALIDATION_ERROR` (the UI currently marks the comment as optional).
 
 ## Danger Zones
 
@@ -54,6 +62,8 @@ Day-to-day commands:
 - Assertions on exact floating-point values near the rule boundary (margin 4e-5,
   `services/data-engine/README.md`); prefer the tolerances the existing tests use.
 - A green run with many skips is not evidence; check the skip summary.
+- Frontend tests written against mock data prove the UI only; they say nothing about the contract
+  until the screen is wired to the API.
 
 ## Checklists
 
@@ -65,7 +75,7 @@ Day-to-day commands:
 **When writing data engine tests:**
 - [ ] Use the `engine` / `mock_dir` fixtures from `conftest.py`; never build state outside the temporary directory.
 - [ ] Assert behaviour and contract shapes, not internal helpers.
-- [ ] Human-in-the-loop behaviour is covered when touched: override logged, `engine_colour` unchanged, reason present.
+- [ ] Human-in-the-loop behaviour is covered when touched: override or correction logged, original value kept, `engine_colour` unchanged, reason present.
 - [ ] Optional dependencies use `pytest.importorskip`, not try/except.
 - [ ] `pytest -q` passes locally and the skip count has not grown unexpectedly.
 

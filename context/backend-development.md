@@ -35,6 +35,22 @@ Two back-end components with different languages and owners.
     needs `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `DATA_ENGINE_URL`.
   - Step-by-step: `services/data-engine/docs/INTEGRATION.md` section 2.
 
+### What the frontend now expects (from the mock UI in PR #7)
+
+The workspace UI in `apps/intersfrontend` is built on mock rows (`src/mocks/dashboards.js`) and expects
+more than the engine returns today:
+
+- Candidate row fields `crop` and `mean_yield_t_ha`. The engine's row has neither; `MEAN_YIELD_T_HA`
+  exists only as an engine feature, and the data has `CROP_GUID` but no crop name
+  (`gendd/specs/feature-roadmap.md`, F1.2).
+- Breeder corrections: the edit modal changes crop, mean yield and justification. This is an accepted
+  product decision and needs a new engine capability (roadmap F1.4). It is planned, not implemented:
+  - An append-only corrections log following the `audit.py` pattern.
+  - `POST /corrections` and `GET /corrections` in `api.py`.
+  - A `corrected` flag, plus original and corrected values, on the candidate row and profile.
+  - Express forwarding under `/api/breeder/corrections`.
+  - Corrections do not change `engine_colour`.
+
 ### Data engine (`services/data-engine`)
 
 - Directories:
@@ -87,6 +103,9 @@ Two back-end components with different languages and owners.
 - `src/data_engine/audit.py` and `POST /overrides`: the audit log must stay append-only and must
   never change `engine_colour`. Do not add an override path to the agent tools (deliberately absent,
   `services/data-engine/docs/INTEGRATION.md` section 3).
+- Corrections (planned, roadmap F1.4) must stay separate from overrides: overrides change the effective
+  colour, while corrections change displayed values. Both are append-only and never modify the source
+  tables or `engine_colour`. Agent tools must label corrected values as breeder corrections.
 - `src/data_engine/agent_tools.py` `SYSTEM_PROMPT`: rules such as "never change, compute or re-derive
   a colour" enforce the human-in-the-loop constraint.
 - `POST /sql` (`engine.py` `sql`): read-only is enforced by a string check (single statement starting
@@ -98,7 +117,10 @@ Two back-end components with different languages and owners.
 ## Unknowns
 
 - Unknown: who owns the Express integration and when the `clients/node/` examples will be wired in.
-- Unknown: the Express route for natural-language questions (the agent loop has no route yet).
+- Unknown: whether the `POST /chat` route from `breederRoutes.example.js` is kept as-is for the chat
+  widget, or reshaped to accept the widget's conversation history.
+- Unknown: where a human-readable crop name comes from (only `CROP_GUID` in the data), and whether
+  corrections should feed the rules (needs the SME).
 - Unknown: which Claude model id `ANTHROPIC_MODEL` should use, and who holds the API key.
 - Unknown: Python lint and formatting conventions for `services/data-engine`.
 - Unknown: whether the override log should move from JSON-Lines to a database (`audit.py` mentions a

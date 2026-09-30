@@ -28,6 +28,10 @@ Day-to-day commands:
   and caps tool rounds at `MAX_TOOL_ROUNDS = 6`.
 - Overrides are human decisions from the UI (`POST /overrides`); the agent has no override tool on
   purpose.
+- The frontend (PR #7) is a mock-only workspace that already expects data the engine does not return:
+  `crop` and `mean_yield_t_ha` on each candidate row, and breeder corrections to crop, mean yield and
+  justification. Corrections are an accepted product decision; the engine capability is planned in
+  `gendd/specs/feature-roadmap.md`, F1.4 (details in `context/backend-development.md`).
 
 ## Key Areas
 
@@ -36,7 +40,8 @@ Day-to-day commands:
 - `services/data-engine/src/data_engine/api.py` - REST endpoints and error contract.
 - `services/data-engine/src/data_engine/engine.py` - `DataEngine`.
 - `services/data-engine/src/data_engine/agent_tools.py`, `mcp_server.py` - tools and system prompt.
-- `services/data-engine/src/data_engine/audit.py` - override log.
+- `services/data-engine/src/data_engine/audit.py` - override log; the pattern to copy for the
+  corrections log.
 - `services/data-engine/config/rules.yaml`, `config/sources.yaml`.
 
 ## Safe First Changes
@@ -47,6 +52,8 @@ Day-to-day commands:
   forwards the engine response and errors unchanged.
 - Extend `GET /health` in Express to report whether the data engine is reachable, keeping
   `{ healthy: ... }` accurate.
+- Add `mean_yield_t_ha` to the candidate row in `engine.py` (it already exists as the
+  `MEAN_YIELD_T_HA` feature), document it in `CONTRACTS.md`, and add a pytest.
 
 ## Danger Zones
 
@@ -54,6 +61,8 @@ Day-to-day commands:
   re-run of `python -m data_engine.evaluate`.
 - Contract shapes in `services/data-engine/docs/CONTRACTS.md` - the UI and agent depend on them.
 - `audit.py` and `POST /overrides` - must stay append-only and never change `engine_colour`.
+- Corrections (F1.4): mixing them into the override log, applying them by editing the source tables,
+  or letting them change `engine_colour` before the SME confirms they should feed the rules.
 - Adding an override or colour-changing tool to `agent_tools.py`, or weakening `SYSTEM_PROMPT` rules.
 - `POST /sql` - keep it on an in-memory, read-only connection.
 - Exposing the data engine directly to the browser or internet (it has no auth and allows any origin).
@@ -73,5 +82,9 @@ Day-to-day commands:
 - [ ] `pytest -q` passes in `services/data-engine` and the result is noted in the pull request.
 - [ ] Payload changes are reflected in `services/data-engine/docs/CONTRACTS.md` in the same pull request.
 - [ ] Rule changes bump the version in `config/rules.yaml` and include the new evaluation numbers.
-- [ ] Every returned colour still carries a reason and evidence; overrides remain human-only.
+- [ ] Every returned colour still carries a reason and evidence; overrides and corrections remain
+      human-only and append-only.
+- [ ] Corrected values are returned with their original value and a `corrected` marker, never as
+      engine values.
 - [ ] Mock files in `data/synthetic/uc4/` are unchanged.
+- [ ] The feature's checklist items are updated in `gendd/specs/feature-roadmap.md`.

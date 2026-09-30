@@ -39,8 +39,20 @@
   `sklearn` (see `test_engine.py`, `test_quality_and_diagnostics.py`, `test_math.py`).
 - Tests never write to the real `.state/` directory (`conftest.py` autouse fixture).
 - Frontend testability: `data-testid` on interactive elements and status messages; loading and error
-  states visible in the UI (`.cursor/rules/80-testability-lite.mdc`). Existing ids: `landing-title`,
-  `health-status`, `brand-banner`, `site-footer`.
+  states visible in the UI (`.cursor/rules/80-testability-lite.mdc`). Existing ids, since PR #7
+  (the old `landing-title`, `health-status`, `brand-banner`, `site-footer` no longer exist):
+  - Workspace and sidebar: `workspace-scroll`, `sidebar`, `new-dashboard-button`,
+    `recent-dashboard-<id>`, `sidebar-user`, `plant-decoration`.
+  - Upload: `welcome-view`, `upload-dropzone`, `upload-input`, `upload-add-button`, `selected-files`,
+    `analysis-loading`, `upload-submit`.
+  - Dashboard: `dashboard-view`, `dashboard-summary`, `dashboard-filters`, `filter-search-input`,
+    `filter-status-<all|green|amber|red>`, `filter-empty`, `triage-section-<green|amber|red>`,
+    `triage-count-<green|amber|red>`, `candidate-row-<candidate_id>`, `overridden-badge-<candidate_id>`.
+  - Edit and override: `row-context-menu`, `row-context-menu-edit`, `edit-candidate-modal`,
+    `edit-crop-input`, `edit-yield-input`, `edit-justification-input`, `edit-status-select`,
+    `edit-override-reason-select`, `edit-comment-input`, `edit-cancel-button`, `edit-save-button`.
+  - Chat: `chat-toggle-button`, `chat-widget`, `chat-minimize-button`, `chat-close-button`,
+    `chat-messages`, `chat-message-<bot|user>`, `chat-typing`, `chat-input`, `chat-send-button`.
 - Backend testability: clear JSON errors and an accurate `/health` (`.cursor/rules/80-testability-lite.mdc`).
 - Acceptance criteria in Gherkin, each naming its test level: `gendd/definition-of-ready.md`.
 - Every acceptance criterion maps to a passing test: `gendd/definition-of-done.md`. Coverage
@@ -51,9 +63,13 @@
 - Data engine: any change under `services/data-engine/` runs `pytest -q` locally; any change to
   `config/rules.yaml` also re-runs `python -m data_engine.evaluate` and checks parity has not dropped.
 - Express and frontend: no framework yet; `npm run lint` must pass.
+- The frontend currently runs on mock data (`apps/intersfrontend/src/mocks/`). Tests written against
+  the mock UI must be updated when each screen is wired to the API; the `data-testid`s above should
+  stay stable across that change.
 - Demo-critical behaviour to protect (from `gendd/specs/uc4-use-case.md`): every candidate has a colour
   and a reason; an override is logged with user, time, reason code and original colour; the engine
-  colour is never changed by an override.
+  colour is never changed by an override. Once breeder corrections exist (roadmap F1.4): a correction is
+  logged with the original value, and the original stays visible.
 
 ## Danger zones
 

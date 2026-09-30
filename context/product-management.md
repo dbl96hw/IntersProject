@@ -56,8 +56,19 @@ data in one place with a recommendation and its reasoning, without chasing five 
 ### Coverage of the use case today
 
 - Implemented and pending features, by phase and priority, each with its checklist:
-  `gendd/specs/feature-roadmap.md`. Phase 0 (data engine and scaffold) is done; the breeder-facing UI,
-  the Express integration and the chat assistant are pending.
+  `gendd/specs/feature-roadmap.md`. Phase 0 is done: the data engine, the scaffold, and the breeder
+  workspace UI prototype on mock data (PR #7). Pending: the Express integration, wiring each screen to
+  real data, the breeder corrections capability, and the real chat assistant.
+
+### Product decisions
+
+- 2026-09-30, accepted: breeders may correct candidate values (crop, mean yield, justification) from
+  the edit modal. Corrections are append-only, keep the original value, and record who, when and a
+  comment. They never overwrite the system of record and never change `engine_colour`. Implementation:
+  `gendd/specs/feature-roadmap.md`, F1.4 and F1.5.
+- UI shape from PR #7: one "dashboard" per upload, listed as "Recent dashboards" in the sidebar, with
+  candidates grouped into Approved (GREEN), Conditional (AMBER) and Not approved (RED). The app is
+  branded "Git Push & Pray" (`apps/intersfrontend/src/constants/messages.js`, `APP_NAME`).
 
 ## Conventions in force
 
@@ -77,8 +88,17 @@ data in one place with a recommendation and its reasoning, without chasing five 
 - The candidate rule `UC4_MATERIAL_V0` is the team's own proposal, not Syngenta's logic
   (`services/data-engine/README.md`, "Honest limits"); present it as such in the demo.
 - Connecting to any live research system is out of scope.
+- Corrected values shown as if they came from the engine would undermine trust and traceability. A
+  corrected value must always be visibly marked as a breeder correction, with the original available.
+- The UI labels (Approved / Conditional / Not approved) sound like final decisions. The demo must make
+  clear that the engine recommends and the breeder decides.
 
 ## Unknowns
+
+- Unknown: whether breeder corrections should feed the rules (and so change the engine's colour) or
+  stay as annotations; to confirm with the SME (Diganta Adhikari, `services/data-engine/docs/FINDINGS.md`).
+- Unknown: whether triage sections should list Not approved (RED) first, as the engine sorts, or
+  Approved (GREEN) first, as the mock UI does.
 
 - Unknown: judging criteria and weights, demo length and format.
 - Unknown: whether the demo includes a conversational channel beyond the web UI (for example WhatsApp

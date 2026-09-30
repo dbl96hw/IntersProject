@@ -25,7 +25,7 @@ keeps the final call.
   - `.github/workflows/` - continuous integration (lint only).
   - `.cursor/rules/` - team coding rules for the JavaScript apps.
 - Entry points:
-  - Frontend: `apps/intersfrontend/src/main.jsx` -> `App.jsx` -> `pages/LandingPage.jsx`.
+  - Frontend: `apps/intersfrontend/src/main.jsx` -> `App.jsx` -> `pages/Workspace.jsx`.
   - Backend: `apps/intersbackend/src/index.js` (`GET /`, `GET /health`).
   - Data engine REST: `services/data-engine/src/data_engine/api.py` (`uvicorn data_engine.api:app --port 8001`).
   - Data engine MCP server (stdio): `services/data-engine/src/data_engine/mcp_server.py`.
@@ -46,14 +46,20 @@ flowchart LR
   McpServer --> EngineLib["DataEngine (Python library)"]
   Engine --> EngineLib
   EngineLib --> Fixtures["data/synthetic/uc4 + uploaded documents"]
-  EngineLib --> State["services/data-engine/.state (override log, runs, snapshot)"]
+  EngineLib --> State["services/data-engine/.state (override and correction logs, runs, snapshot)"]
 ```
 
-Current state versus target: only the data engine is implemented. `apps/intersbackend/src/index.js`
-exposes `/` and `/health` only, and `apps/intersfrontend` renders a landing page only. The Express
-wiring exists as drop-in examples in `services/data-engine/clients/node/` (`dataEngineClient.js`,
-`breederRoutes.example.js`, `agentLoop.example.js`, `constants.js`) that have not been copied into
-`apps/intersbackend` yet.
+Current state versus target (synced with `dev` on 2026-09-30):
+
+- Data engine: implemented.
+- Frontend: a full breeder workspace UI (upload, colour-grouped triage tables, edit / override modal,
+  chat widget) exists on mock data only (`apps/intersfrontend/src/mocks/`, PR #7). It makes no API
+  calls.
+- Express: `apps/intersbackend/src/index.js` still exposes only `/` and `/health`. The wiring exists as
+  drop-in examples in `services/data-engine/clients/node/` (`dataEngineClient.js`,
+  `breederRoutes.example.js`, `agentLoop.example.js`, `constants.js`) that have not been copied into
+  `apps/intersbackend` yet.
+- The link between the three is the critical path; see `gendd/specs/feature-roadmap.md`, Phase 1.
 
 ### Data engine pipeline
 
@@ -77,6 +83,11 @@ These come from the use case's non-negotiable constraints and are enforced in co
   (`services/data-engine/src/data_engine/audit.py`, `services/data-engine/docs/INTEGRATION.md` section 3).
 - The system of record is never overwritten; quality fixes are recorded with provenance and the mock
   files are never modified (`data/synthetic/uc4/README.md`).
+- Breeder corrections to candidate values (crop, mean yield, justification) are an accepted product
+  decision (`context/product-management.md`). They follow the same rule as overrides: appended to an
+  audited log with who, when, the original value and a comment; never written into the source data;
+  always shown as corrections next to the original. Planned, not implemented
+  (`gendd/specs/feature-roadmap.md`, F1.4).
 - Out of scope: any connection to a live research system (`gendd/specs/uc4-use-case.md`).
 
 ## Conventions in force
@@ -105,8 +116,10 @@ These come from the use case's non-negotiable constraints and are enforced in co
   (`python -m data_engine.evaluate`) and parity re-checked.
 - `services/data-engine/docs/CONTRACTS.md` shapes: the Express routes, agent loop and UI depend on
   them. Changing a field name is a breaking change across three components.
-- Adding an agent path that writes overrides or changes a colour breaks the human-in-the-loop
-  constraint.
+- Adding an agent path that writes overrides or corrections, or changes a colour, breaks the
+  human-in-the-loop constraint.
+- Sending breeder edits from the UI as if they were engine values, or storing them by editing the
+  source data, breaks provenance. Edits go through the corrections path only.
 - `data/synthetic/uc4/`: tests and published findings are produced from exactly these files; editing
   them silently changes results.
 
@@ -118,5 +131,9 @@ These come from the use case's non-negotiable constraints and are enforced in co
   (`agentLoop.example.js`), an MCP client, or both.
 - Unknown: whether the Express backend will proxy all engine calls, or the frontend may call the
   engine directly (the engine allows any origin via `CORSMiddleware(allow_origins=["*"])` in `api.py`).
+- Unknown: how the UI's "dashboards" (one per upload in the mock) map to the engine, which builds a
+  single dataset from its data directory plus uploaded documents.
+- Unknown: whether breeder corrections should feed the rules (and so change `engine_colour`) or stay as
+  annotations; needs the SME.
 - Unknown: a component inventory at `gendd/architecture/components.md` (referenced by the Definition
   of Ready) does not exist yet; `/gendd:gendd-brownfield` is expected to produce it.

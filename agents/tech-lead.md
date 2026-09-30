@@ -22,8 +22,12 @@ Day-to-day commands (from the repo root unless noted):
 ## Role-Specific Context
 
 - Three components, two languages: React + Vite UI, Express API (JavaScript), Python data engine
-  (FastAPI). Only the data engine is substantially built; the UI and Express wiring are the critical
-  path to a demo (`context/architecture.md`, "Current state versus target").
+  (FastAPI). The data engine is built, and the UI exists as a mock-only prototype (PR #7). Express
+  wiring, and connecting the UI to real data, are the critical path to a demo
+  (`context/architecture.md`, "Current state versus target"; `gendd/specs/feature-roadmap.md`, Phase 1).
+- Accepted product decision (2026-09-30): breeders may correct crop, mean yield and justification,
+  through an audited, append-only corrections path (roadmap F1.4). Review UI and engine changes
+  against it.
 - The team is interns learning the stack; `.cursor/rules/30-learning-and-safety.mdc` asks for the
   simplest change that works and no new frameworks without a mentor.
 - The product must keep a human in the loop and always show its reasoning
@@ -58,7 +62,9 @@ Day-to-day commands (from the repo root unless noted):
   report and a new rule version.
 - Contract changes in `services/data-engine/docs/CONTRACTS.md` that are not coordinated across the
   UI, Express and agent loop.
-- Any path that lets the agent write overrides or change a colour (breaks human in the loop).
+- Any path that lets the agent write overrides or corrections, or change a colour (breaks human in the loop).
+- Mock data (`apps/intersfrontend/src/mocks/`) left in a screen that claims to be wired, which makes a
+  demo look real when it is not.
 - Large AI-generated pull requests merged on a green lint check alone (see `context/technical-leadership.md`).
 - New frameworks or services that conflict with `.cursor/rules/30-learning-and-safety.mdc`.
 - Secrets (`ANTHROPIC_API_KEY`) in committed files or in `VITE_*` variables.
@@ -72,6 +78,8 @@ Day-to-day commands (from the repo root unless noted):
 - [ ] `npm run lint` passes; for changes under `services/`, `pytest -q` was run and the result is in the pull request.
 - [ ] Every colour shown or returned still carries its reason or evidence; the breeder can still override.
 - [ ] Overrides remain human-only, append-only, and never change `engine_colour`.
+- [ ] Edits to engine values (crop, mean yield, justification) go only through the audited corrections
+      path and are shown as corrections next to the original value.
 - [ ] Payload shapes match `services/data-engine/docs/CONTRACTS.md`, or the document is updated in the same pull request.
 - [ ] Rule changes bump the rule version in `config/rules.yaml` and include the new evaluation numbers.
 - [ ] No `.env`, API keys, tokens, or new binary archives are committed.
@@ -80,5 +88,6 @@ Day-to-day commands (from the repo root unless noted):
 - [ ] The feature's checklist items and Status are updated in `gendd/specs/feature-roadmap.md`.
 
 **Before promoting `dev` to `stg` or `stg` to `main`:**
-- [ ] The demo flow works end to end locally: triage table, candidate card with reason, override logged.
+- [ ] The demo flow works end to end locally on real engine data (no screen in the demo path imports
+      from `src/mocks/`): triage table, candidate card with reason, override and correction logged.
 - [ ] Known `npm audit` findings at Medium or above are triaged (`gendd/config.md` severity bar).
