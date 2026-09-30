@@ -1,0 +1,95 @@
+.dashboard-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.dashboard-filters__search {
+  flex: 1 1 280px;
+  min-width: 0;
+  max-width: 420px;
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--color-divider);
+  border-radius: 999px;
+  background: var(--color-card-bg);
+  color: var(--color-text-main);
+}
+
+.dashboard-filters__search:focus-visible {
+  outline: 2px solid var(--color-logo-terracotta);
+  outline-offset: 1px;
+}
+
+.dashboard-filters__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.dashboard-filters__chip {
+  --chip-accent: var(--color-sidebar-main);
+  --chip-bg: var(--color-card-bg);
+  --chip-text: var(--color-text-main);
+
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.9rem;
+  border: 1px solid var(--chip-accent);
+  border-radius: 999px;
+  background: var(--color-card-bg);
+  color: var(--chip-text);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.dashboard-filters__chip--green {
+  --chip-accent: var(--color-approved-accent);
+  --chip-bg: var(--color-approved-bg);
+  --chip-text: var(--color-approved-text);
+}
+
+.dashboard-filters__chip--amber {
+  --chip-accent: var(--color-conditional-accent);
+  --chip-bg: var(--color-conditional-bg);
+  --chip-text: var(--color-conditional-text);
+}
+
+.dashboard-filters__chip--red {
+  --chip-accent: var(--color-rejected-accent);
+  --chip-bg: var(--color-rejected-bg);
+  --chip-text: var(--color-rejected-text);
+}
+
+.dashboard-filters__chip:hover,
+.dashboard-filters__chip--active {
+  background: var(--chip-bg);
+}
+
+.dashboard-filters__chip--all.dashboard-filters__chip--active {
+  background: var(--color-sidebar-main);
+  color: var(--color-card-bg);
+}
+
+.dashboard-filters__chip--active {
+  font-weight: 600;
+}
+
+.dashboard-filters__chip-count {
+  min-width: 1.4rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: var(--color-card-bg);
+  font-size: 0.75rem;
+  text-align: center;
+  color: var(--color-text-main);
+}
+
+.dashboard-filters__chip:focus-visible {
+  outline: 2px solid var(--color-logo-terracotta);
+  outline-offset: 2px;
+}
