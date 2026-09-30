@@ -1,0 +1,134 @@
+# Versioned, human-readable triage rules.
+#
+# Architecture rule of the team: THE DETERMINISTIC ENGINE DECIDES THE COLOUR,
+# the LLM only explains it. Every threshold lives here (not in code) so a
+# breeder or the SME can read, challenge and change it without touching Python.
+#
+# Colour mapping: PASS -> GREEN, HOLD -> AMBER, FAIL -> RED.
+
+trial_rules:
+  # Reconstruction of the official scoring logic shipped with the mock data
+  # (RULE_VERSION = SYNTH_V1 in trial_recommendations_synthetic.csv).
+  version: SYNTH_V1_RECON_2026-09-30
+  status: reverse-engineered, pending SME confirmation
+  # When the export carries an official verdict, show it (system of record) and
+  # use the reconstruction to explain it or flag it as "not explained by the data".
+  prefer_official: true
+
+  # Per-trait thresholds. Each one reproduces the official per-trait rationale
+  # ("yield meets threshold", "disease risk elevated", ...) on 72/72 trials.
+  # The exact cut-off lies in the empty gap between observed OK and not-OK values;
+  # the gap is recorded so nobody mistakes the chosen value for a measured one.
+  thresholds:
+    yield:
+      field: YIELD_T_HA
+      op: ">="
+      value: 9.0
+      unit: t/ha
+      observed_gap: [8.90, 9.14]
+      ok_text: yield meets threshold
+      bad_text: yield below target
+    moisture:
+      field: MOISTURE_PCT
+      op: "<="
+      value: 22.0
+      unit: "%"
+      observed_gap: [21.8, 22.1]
+      ok_text: moisture meets threshold
+      bad_text: moisture above target
+    disease:
+      field: DISEASE_SCORE
+      op: "<="
+      value: 5.0
+      unit: score (1-9)
+      observed_gap: [4.9, 5.2]
+      ok_text: disease score acceptable
+      bad_text: disease risk elevated
+    genomic_value:
+      field: GENOMIC_BREEDING_VALUE_MEAN
+      op: ">="
+      value: 102.0
+      unit: index
+      observed_gap: [101.0, 103.4]
+      ok_text: genomic value favourable
+      bad_text: genomic value below target
+
+  # Verdict logic.
+  #  PASS is exact on the data: all four thresholds met AND resistant share > 40 %.
+  #
+  #  FAIL vs HOLD is NOT a function of the pass/fail *flags*: identical flag
+  #  vectors receive different verdicts, so any flag-based rule tops out at
+  #  60/72 (Bayes ceiling, computed by data_engine.calibrate.bayes_ceiling).
+  #  The calibrated model showed that the *size* of the miss matters (yield and
+  #  disease magnitudes dominate). Distilled back into a deterministic rule:
+  #
+  #    severity = sum over the 4 criteria of the relative shortfall beyond the
+  #               threshold, max(0, |value - threshold| / threshold) on the bad side
+  #    FAIL if severity > cut, else HOLD
+  #
+  #  Equal weights, dimensionless, one tuned number (the cut). Cross-validated
+  #  (5-fold x 50) the cut lands in [0.33, 0.42] with out-of-sample accuracy
+  #  0.90 +- 0.07 on FAIL/HOLD; on all 72 trials it matches 68/72 (94 %).
+  #
+  #  Root-cause analysis of those 4 misses (data_engine.quality) showed they all
+  #  come from the equal-weight assumption: two trials FAIL on a ~30 % yield
+  #  shortfall alone, two HOLD with a 34-40 % disease excess. Letting the data
+  #  set the weights with a maximum-margin linear separator on the four
+  #  shortfalls (data_engine.calibrate.fit_weighted_severity) gives
+  #      yield 1.00 > disease 0.56 > moisture 0.19 > genomic value 0.08, cut 0.248
+  #  (stored below with 4 decimals: the margin is thin, so rounding to 2
+  #  decimals already flips one trial; see the margin in the evaluation report)
+  #  which separates all 65 FAIL/HOLD trials (72/72 overall), with
+  #  cross-validated accuracy 0.985 +- 0.031 (weights refit on training folds
+  #  only). Reading: a yield shortfall weighs about twice a disease excess;
+  #  moisture and genomic value barely move the verdict. Still a hypothesis
+  #  until the SME confirms the official weights.
+  #
+  #  mode: weighted_severity  (default)  4 weights + cut, 72/72, CV 0.985
+  #  mode: severity           equal weights, 1 cut, 68/72, CV 0.90
+  #  mode: gate               "yield gates FAIL", 55/72 (naive baseline)
+  verdict:
+    mode: weighted_severity
+    pass_requires_all: [yield, moisture, disease, genomic_value]
+    pass_extra:
+      field: RESISTANT_MATERIAL_PCT
+      op: ">"
+      value: 40.0
+      unit: "% resistant materials"
+    severity_cut: 0.35
+    severity_weights: {yield: 1.0, moisture: 0.1904, disease: 0.5644, genomic_value: 0.0758}
+    weighted_severity_cut: 0.2483
+    fail_if_any: [yield]      # used by mode: gate
+    otherwise: HOLD
+
+material_rules:
+  # Candidate-level (material/line) triage. A candidate is tested in ~5 trials.
+  # Its colour aggregates its trial verdicts and its own genomic evidence. This
+  # rule set is OUR PROPOSAL (v0) and is flagged as such to the breeder until
+  # the SME confirms or replaces it.
+  # Caveat surfaced by the consistency checks: in the mock data every candidate
+  # was tested in a single location-year, so these trials are replicates of one
+  # environment, not a multi-environment trial. The rule is written for the
+  # general case and stays valid when real multi-location data arrives.
+  version: UC4_MATERIAL_V0
+  status: team proposal, pending SME confirmation
+  red:
+    # Fails in the majority of the trials it was tested in.
+    fail_share_gte: 0.6
+  green:
+    # Fails in at most one trial out of five and carries a favourable
+    # genomic breeding value.
+    fail_share_lte: 0.2
+    genomic_value_gte: 102.0
+    min_trials: 3
+  otherwise: AMBER
+
+# Probability band in which the calibrated model marks a trial as "ambiguous"
+# (the classes genuinely overlap there): the engine then asks for human review.
+ambiguity_band: [0.35, 0.65]
+
+# Mahalanobis anomaly flag: chi-square quantile on the retained spectral
+# dimensions. 0.975 -> ~2.5 % false-alarm rate if features were Gaussian.
+anomaly_quantile: 0.975
+# Share of variance (Frobenius energy) retained by the spectral truncation.
+spectral_energy: 0.95

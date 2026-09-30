@@ -1,0 +1,69 @@
+# Source signatures used by `data_engine.detect`.
+#
+# Detection is deterministic: a file is assigned to the source whose signature
+# columns it covers best. Only when no source reaches `min_score` is the file
+# returned as UNKNOWN, so the caller (LLM or human) can classify it. This keeps
+# the LLM out of the hot path and makes every classification auditable.
+#
+# score(file, variant) = |headers ∩ signature| / |signature|   (signature recall)
+#
+# Recall (not Jaccard) is used on purpose: real exports carry many extra,
+# mostly-empty columns, and those must not penalise the match.
+
+min_score: 0.6
+
+# Canonical key names and the aliases under which they appear in the exports.
+# The canonical model is built on these three keys only.
+keys:
+  MATERIAL_GUID: [MATERIAL_GUID, GID]
+  TRIAL_GUID: [TRIAL_GUID, ATTACHED_TO_FIELD_ENTITY_ID]
+  LOCATION_GUID: [LOCATION_GUID, FIELD_ID]
+
+sources:
+  trial:
+    description: Trial master (one row per field trial).
+    variants:
+      - [TRIAL_GUID, TRIAL_ID, TRIAL_DESCRIPTION, PROTOCOL_GUID, TRIAL_TYPE_LID,
+         NO_OF_REPLICATIONS, START_YEAR, LOCATION_GUID, BREEDING_GROUP_GUID]
+
+  trial_recommendations:
+    description: Trial-level phenotype summary with the official pass/fail verdict.
+    variants:
+      - [TRIAL_GUID, YIELD_T_HA, MOISTURE_PCT, DISEASE_SCORE, PLANT_HEIGHT_CM,
+         FLOWERING_DAYS, TRIAL_RECOMMENDATION, RECOMMENDATION_RATIONALE, RULE_VERSION]
+
+  operations:
+    description: Field operations (planting, irrigation, harvest) per trial and material.
+    variants:
+      - [OPERATION_GUID, OPERATION_TYPE_LID, OPERATION_STATUS_LID, OPERATION_DATE,
+         PLOT_NO, TRIAL_GUID, MATERIAL_GUID]
+
+  lab_observations:
+    description: Lab trait measurements per material (trait identified by TRAIT_GUID).
+    variants:
+      - [TRAIT_GUID, NUMBER_VALUE, ALPHA_VALUE, OBSERVATION_DATE, MATERIAL_GUID,
+         CALCULATED, INHERITED]
+
+  observations:
+    description: Plot-level observation records linking trial, location and material.
+    variants:
+      # Current drop (2026-09-29).
+      - [OBSERVATION_UUID, OBSERVATION_ID, ATTACHED_TO_FIELD_ENTITY_ID, FIELD_ID,
+         GID, REPLICATION_NO, PLANTS_IN_PLOT, SUBPLOT_ID, BARCODE]
+      # First drop (2026-09-28): different schema for the same logical source.
+      # Kept so that schema drift is detected, not silently mis-routed.
+      - [OBSERVATION_GUID, TRIAL_GUID, MATERIAL_GUID, TRAIT_CODE, TRAIT_NAME,
+         OBSERVATION_VALUE, OBSERVATION_UOM, REPLICATION_NO]
+
+  germplasm:
+    description: Germplasm / pedigree master (one row per material).
+    variants:
+      - [MATERIAL_GUID, MATERIAL_ID, LINE_GUID, PEDIGREE, GENERATION_CODE,
+         FEMALE_PARENT_MATERIAL_GUID, MALE_PARENT_MATERIAL_GUID, ADVANCEMENT_DECISION]
+
+  genomics:
+    description: Genotyping results per material (markers, breeding value, QC).
+    variants:
+      - [GENOMIC_SAMPLE_GUID, MATERIAL_GUID, MARKER_DROUGHT_TOLERANCE,
+         MARKER_DISEASE_RESISTANCE, MARKER_YIELD_POTENTIAL, MARKER_MATURITY,
+         GENOMIC_BREEDING_VALUE, QC_CALL_RATE_PCT]
