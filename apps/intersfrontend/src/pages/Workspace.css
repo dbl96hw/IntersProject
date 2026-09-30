@@ -1,0 +1,23 @@
+.workspace {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* The main area itself never scrolls, so the corner leaves stay pinned to the visible corners. */
+.workspace__main {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--color-page-bg);
+}
+
+.workspace__scroll {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  overflow-y: auto;
+}

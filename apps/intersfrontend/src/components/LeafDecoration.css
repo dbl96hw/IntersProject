@@ -1,0 +1,36 @@
+.leaf-decoration {
+  position: absolute;
+  z-index: 0;
+  /* Scales with the smaller window side, so the leaves never crowd small windows. */
+  width: clamp(80px, 18vmin, 170px);
+  height: auto;
+  aspect-ratio: 1;
+  pointer-events: none;
+  opacity: 0.55;
+}
+
+.leaf-decoration--top-right {
+  top: 0;
+  right: 0;
+}
+
+.leaf-decoration--bottom-left {
+  bottom: 0;
+  left: 0;
+  transform: rotate(180deg);
+}
+
+.leaf-decoration__stem {
+  fill: none;
+  stroke: var(--color-decor-brown);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+.leaf-decoration__leaf--green {
+  fill: var(--color-decor-leaf);
+}
+
+.leaf-decoration__leaf--brown {
+  fill: var(--color-decor-brown);
+}
