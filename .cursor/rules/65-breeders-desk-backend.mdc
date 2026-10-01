@@ -1,0 +1,75 @@
+---
+description: Breeder's Desk (Syngenta UC4) product and architecture context for the Express backend.
+globs: apps/intersbackend/**
+alwaysApply: false
+---
+
+# Breeder's Desk — Backend Context
+
+## Product
+
+- Breeder's Desk, Syngenta UC4 (HatchWorks GenDD Hackathon 2026).
+- A breeder uploads files or asks questions in a chat. Each candidate line gets a green / amber / red status with a plain-language justification.
+- The breeder validates, edits and decides pass / no pass. Human in the loop is mandatory.
+- Never write copy (API messages, prompts, justifications) saying the system approved or rejected a line. The system suggests; the breeder decides.
+
+## Architecture (hybrid)
+
+- **Data engine** (`services/data-engine`, FastAPI at `DATA_ENGINE_URL`, default `http://localhost:8001`) is the only component that decides colours and produces numbers. It unifies the 7 Syngenta sources and applies `services/data-engine/config/rules.yaml`.
+- The backend never recomputes, reshapes or overrides the engine's colour, verdict or evidence.
+- **`apps/intersbackend`** (Express, JS ESM) is the gateway: chats, messages, files (Supabase Storage), history and breeder reviews (Supabase Postgres), and calls to the engine and to Claude.
+- Do not modify `services/data-engine`, `data/raw` or `data/synthetic`. Request engine changes from its owner.
+
+## Colours
+
+- The backend never changes a colour by itself.
+- A breeder's colour change is forwarded to the engine's `POST /overrides`. The engine stays the single place for colours and their audit log.
+
+## Claude: three jobs only
+
+1. Extract records from PDF, Word and images using the engine's original column names (tool `submit_records`).
+2. Write each candidate's justification citing only the engine's evidence (tool `submit_justifications`).
+3. Answer chat questions through the engine's tools (`GET /tools`, `POST /tools/:name`), max 6 tool rounds.
+
+- Claude never decides or changes a colour. Reject a justification that names a colour different from the engine's.
+- Never send `TRIAL_RECOMMENDATION` or `RECOMMENDATION_RATIONALE` to Claude.
+- Claude never invents values. Missing values stay missing (do not fill, guess or default them).
+
+## Evidence check
+
+- Every number in a justification must exist in that candidate's engine evidence. The check lives in `src/llm/evidence.check.js`.
+- If a number is not found, use the engine's reason instead and mark the justification as unverified.
+
+## Contract naming
+
+- Keep engine field names exactly as in `services/data-engine/docs/CONTRACTS.md`: snake_case, colours upper case `GREEN | AMBER | RED`, `candidate_id`, `engine_colour`, `verdict`, `reason`, `rule_version`.
+- Only ADD our own fields: `justification`, `justification_source`, `verified`, `confidence`, `decision`, `edited`. Never rename or convert engine fields (no camelCase mapping). JS variable names still follow the naming rule.
+
+## Modes
+
+- `ANALYSIS_MODE=mock`: no Claude, no Supabase, no engine. Return canned responses so the frontend works offline.
+- `ANALYSIS_MODE=live`: real engine, Claude and Supabase.
+
+## Approved dependencies
+
+- `@anthropic-ai/sdk`, `@supabase/supabase-js`, `multer`, `xlsx`, `mammoth`, `zod`. No others without asking.
+
+## Secrets and logging
+
+- `ANTHROPIC_API_KEY` and `SUPABASE_SERVICE_ROLE_KEY` live only on the server (`process.env`). Never send them to the frontend.
+- Never log secrets or uploaded file contents. Log route and reason only (see testability rule).
+
+## Constants
+
+- Keep the `DATA_ENGINE_URL` default, max tool rounds (6), colours and tool names in `src/constants/` (see shared constants rule).
+
+## Tests
+
+- Use `node:test` (`node --test`). No extra test framework.
+- In unit tests, mock the Anthropic SDK and the engine (`fetch`). Never hit real services.
+
+## Contracts
+
+- `docs/api-contract.md` is the source of truth for the frontend API.
+- `services/data-engine/docs/CONTRACTS.md` is the source of truth for the engine.
+- Error responses keep the shape from the API contract rule: `{ error: { code, message, field } }`.

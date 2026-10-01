@@ -1,0 +1,14 @@
+{
+  "sample": true,
+  "rule_version": "UC4_MATERIAL_V0",
+  "mode": "gate",
+  "parity": { "agree": 72, "total": 72, "accuracy": 1.0 },
+  "confusion_official_vs_engine": {
+    "PASS": { "PASS": 40, "HOLD": 0, "FAIL": 0 },
+    "HOLD": { "PASS": 0, "HOLD": 12, "FAIL": 0 },
+    "FAIL": { "PASS": 0, "HOLD": 0, "FAIL": 20 }
+  },
+  "not_explained": [],
+  "mismatch_root_causes": [],
+  "calibration": {}
+}

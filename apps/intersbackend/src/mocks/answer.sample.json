@@ -1,0 +1,5 @@
+{
+  "text": "Sample answer (mock mode, invented data): 1 line is red. SYN-MZ-90003 fails in 3 of 5 trials; disease risk is elevated (DISEASE_SCORE = 7.7, threshold <= 5). You decide; you can change any colour.",
+  "tool_calls": [{ "name": "query_candidates", "input": { "colour": "RED" } }],
+  "usage": { "input_tokens": 0, "output_tokens": 0, "cache_read_tokens": 0, "cost_usd": 0, "duration_ms": 0 }
+}

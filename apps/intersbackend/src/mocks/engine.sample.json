@@ -1,0 +1,106 @@
+{
+  "SYN-MZ-90001": {
+    "candidate_id": "SYN-MZ-90001", "colour": "GREEN", "engine_colour": "GREEN", "overridden": false, "override": null,
+    "verdict": "PASS", "reason": "passes 4 of 4 trials", "n_trials": 4, "n_fail": 0,
+    "ambiguous_trials": [], "atypical": false, "rule_version": "UC4_MATERIAL_V0",
+    "evidence": [
+      { "rule": "disease", "source": "trial_recommendations", "field": "DISEASE_SCORE", "record": "SYN-TR-9001",
+        "value": 3.1, "op": "<=", "threshold": 5.0, "passed": true,
+        "statement": "disease risk low (DISEASE_SCORE = 3.1 score (1-9), threshold <= 5)" }
+    ],
+    "trials": [
+      { "trial_id": "SYN-TR-9001", "location": "LOC-01", "year": 2024, "official_verdict": "PASS", "engine_verdict": "PASS",
+        "explained_by_data": true, "reason": "all rules pass", "ambiguous": false, "p_fail": 0.08 },
+      { "trial_id": "SYN-TR-9002", "location": "LOC-02", "year": 2024, "official_verdict": "PASS", "engine_verdict": "PASS",
+        "explained_by_data": true, "reason": "all rules pass", "ambiguous": false, "p_fail": 0.11 },
+      { "trial_id": "SYN-TR-9003", "location": "LOC-03", "year": 2024, "official_verdict": "PASS", "engine_verdict": "PASS",
+        "explained_by_data": true, "reason": "all rules pass", "ambiguous": false, "p_fail": 0.06 },
+      { "trial_id": "SYN-TR-9004", "location": "LOC-04", "year": 2024, "official_verdict": "PASS", "engine_verdict": "PASS",
+        "explained_by_data": true, "reason": "all rules pass", "ambiguous": false, "p_fail": 0.09 }
+    ],
+    "genomics": { "source": "genomics", "GENOMIC_BREEDING_VALUE": 106.4, "QC_CALL_RATE_PCT": 98.2 },
+    "lab": { "source": "lab_observations", "MOISTURE_PCT": 14.1 },
+    "atypicality": { "atypical": false, "distance": 0.42 },
+    "similar_candidates": [{ "candidate_id": "SYN-MZ-90002", "distance": 0.37, "colour": "AMBER" }],
+    "lineage": { "female_parent": null, "male_parent": null },
+    "document_evidence": [],
+    "data_gaps": []
+  },
+  "SYN-MZ-90002": {
+    "candidate_id": "SYN-MZ-90002", "colour": "AMBER", "engine_colour": "AMBER", "overridden": false, "override": null,
+    "verdict": "HOLD", "reason": "fails in 1 of 4 trials", "n_trials": 4, "n_fail": 1,
+    "ambiguous_trials": [], "atypical": false, "rule_version": "UC4_MATERIAL_V0",
+    "evidence": [
+      { "rule": "lodging", "source": "trial_recommendations", "field": "LODGING_PCT", "record": "SYN-TR-9006",
+        "value": 18.0, "op": "<=", "threshold": 15.0, "passed": false,
+        "statement": "lodging above limit (LODGING_PCT = 18 %, threshold <= 15)" }
+    ],
+    "trials": [
+      { "trial_id": "SYN-TR-9005", "location": "LOC-01", "year": 2024, "official_verdict": "PASS", "engine_verdict": "PASS",
+        "explained_by_data": true, "reason": "all rules pass", "ambiguous": false, "p_fail": 0.14 },
+      { "trial_id": "SYN-TR-9006", "location": "LOC-02", "year": 2024, "official_verdict": "FAIL", "engine_verdict": "FAIL",
+        "explained_by_data": true, "reason": "lodging above limit", "ambiguous": false, "p_fail": 0.71 },
+      { "trial_id": "SYN-TR-9007", "location": "LOC-03", "year": 2024, "official_verdict": "PASS", "engine_verdict": "PASS",
+        "explained_by_data": true, "reason": "all rules pass", "ambiguous": false, "p_fail": 0.2 },
+      { "trial_id": "SYN-TR-9008", "location": "LOC-04", "year": 2024, "official_verdict": "PASS", "engine_verdict": "PASS",
+        "explained_by_data": true, "reason": "all rules pass", "ambiguous": false, "p_fail": 0.18 }
+    ],
+    "genomics": { "source": "genomics", "GENOMIC_BREEDING_VALUE": 101.7, "QC_CALL_RATE_PCT": 97.5 },
+    "lab": { "source": "lab_observations", "MOISTURE_PCT": 15.3 },
+    "atypicality": { "atypical": false, "distance": 0.51 },
+    "similar_candidates": [{ "candidate_id": "SYN-MZ-90001", "distance": 0.37, "colour": "GREEN" }],
+    "lineage": { "female_parent": null, "male_parent": null },
+    "document_evidence": [],
+    "data_gaps": []
+  },
+  "SYN-MZ-90003": {
+    "candidate_id": "SYN-MZ-90003", "colour": "RED", "engine_colour": "RED", "overridden": false, "override": null,
+    "verdict": "FAIL", "reason": "fails in 3 of 5 trials", "n_trials": 5, "n_fail": 3,
+    "ambiguous_trials": ["SYN-TR-9025"], "atypical": false, "rule_version": "UC4_MATERIAL_V0",
+    "evidence": [
+      { "rule": "disease", "source": "trial_recommendations", "field": "DISEASE_SCORE", "record": "SYN-TR-9021",
+        "value": 7.7, "op": "<=", "threshold": 5.0, "passed": false,
+        "statement": "disease risk elevated (DISEASE_SCORE = 7.7 score (1-9), threshold <= 5)" }
+    ],
+    "trials": [
+      { "trial_id": "SYN-TR-9021", "location": "LOC-01", "year": 2024, "official_verdict": "FAIL", "engine_verdict": "FAIL",
+        "explained_by_data": true, "reason": "disease risk elevated", "ambiguous": false, "p_fail": 0.82 },
+      { "trial_id": "SYN-TR-9022", "location": "LOC-02", "year": 2024, "official_verdict": "FAIL", "engine_verdict": "FAIL",
+        "explained_by_data": true, "reason": "disease risk elevated", "ambiguous": false, "p_fail": 0.77 },
+      { "trial_id": "SYN-TR-9023", "location": "LOC-03", "year": 2024, "official_verdict": "PASS", "engine_verdict": "PASS",
+        "explained_by_data": true, "reason": "all rules pass", "ambiguous": false, "p_fail": 0.31 },
+      { "trial_id": "SYN-TR-9024", "location": "LOC-04", "year": 2024, "official_verdict": "PASS", "engine_verdict": "PASS",
+        "explained_by_data": true, "reason": "all rules pass", "ambiguous": false, "p_fail": 0.28 },
+      { "trial_id": "SYN-TR-9025", "location": "LOC-05", "year": 2024, "official_verdict": "FAIL", "engine_verdict": "HOLD",
+        "explained_by_data": false, "reason": "official FAIL not explained by the recorded data", "ambiguous": true, "p_fail": 0.52 }
+    ],
+    "genomics": { "source": "genomics", "GENOMIC_BREEDING_VALUE": 96.2, "QC_CALL_RATE_PCT": 96.8 },
+    "lab": { "source": "lab_observations", "MOISTURE_PCT": 16.0 },
+    "atypicality": { "atypical": false, "distance": 0.63 },
+    "similar_candidates": [{ "candidate_id": "SYN-MZ-90002", "distance": 0.58, "colour": "AMBER" }],
+    "lineage": { "female_parent": null, "male_parent": null },
+    "document_evidence": [],
+    "data_gaps": []
+  },
+  "SYN-MZ-90004": {
+    "candidate_id": "SYN-MZ-90004", "colour": "AMBER", "engine_colour": "AMBER", "overridden": false, "override": null,
+    "verdict": "HOLD", "reason": "insufficient trials: 1 of 2 required", "n_trials": 1, "n_fail": 0,
+    "ambiguous_trials": [], "atypical": false, "rule_version": "UC4_MATERIAL_V0",
+    "evidence": [
+      { "rule": "min_trials", "source": "trial_recommendations", "field": "TRIAL_COUNT", "record": "SYN-MZ-90004",
+        "value": 1, "op": ">=", "threshold": 2, "passed": false,
+        "statement": "too few trials (TRIAL_COUNT = 1, threshold >= 2)" }
+    ],
+    "trials": [
+      { "trial_id": "SYN-TR-9031", "location": "LOC-02", "year": 2024, "official_verdict": "PASS", "engine_verdict": "PASS",
+        "explained_by_data": true, "reason": "all rules pass", "ambiguous": false, "p_fail": 0.22 }
+    ],
+    "genomics": { "source": "genomics", "GENOMIC_BREEDING_VALUE": 103.0, "QC_CALL_RATE_PCT": null },
+    "lab": null,
+    "atypicality": { "atypical": false, "distance": 0.47 },
+    "similar_candidates": [{ "candidate_id": "SYN-MZ-90001", "distance": 0.44, "colour": "GREEN" }],
+    "lineage": { "female_parent": null, "male_parent": null },
+    "document_evidence": [],
+    "data_gaps": ["lab: no lab_observations record for this line -> QC call rate cannot be checked"]
+  }
+}
