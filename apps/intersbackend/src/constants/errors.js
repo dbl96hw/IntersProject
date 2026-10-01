@@ -1,0 +1,19 @@
+/**
+ * Error codes returned in { error: { code, message, field } }.
+ */
+
+export const ERROR_CODES = {
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
+  FILE_TOO_LARGE: 'FILE_TOO_LARGE',
+  NOT_FOUND: 'NOT_FOUND',
+  DATA_ENGINE_UNAVAILABLE: 'DATA_ENGINE_UNAVAILABLE',
+  INTERNAL_ERROR: 'INTERNAL_ERROR',
+};
+
+export const HTTP_STATUS = {
+  BAD_REQUEST: 400,
+  NOT_FOUND: 404,
+  PAYLOAD_TOO_LARGE: 413,
+  INTERNAL_ERROR: 500,
+  BAD_GATEWAY: 502,
+};
