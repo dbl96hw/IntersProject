@@ -9,3 +9,4 @@ export * from './db.js';
 export * from './defaults.js';
 export * from './errors.js';
 export * from './modes.js';
+export * from './uploads.js';

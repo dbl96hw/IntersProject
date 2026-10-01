@@ -16,6 +16,14 @@ export async function getChat(id) {
   return unwrap(await chatsTable().select('*').eq('id', id).maybeSingle());
 }
 
+export async function updateChatTitle(id, title) {
+  return unwrap(await chatsTable()
+    .update({ title, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .maybeSingle());
+}
+
 export async function touchChat(id) {
   unwrap(await chatsTable().update({ updated_at: new Date().toISOString() }).eq('id', id));
 }

@@ -84,6 +84,12 @@ export function createMemoryDb() {
     async getChat(id) {
       return copy(chats.get(id));
     },
+    async updateChatTitle(id, title) {
+      const chat = chats.get(id);
+      if (!chat) return null;
+      Object.assign(chat, { title, updated_at: now() });
+      return copy(chat);
+    },
     async touchChat(id) {
       const chat = chats.get(id);
       if (chat) chat.updated_at = now();

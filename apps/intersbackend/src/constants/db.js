@@ -23,7 +23,10 @@ export const DECISIONS = { PENDING: 'pending', PASS: 'pass', NO_PASS: 'no_pass' 
 export const JUSTIFICATION_SOURCES = { CLAUDE: 'claude', ENGINE: 'engine' };
 export const CONFIDENCE = { HIGH: 'high', MEDIUM: 'medium', LOW: 'low' };
 
+export const WARNING_CODES = { SAMPLE_DATA: 'SAMPLE_DATA' };
+
 export const DEFAULT_CHAT_TITLE = 'New chat';
+export const MAX_CHAT_TITLE_LENGTH = 80;
 export const DEFAULT_PAGE_SIZE = 20;
 export const MAX_PAGE_SIZE = 100;
 export const MAX_SEARCH_LENGTH = 100;

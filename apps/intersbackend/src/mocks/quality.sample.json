@@ -1,0 +1,15 @@
+{
+  "sample": true,
+  "summary": { "issues": 1, "corrections": 0 },
+  "issues": [
+    {
+      "source": "lab_observations",
+      "field": "QC_CALL_RATE_PCT",
+      "kind": "missing",
+      "count": 1,
+      "message": "SYN-MZ-90004 has no lab_observations record"
+    }
+  ],
+  "corrections": [],
+  "what_if_recomputed_aggregates": {}
+}

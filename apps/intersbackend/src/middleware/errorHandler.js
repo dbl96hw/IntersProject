@@ -1,6 +1,7 @@
 import multer from 'multer';
 import { ZodError } from 'zod';
 import { ERROR_CODES, HTTP_STATUS } from '../constants/index.js';
+import { HttpError } from '../errors.js';
 import { DataEngineError } from '../services/dataEngineClient.js';
 
 const NETWORK_ERROR_NAMES = new Set(['TimeoutError', 'AbortError']);
@@ -10,6 +11,9 @@ function isNetworkError(err) {
 }
 
 function toErrorResponse(err) {
+  if (err instanceof HttpError) {
+    return { status: err.status, code: err.code, message: err.message, field: err.field };
+  }
   if (err instanceof DataEngineError) {
     return { status: err.status, code: err.code, message: err.message, field: err.field };
   }

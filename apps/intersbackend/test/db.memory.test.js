@@ -51,6 +51,17 @@ test('createChat stores a chat and listChats returns newest first', async () => 
   assert.deepEqual((await db.chats.listChats()).map((chat) => chat.id), [second.id, first.id]);
 });
 
+test('updateChatTitle renames the chat and bumps updated_at', async () => {
+  const db = createMemoryDb();
+  const chat = await db.chats.createChat();
+
+  const renamed = await db.chats.updateChatTitle(chat.id, 'trials-2024.csv');
+
+  assert.equal(renamed.title, 'trials-2024.csv');
+  assert.ok(renamed.updated_at > chat.updated_at);
+  assert.equal(await db.chats.updateChatTitle('missing', 'x'), null);
+});
+
 test('saveMessage stores the message in order and bumps the chat', async () => {
   const db = createMemoryDb();
   const chat = await db.chats.createChat({ title: 'Chat' });

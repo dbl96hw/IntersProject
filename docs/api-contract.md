@@ -40,8 +40,10 @@ Every error has the same shape. `field` is `null` when the error is not about on
 | Status | `code` | When |
 |---|---|---|
 | 400 | `VALIDATION_ERROR` | Bad input (missing field, wrong value, invalid JSON, too many files) |
-| 404 | `NOT_FOUND` | Unknown chat, message, candidate or route |
+| 400 | `UNSUPPORTED_FILE_TYPE` | A file is not `.csv .xlsx .xls .pdf .docx .png .jpg .jpeg .webp` (`field` is `"files"`) |
+| 404 | `NOT_FOUND` | Unknown or malformed (non-uuid) chat, message or candidate id, or unknown route |
 | 413 | `FILE_TOO_LARGE` | A file is over `MAX_FILE_MB` (10 MB by default), or the JSON body is over 25 MB |
+| 501 | `NOT_IMPLEMENTED` | The endpoint validates its input but is not built yet (`PATCH /api/candidates/:id`, `POST /api/candidates/:id/decision`) |
 | 502 | `DATA_ENGINE_UNAVAILABLE` | The data engine did not answer (down or timed out) |
 | 500 | `INTERNAL_ERROR` | Anything else (no stack trace in the response) |
 
@@ -284,7 +286,7 @@ Errors: 404 `NOT_FOUND`.
 | Field | Required | Notes |
 |---|---|---|
 | `text` | Yes if no files are sent | The question or a note about the files |
-| `files[]` | No | Up to `MAX_FILES` (10) files of `MAX_FILE_MB` (10 MB) each |
+| `files` | No | Repeat the field once per file (`formData.append('files', file)`). Up to `MAX_FILES` (10) files of `MAX_FILE_MB` (10 MB) each. Allowed: `.csv .xlsx .xls .pdf .docx .png .jpg .jpeg .webp`. UTF-8 file names (e.g. `análisis.csv`) are kept as sent. |
 
 With files, the backend runs an **analysis**: tables are sent to the engine, documents are extracted by Claude and sent to the engine, then each candidate is explained. Without files, it runs an **answer**: Claude answers through the engine's tools (max 6 rounds).
 
@@ -341,7 +343,9 @@ With files, the backend runs an **analysis**: tables are sent to the engine, doc
 }
 ```
 
-Errors (no message is saved): 400 `VALIDATION_ERROR` (no text and no files, too many files, unsupported file type), 404 `NOT_FOUND` (chat), 413 `FILE_TOO_LARGE`.
+If the chat still has the default title and files were sent, its title becomes the file names (joined by `, `, max 80 characters).
+
+Errors (no message is saved): 400 `VALIDATION_ERROR` (no text and no files, too many files), 400 `UNSUPPORTED_FILE_TYPE`, 404 `NOT_FOUND` (chat), 413 `FILE_TOO_LARGE`.
 
 #### `POST /api/chats/:id/messages/:messageId/retry`
 
@@ -532,3 +536,8 @@ Errors for all three: 502 `DATA_ENGINE_UNAVAILABLE`.
 ## Mock mode
 
 With `ANALYSIS_MODE=mock` (the default), every endpoint returns the same shapes with canned data. No Claude, Supabase or engine is called. `usage` is all zeros, `versions.model` is `"mock"`, and `GET /health` reports `engine: "skipped"`.
+
+- A message with files returns 4 invented candidates (`SYN-MZ-90001` to `SYN-MZ-90004`: green, amber, red, and amber with a data gap). The analysis has `"sample": true` and a `SAMPLE_DATA` warning, so the UI can label it as sample data. Each `ingestion` item names the real uploaded file with `source: "SAMPLE"` and `rows: null`.
+- A question-only message returns a canned answer.
+- `GET /api/candidates/:id` returns a canned `engine_detail` for those 4 ids.
+- Chats, messages and candidates are kept in memory and are lost when the server restarts.

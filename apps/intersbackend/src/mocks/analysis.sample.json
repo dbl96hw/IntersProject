@@ -1,0 +1,119 @@
+{
+  "sample": true,
+  "summary": "4 candidates analysed (sample data): 1 green, 2 amber, 1 red.",
+  "candidates": [
+    {
+      "candidate_id": "SYN-MZ-90001",
+      "colour": "GREEN",
+      "engine_colour": "GREEN",
+      "overridden": false,
+      "override": null,
+      "verdict": "PASS",
+      "reason": "passes 4 of 4 trials",
+      "n_trials": 4,
+      "n_fail": 0,
+      "ambiguous_trials": [],
+      "atypical": false,
+      "rule_version": "UC4_MATERIAL_V0",
+      "evidence": [
+        {
+          "rule": "disease", "source": "trial_recommendations", "field": "DISEASE_SCORE", "record": "SYN-TR-9001",
+          "value": 3.1, "op": "<=", "threshold": 5.0, "passed": true,
+          "statement": "disease risk low (DISEASE_SCORE = 3.1 score (1-9), threshold <= 5)"
+        }
+      ],
+      "data_gaps": [],
+      "justification": "Passes 4 of 4 trials; disease score 3.1 is within the threshold of 5.",
+      "justification_source": "claude",
+      "verified": true,
+      "confidence": "high"
+    },
+    {
+      "candidate_id": "SYN-MZ-90002",
+      "colour": "AMBER",
+      "engine_colour": "AMBER",
+      "overridden": false,
+      "override": null,
+      "verdict": "HOLD",
+      "reason": "fails in 1 of 4 trials",
+      "n_trials": 4,
+      "n_fail": 1,
+      "ambiguous_trials": [],
+      "atypical": false,
+      "rule_version": "UC4_MATERIAL_V0",
+      "evidence": [
+        {
+          "rule": "lodging", "source": "trial_recommendations", "field": "LODGING_PCT", "record": "SYN-TR-9006",
+          "value": 18.0, "op": "<=", "threshold": 15.0, "passed": false,
+          "statement": "lodging above limit (LODGING_PCT = 18 %, threshold <= 15)"
+        }
+      ],
+      "data_gaps": [],
+      "justification": "Fails in 1 of 4 trials; lodging of 18% is above the threshold of 15%.",
+      "justification_source": "claude",
+      "verified": true,
+      "confidence": "medium"
+    },
+    {
+      "candidate_id": "SYN-MZ-90003",
+      "colour": "RED",
+      "engine_colour": "RED",
+      "overridden": false,
+      "override": null,
+      "verdict": "FAIL",
+      "reason": "fails in 3 of 5 trials",
+      "n_trials": 5,
+      "n_fail": 3,
+      "ambiguous_trials": ["SYN-TR-9025"],
+      "atypical": false,
+      "rule_version": "UC4_MATERIAL_V0",
+      "evidence": [
+        {
+          "rule": "disease", "source": "trial_recommendations", "field": "DISEASE_SCORE", "record": "SYN-TR-9021",
+          "value": 7.7, "op": "<=", "threshold": 5.0, "passed": false,
+          "statement": "disease risk elevated (DISEASE_SCORE = 7.7 score (1-9), threshold <= 5)"
+        }
+      ],
+      "data_gaps": [],
+      "justification": "Fails in 3 of 5 trials; disease score 7.7 is above the threshold of 5.",
+      "justification_source": "claude",
+      "verified": true,
+      "confidence": "high"
+    },
+    {
+      "candidate_id": "SYN-MZ-90004",
+      "colour": "AMBER",
+      "engine_colour": "AMBER",
+      "overridden": false,
+      "override": null,
+      "verdict": "HOLD",
+      "reason": "insufficient trials: 1 of 2 required",
+      "n_trials": 1,
+      "n_fail": 0,
+      "ambiguous_trials": [],
+      "atypical": false,
+      "rule_version": "UC4_MATERIAL_V0",
+      "evidence": [
+        {
+          "rule": "min_trials", "source": "trial_recommendations", "field": "TRIAL_COUNT", "record": "SYN-MZ-90004",
+          "value": 1, "op": ">=", "threshold": 2, "passed": false,
+          "statement": "too few trials (TRIAL_COUNT = 1, threshold >= 2)"
+        }
+      ],
+      "data_gaps": ["lab: no lab_observations record for this line -> QC call rate cannot be checked"],
+      "justification": "Only 1 trial is available and 2 are required; there is no lab record, so the QC call rate cannot be checked.",
+      "justification_source": "claude",
+      "verified": true,
+      "confidence": "low"
+    }
+  ],
+  "warnings": [
+    {
+      "code": "SAMPLE_DATA",
+      "message": "Mock mode: these candidates are invented sample data, not results from your files.",
+      "file": null
+    }
+  ],
+  "usage": { "input_tokens": 0, "output_tokens": 0, "cache_read_tokens": 0, "cost_usd": 0, "duration_ms": 0 },
+  "versions": { "explanation_prompt": "explain_v1", "extraction_prompt": "extract_v1", "rule_version": "UC4_MATERIAL_V0", "model": "mock" }
+}

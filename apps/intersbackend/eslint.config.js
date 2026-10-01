@@ -15,6 +15,8 @@ export default [
         Buffer: 'readonly',
         setTimeout: 'readonly',
         structuredClone: 'readonly',
+        FormData: 'readonly',
+        Blob: 'readonly',
       },
     },
   },

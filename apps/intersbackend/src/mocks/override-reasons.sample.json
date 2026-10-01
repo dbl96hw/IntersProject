@@ -1,0 +1,9 @@
+{
+  "FIELD_OBSERVATION": "Breeder saw something in the field the data does not capture",
+  "DATA_ERROR": "The underlying data is wrong or incomplete",
+  "MARKET_FIT": "Commercial / market considerations",
+  "PEDIGREE_KNOWLEDGE": "Knowledge of the line's pedigree or crosses",
+  "ENVIRONMENT_CONTEXT": "Unusual season, location or disease pressure",
+  "STRATEGIC_KEEP": "Kept for a breeding-programme reason (e.g. donor of a trait)",
+  "OTHER": "Other (explain in the comment)"
+}
