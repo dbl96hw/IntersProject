@@ -8,7 +8,8 @@
     "dev": "node --watch --env-file-if-exists=.env src/index.js",
     "lint": "eslint .",
     "test": "node --test",
-    "db:smoke": "node --env-file-if-exists=.env scripts/db-smoke.js"
+    "db:smoke": "node --env-file-if-exists=.env scripts/db-smoke.js",
+    "ingest:smoke": "node --env-file-if-exists=.env scripts/ingest-smoke.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.130.0",

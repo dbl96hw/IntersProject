@@ -55,3 +55,12 @@ test('mock mode applies defaults and returns a frozen config', () => {
   assert.equal(config.supabaseBucket, 'uploads');
   assert.ok(Object.isFrozen(config));
 });
+
+test('DATA_ENGINE_INGEST_TIMEOUT_MS defaults to 120000 and must be at least 60000', () => {
+  assert.equal(parseEnv({}).dataEngineIngestTimeoutMs, 120000);
+  assert.equal(parseEnv({ DATA_ENGINE_INGEST_TIMEOUT_MS: '90000' }).dataEngineIngestTimeoutMs, 90000);
+
+  const err = captureError(() => parseEnv({ DATA_ENGINE_INGEST_TIMEOUT_MS: '30000' }));
+
+  assert.match(err.message, /DATA_ENGINE_INGEST_TIMEOUT_MS/);
+});

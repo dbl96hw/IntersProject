@@ -28,6 +28,7 @@ export function createApp({ config = defaultConfig, dataEngineClient, db = defau
   const engineClient = dataEngineClient ?? createDataEngineClient({
     baseUrl: config.dataEngineUrl,
     timeoutMs: config.dataEngineTimeoutMs,
+    ingestTimeoutMs: config.dataEngineIngestTimeoutMs,
   });
 
   const analysisService = createAnalysisService({ config });
