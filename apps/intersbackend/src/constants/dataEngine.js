@@ -4,6 +4,9 @@
 export const DEFAULT_DATA_ENGINE_URL = 'http://localhost:8001';
 export const DEFAULT_DATA_ENGINE_TIMEOUT_MS = 30000;
 export const HEALTH_CHECK_TIMEOUT_MS = 2000;
+// Ingesting records or a document makes the engine rebuild its model, which takes far longer than a read.
+export const DEFAULT_DATA_ENGINE_INGEST_TIMEOUT_MS = 120000;
+export const MIN_DATA_ENGINE_INGEST_TIMEOUT_MS = 60000;
 
 export const DATA_ENGINE_PATHS = {
   HEALTH: '/health',

@@ -3,6 +3,7 @@ import {
   ANALYSIS_MODES,
   DEFAULT_BATCH_SIZE,
   DEFAULT_CORS_ORIGIN,
+  DEFAULT_DATA_ENGINE_INGEST_TIMEOUT_MS,
   DEFAULT_DATA_ENGINE_TIMEOUT_MS,
   DEFAULT_DATA_ENGINE_URL,
   DEFAULT_MAX_FILES,
@@ -10,6 +11,7 @@ import {
   DEFAULT_MAX_PARALLEL_BATCHES,
   DEFAULT_PORT,
   DEFAULT_SUPABASE_BUCKET,
+  MIN_DATA_ENGINE_INGEST_TIMEOUT_MS,
 } from '../constants/index.js';
 
 const LIVE_REQUIRED_VARIABLES = [
@@ -28,6 +30,9 @@ const envSchema = z.object({
   ANALYSIS_MODE: z.enum(Object.values(ANALYSIS_MODES)).default(ANALYSIS_MODES.MOCK),
   DATA_ENGINE_URL: z.url().optional(),
   DATA_ENGINE_TIMEOUT_MS: positiveInt(DEFAULT_DATA_ENGINE_TIMEOUT_MS),
+  DATA_ENGINE_INGEST_TIMEOUT_MS: z.coerce.number().int()
+    .min(MIN_DATA_ENGINE_INGEST_TIMEOUT_MS, `must be at least ${MIN_DATA_ENGINE_INGEST_TIMEOUT_MS} ms`)
+    .default(DEFAULT_DATA_ENGINE_INGEST_TIMEOUT_MS),
   ANTHROPIC_API_KEY: z.string().optional(),
   ANTHROPIC_MODEL: z.string().optional(),
   SUPABASE_URL: z.url().optional(),
@@ -70,6 +75,7 @@ export function parseEnv(source) {
     analysisMode: env.ANALYSIS_MODE,
     dataEngineUrl: env.DATA_ENGINE_URL ?? DEFAULT_DATA_ENGINE_URL,
     dataEngineTimeoutMs: env.DATA_ENGINE_TIMEOUT_MS,
+    dataEngineIngestTimeoutMs: env.DATA_ENGINE_INGEST_TIMEOUT_MS,
     anthropicApiKey: env.ANTHROPIC_API_KEY,
     anthropicModel: env.ANTHROPIC_MODEL,
     supabaseUrl: env.SUPABASE_URL,

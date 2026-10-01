@@ -26,6 +26,7 @@ function unavailableError() {
 export function createDataEngineClient({
   baseUrl = config.dataEngineUrl,
   timeoutMs = config.dataEngineTimeoutMs,
+  ingestTimeoutMs = config.dataEngineIngestTimeoutMs,
 } = {}) {
   async function request(path, { method = 'GET', body, query, timeoutMs: requestTimeoutMs = timeoutMs } = {}) {
     const url = new URL(path, baseUrl);
@@ -71,7 +72,12 @@ export function createDataEngineClient({
     uploadDocument: (filename, buffer) => request(DATA_ENGINE_PATHS.DOCUMENTS_BASE64, {
       method: 'POST',
       body: { filename, content_base64: Buffer.from(buffer).toString('base64') },
+      timeoutMs: ingestTimeoutMs,
     }),
-    ingestRecords: (label, records) => request(DATA_ENGINE_PATHS.INGEST_RECORDS, { method: 'POST', body: { label, records } }),
+    ingestRecords: (label, records) => request(DATA_ENGINE_PATHS.INGEST_RECORDS, {
+      method: 'POST',
+      body: { label, records },
+      timeoutMs: ingestTimeoutMs,
+    }),
   };
 }
