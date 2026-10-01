@@ -1,0 +1,40 @@
+/*
+ * Single source of truth for the app palette.
+ * Other stylesheets must use these variables instead of raw color values.
+ */
+:root {
+  /* Sidebar */
+  --color-sidebar-main: #303816;
+  --color-sidebar-secondary: #4D5724;
+
+  /* Approved (green) */
+  --color-approved-accent: #1FA63A;
+  --color-approved-bg: #E2F1D5;
+  --color-approved-text: #12651F;
+
+  /* Conditional (amber) */
+  --color-conditional-accent: #F5B719;
+  --color-conditional-bg: #FFF0BF;
+  --color-conditional-text: #70520A;
+
+  /* Not approved (red) */
+  --color-rejected-accent: #DF2528;
+  --color-rejected-bg: #FAD2C9;
+  --color-rejected-text: #8D1717;
+
+  /* Surfaces and text */
+  --color-page-bg: #FAF5E9;
+  --color-card-bg: #FFF9EF;
+  --color-divider: #E5DCC9;
+  --color-text-main: #252C13;
+  --color-text-secondary: #555642;
+
+  /* Logo and decorations */
+  --color-logo-terracotta: #D87535;
+  --color-decor-brown: #824B29;
+  --color-decor-leaf: #687437;
+
+  /* Built from --color-text-main (#252C13) so shadows and overlays stay on-palette */
+  --color-shadow: rgba(37, 44, 19, 0.12);
+  --color-overlay: rgba(37, 44, 19, 0.35);
+}

@@ -1,11 +1,67 @@
-export const LANDING_TITLE = "inter's project: Git push and pray";
+export const APP_NAME = 'Git Push & Pray';
 
-export const LANDING_SUBTITLE =
-  'Shared starting page for the team. Add new sections from here.';
+export const SIDEBAR_TEXT = {
+  NEW_DASHBOARD: 'New dashboard',
+  RECENT_DASHBOARDS: 'Recent dashboards',
+  NO_DASHBOARDS: 'No dashboards yet',
+};
 
-export const BACKEND_STATUS = {
-  CHECKING: 'checking backend...',
-  UP: 'backend is up',
-  UNHEALTHY: 'backend responded, but unhealthy',
-  UNREACHABLE: 'could not reach backend — is intersbackend running?',
+export const WELCOME_TEXT = {
+  GREETING: 'How can I help you today?',
+  DROPZONE_TITLE: 'Upload your files to create your dashboard',
+  DROPZONE_HINT: 'Drag and drop them here, or browse from your computer',
+  DROPZONE_ACTIVE: 'Drop your files to add them',
+  BROWSE_FILES: 'Browse files',
+  REMOVE_FILE: 'Remove file',
+  SUBMIT: 'Create dashboard',
+  ANALYZING: 'Analyzing your files...',
+  FILES_SELECTED: 'Selected files',
+};
+
+export const DASHBOARD_TEXT = {
+  TITLE: 'Candidate triage dashboard',
+  SUBTITLE: 'Result of the analysis of the files you uploaded',
+  FILES_ANALYZED: 'Files analyzed',
+  CANDIDATES_EVALUATED: 'candidates evaluated',
+  CANDIDATE_ONE: 'candidate',
+  CANDIDATE_OTHER: 'candidates',
+  EMPTY_SECTION: 'No candidates in this group',
+  OVERRIDDEN_BADGE: 'Overridden',
+  ROW_HINT: 'Click a row to expand it. Right-click a row to edit it.',
+};
+
+export const FILTER_TEXT = {
+  SEARCH_LABEL: 'Search candidates',
+  SEARCH_PLACEHOLDER: 'Search by ID, crop, or justification',
+  STATUS_GROUP_LABEL: 'Filter by status',
+  STATUS_ALL: 'All',
+  NO_RESULTS: 'No candidates match your filters.',
+};
+
+export const EDIT_TEXT = {
+  MENU_EDIT_ROW: 'Edit row',
+  MODAL_TITLE: 'Edit candidate',
+  CROP: 'Crop',
+  MEAN_YIELD: 'Mean yield (t/ha)',
+  JUSTIFICATION: 'Justification',
+  STATUS: 'Status',
+  OVERRIDE_REASON: 'Override reason',
+  OVERRIDE_REASON_PLACEHOLDER: 'Select a reason',
+  COMMENT: 'Comment (optional)',
+  REASON_REQUIRED: 'Choose an override reason to change the status.',
+  YIELD_INVALID: 'Enter a yield of zero or more.',
+  CROP_REQUIRED: 'Enter a crop.',
+  JUSTIFICATION_REQUIRED: 'Enter a justification.',
+  CANCEL: 'Cancel',
+  SAVE: 'Save changes',
+};
+
+export const CHAT_TEXT = {
+  TITLE: 'Chat with Git Push & Pray',
+  INPUT_PLACEHOLDER: 'Ask about a candidate...',
+  SEND: 'Send message',
+  MINIMIZE: 'Minimize chat',
+  CLOSE: 'Close chat',
+  OPEN: 'Open chat',
+  TYPING: 'Typing...',
 };

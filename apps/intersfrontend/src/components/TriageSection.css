@@ -1,0 +1,137 @@
+.triage-section {
+  --section-accent: var(--color-text-secondary);
+  --section-bg: var(--color-card-bg);
+  --section-text: var(--color-text-main);
+
+  overflow: hidden;
+  border: 1px solid var(--section-accent);
+  border-radius: 16px;
+  background: var(--section-bg);
+}
+
+.triage-section--green {
+  --section-accent: var(--color-approved-accent);
+  --section-bg: var(--color-approved-bg);
+  --section-text: var(--color-approved-text);
+}
+
+.triage-section--amber {
+  --section-accent: var(--color-conditional-accent);
+  --section-bg: var(--color-conditional-bg);
+  --section-text: var(--color-conditional-text);
+}
+
+.triage-section--red {
+  --section-accent: var(--color-rejected-accent);
+  --section-bg: var(--color-rejected-bg);
+  --section-text: var(--color-rejected-text);
+}
+
+.triage-section__header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.9rem 1.1rem;
+  border-bottom: 1px solid var(--section-accent);
+}
+
+.triage-section__dot {
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 50%;
+  background: var(--section-accent);
+}
+
+.triage-section__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--section-text);
+}
+
+.triage-section__description {
+  flex: 1;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+
+.triage-section__count {
+  padding: 0.2rem 0.7rem;
+  border-radius: 999px;
+  background: var(--color-card-bg);
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--section-text);
+}
+
+.triage-section__empty {
+  margin: 0;
+  padding: 1rem 1.1rem;
+  font-size: 0.9rem;
+  color: var(--section-text);
+}
+
+/* Fixed layout plus one shared <colgroup> config keeps all three tables the same width per column. */
+.triage-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 0.9rem;
+}
+
+.triage-table th,
+.triage-table td {
+  padding: 0.7rem 1rem;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: top;
+}
+
+.triage-table th {
+  border-bottom: 1px solid var(--section-accent);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--section-text);
+}
+
+.triage-table__row {
+  border-bottom: 1px solid var(--section-accent);
+  background: var(--section-bg);
+  color: var(--color-text-main);
+  cursor: pointer;
+}
+
+.triage-table__row:last-child {
+  border-bottom: none;
+}
+
+.triage-table__row:hover {
+  outline: 1px solid var(--section-accent);
+  outline-offset: -1px;
+}
+
+.triage-table__row:focus-visible {
+  outline: 2px solid var(--section-accent);
+  outline-offset: -2px;
+}
+
+.triage-table__row--expanded td {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.triage-table__badge {
+  display: inline-block;
+  margin-right: 0.5rem;
+  padding: 0.05rem 0.5rem;
+  border-radius: 999px;
+  background: var(--color-sidebar-secondary);
+  cursor: help;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--color-card-bg);
+}

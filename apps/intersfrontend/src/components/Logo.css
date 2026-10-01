@@ -1,0 +1,43 @@
+.logo {
+  display: block;
+  flex-shrink: 0;
+}
+
+.logo__seed {
+  fill: var(--color-logo-terracotta);
+}
+
+.logo__seed-shade {
+  fill: var(--color-decor-brown);
+  opacity: 0.35;
+}
+
+.logo__seam {
+  fill: none;
+  stroke: var(--color-decor-brown);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.logo__highlight {
+  fill: none;
+  stroke: var(--color-card-bg);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  opacity: 0.55;
+}
+
+.logo__stem {
+  fill: none;
+  stroke: var(--color-decor-leaf);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+
+.logo__leaf--right {
+  fill: var(--color-approved-accent);
+}
+
+.logo__leaf--left {
+  fill: var(--color-decor-leaf);
+}
