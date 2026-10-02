@@ -43,7 +43,6 @@ Every error has the same shape. `field` is `null` when the error is not about on
 | 400 | `UNSUPPORTED_FILE_TYPE` | A file is not `.csv .xlsx .xls .pdf .docx .png .jpg .jpeg .webp` (`field` is `"files"`) |
 | 404 | `NOT_FOUND` | Unknown or malformed (non-uuid) chat, message or candidate id, or unknown route |
 | 413 | `FILE_TOO_LARGE` | A file is over `MAX_FILE_MB` (10 MB by default), or the JSON body is over 25 MB |
-| 501 | `NOT_IMPLEMENTED` | The endpoint validates its input but is not built yet (`PATCH /api/candidates/:id`, `POST /api/candidates/:id/decision`) |
 | 502 | `DATA_ENGINE_UNAVAILABLE` | The data engine did not answer (down or timed out) |
 | 500 | `INTERNAL_ERROR` | Anything else (no stack trace in the response) |
 
@@ -539,5 +538,6 @@ With `ANALYSIS_MODE=mock` (the default), every endpoint returns the same shapes 
 
 - A message with files returns 4 invented candidates (`SYN-MZ-90001` to `SYN-MZ-90004`: green, amber, red, and amber with a data gap). The analysis has `"sample": true` and a `SAMPLE_DATA` warning, so the UI can label it as sample data. Each `ingestion` item names the real uploaded file with `source: "SAMPLE"` and `rows: null`.
 - A question-only message returns a canned answer.
-- `GET /api/candidates/:id` returns a canned `engine_detail` for those 4 ids.
-- Chats, messages and candidates are kept in memory and are lost when the server restarts.
+- `GET /api/candidates/:id` returns a canned `engine_detail` for those 4 ids. A colour change (`PATCH /api/candidates/:id`) is stored on an in-memory stand-in of the engine, so a later read keeps the new `colour` and leaves `engine_colour` unchanged.
+- A pass / no pass decision is stored in memory and does not change the colour.
+- Chats, messages, candidates, colour overrides and decisions are kept in memory and are lost when the server restarts.

@@ -18,7 +18,3 @@ export function notFoundError(what) {
 export function validationError(message, field = null) {
   return new HttpError(HTTP_STATUS.BAD_REQUEST, ERROR_CODES.VALIDATION_ERROR, message, field);
 }
-
-export function notImplementedError(message) {
-  return new HttpError(HTTP_STATUS.NOT_IMPLEMENTED, ERROR_CODES.NOT_IMPLEMENTED, message);
-}

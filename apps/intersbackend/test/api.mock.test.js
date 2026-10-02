@@ -200,35 +200,86 @@ test('GET /api/candidates/:id returns the engine detail from the sample', async 
   assert.ok(body.engine_detail.evidence.length > 0);
 });
 
-test('PATCH /api/candidates/:id validates, then answers 501 NOT_IMPLEMENTED', async () => {
+test('PATCH with a new colour keeps the engine colour and survives the next read', async () => {
+  const { assistant } = await seedAnalysis();
+  const green = assistant.analysis.candidates.find((candidate) => candidate.candidate_id === 'SYN-MZ-90001');
+  const path = `/api/candidates/${green.id}`;
+
+  const { status, body } = await request(path, { method: 'PATCH', json: VALID_UPDATE });
+  const detail = await request(path);
+
+  assert.equal(status, 200);
+  assert.equal(body.candidate.colour, 'AMBER');
+  assert.equal(body.candidate.engine_colour, 'GREEN');
+  assert.equal(body.candidate.overridden, true);
+  assert.equal(body.override.new_colour, 'AMBER');
+  assert.equal(body.override.engine_colour, 'GREEN');
+  assert.equal(body.override.level, 'candidate');
+  assert.equal(body.override.record, 'SYN-MZ-90001');
+  assert.equal(body.override.reason_code, 'FIELD_OBSERVATION');
+  assert.equal(body.override.user, 'breeder@syngenta');
+  assert.equal(body.override.comment, 'good vigour in plot 12');
+  assert.equal(detail.status, 200);
+  assert.equal(detail.body.candidate.colour, 'AMBER');
+  assert.equal(detail.body.engine_detail.colour, 'AMBER');
+  assert.equal(detail.body.engine_detail.engine_colour, 'GREEN');
+  assert.equal(detail.body.engine_detail.overridden, true);
+});
+
+test('PATCH with only a justification does not call for an override', async () => {
+  const { assistant } = await seedAnalysis();
+  const amber = assistant.analysis.candidates.find((candidate) => candidate.candidate_id === 'SYN-MZ-90002');
+  const justification = 'Breeder note: vigour looked better in plot 12';
+
+  const { status, body } = await request(`/api/candidates/${amber.id}`, {
+    method: 'PATCH',
+    json: { justification, reason_code: 'FIELD_OBSERVATION', comment: '', user: 'breeder@syngenta' },
+  });
+
+  assert.equal(status, 200);
+  assert.equal(body.override, null);
+  assert.equal(body.candidate.edited, true);
+  assert.equal(body.candidate.justification, justification);
+  assert.equal(body.candidate.colour, 'AMBER');
+  assert.equal(body.candidate.engine_colour, 'AMBER');
+  assert.equal(body.candidate.overridden, false);
+});
+
+test('PATCH rejects a missing change, a bad colour, an unknown reason and OTHER without a comment', async () => {
   const { assistant } = await seedAnalysis();
   const path = `/api/candidates/${assistant.analysis.candidates[0].id}`;
 
-  const valid = await request(path, { method: 'PATCH', json: VALID_UPDATE });
   const noChange = await request(path, { method: 'PATCH', json: { ...VALID_UPDATE, new_colour: undefined } });
   const badColour = await request(path, { method: 'PATCH', json: { ...VALID_UPDATE, new_colour: 'rojo' } });
+  const unknownReason = await request(path, { method: 'PATCH', json: { ...VALID_UPDATE, reason_code: 'NOT_A_REASON' } });
   const otherWithoutComment = await request(path, { method: 'PATCH', json: { ...VALID_UPDATE, reason_code: 'OTHER', comment: '' } });
 
-  assert.equal(valid.status, 501);
-  assert.equal(valid.body.error.code, 'NOT_IMPLEMENTED');
   assert.equal(noChange.status, 400);
   assert.equal(noChange.body.error.field, 'new_colour');
   assert.equal(badColour.status, 400);
   assert.equal(badColour.body.error.field, 'new_colour');
+  assert.equal(unknownReason.status, 400);
+  assert.equal(unknownReason.body.error.code, 'VALIDATION_ERROR');
+  assert.equal(unknownReason.body.error.field, 'reason_code');
   assert.equal(otherWithoutComment.status, 400);
   assert.equal(otherWithoutComment.body.error.field, 'comment');
 });
 
-test('POST /api/candidates/:id/decision validates, then answers 501 NOT_IMPLEMENTED', async () => {
-  const { assistant } = await seedAnalysis();
-  const path = `/api/candidates/${assistant.analysis.candidates[0].id}/decision`;
+test('POST /api/candidates/:id/decision stores pass or no pass without changing the colour', async () => {
+  const { chat, assistant } = await seedAnalysis();
+  const red = assistant.analysis.candidates.find((candidate) => candidate.candidate_id === 'SYN-MZ-90003');
+  const path = `/api/candidates/${red.id}/decision`;
 
   const valid = await request(path, { method: 'POST', json: VALID_DECISION });
+  const listed = await request(`/api/candidates?decision=no_pass&chat_id=${chat.id}`);
   const badDecision = await request(path, { method: 'POST', json: { ...VALID_DECISION, decision: 'maybe' } });
   const noUser = await request(path, { method: 'POST', json: { decision: 'pass' } });
 
-  assert.equal(valid.status, 501);
-  assert.equal(valid.body.error.code, 'NOT_IMPLEMENTED');
+  assert.equal(valid.status, 200);
+  assert.equal(valid.body.candidate.decision, 'no_pass');
+  assert.equal(valid.body.candidate.colour, 'RED');
+  assert.equal(valid.body.candidate.engine_colour, 'RED');
+  assert.ok(listed.body.candidates.some((candidate) => candidate.id === red.id));
   assert.equal(badDecision.status, 400);
   assert.equal(badDecision.body.error.field, 'decision');
   assert.equal(noUser.status, 400);

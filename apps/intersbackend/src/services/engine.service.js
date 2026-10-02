@@ -1,13 +1,10 @@
-// Trust-panel passthrough: the engine's body unchanged in live mode, sample JSON in mock mode.
+// Trust-panel passthrough. The client is the real engine in live mode and the
+// in-memory sample client in mock mode; this service does not branch on mode.
 
-import { ANALYSIS_MODES } from '../constants/index.js';
-import { loadSample } from '../mocks/index.js';
-
-export function createEngineService({ config, dataEngineClient }) {
-  const isLive = config.analysisMode === ANALYSIS_MODES.LIVE;
+export function createEngineService({ dataEngineClient }) {
   return {
-    overrideReasons: async () => (isLive ? dataEngineClient.listOverrideReasons() : loadSample('override-reasons')),
-    baseline: async () => (isLive ? dataEngineClient.baseline() : loadSample('baseline')),
-    quality: async () => (isLive ? dataEngineClient.quality() : loadSample('quality')),
+    overrideReasons: () => dataEngineClient.listOverrideReasons(),
+    baseline: () => dataEngineClient.baseline(),
+    quality: () => dataEngineClient.quality(),
   };
 }

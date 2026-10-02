@@ -11,6 +11,7 @@ import { createChatsRouter } from './routes/chats.routes.js';
 import { createEngineRouter } from './routes/engine.routes.js';
 import { createHealthRouter } from './routes/health.js';
 import { createRootRouter } from './routes/root.js';
+import { createMockDataEngineClient } from './mocks/mockDataEngineClient.js';
 import { createAnalysisService } from './services/analysis.service.js';
 import { createCandidatesService } from './services/candidates.service.js';
 import { createChatsService } from './services/chats.service.js';
@@ -24,11 +25,17 @@ function createDefaultFileStorage(config) {
     : createMemoryFileStorage();
 }
 
+function createDefaultEngineClient(config) {
+  return config.analysisMode === ANALYSIS_MODES.LIVE
+    ? createDataEngineClient({
+      baseUrl: config.dataEngineUrl,
+      timeoutMs: config.dataEngineTimeoutMs,
+    })
+    : createMockDataEngineClient();
+}
+
 export function createApp({ config = defaultConfig, dataEngineClient, db = defaultDb, fileStorage } = {}) {
-  const engineClient = dataEngineClient ?? createDataEngineClient({
-    baseUrl: config.dataEngineUrl,
-    timeoutMs: config.dataEngineTimeoutMs,
-  });
+  const engineClient = dataEngineClient ?? createDefaultEngineClient(config);
 
   const analysisService = createAnalysisService({ config });
   const chatsService = createChatsService({
@@ -36,8 +43,8 @@ export function createApp({ config = defaultConfig, dataEngineClient, db = defau
     fileStorage: fileStorage ?? createDefaultFileStorage(config),
     analysisService,
   });
-  const candidatesService = createCandidatesService({ config, db, dataEngineClient: engineClient });
-  const engineService = createEngineService({ config, dataEngineClient: engineClient });
+  const candidatesService = createCandidatesService({ db, dataEngineClient: engineClient });
+  const engineService = createEngineService({ dataEngineClient: engineClient });
   const upload = createUpload({ maxFileMb: config.maxFileMb, maxFiles: config.maxFiles });
 
   const app = express();
