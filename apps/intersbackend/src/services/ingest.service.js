@@ -297,7 +297,18 @@ export function createIngestService({ dataEngine }) {
         if (row.candidate_id) candidateIds.add(String(row.candidate_id));
       }
     }
-    return [...candidateIds].sort();
+    return verifyCandidates(candidateIds);
+  }
+
+  // Only ids the engine lists as candidates reach the analysis: a commercial check (SYN-MZ-CHK01 in the
+  // V2 drop) or a typo in a MATERIAL_ID column would otherwise come back as "not found" warnings.
+  // If the check itself fails (not an outage), the ids are kept as they were.
+  async function verifyCandidates(candidateIds) {
+    if (candidateIds.size === 0) return [];
+    const rows = await queryIds(candidateIds, (list) => `SELECT DISTINCT candidate_id FROM materials WHERE candidate_id IN (${list}) OR MATERIAL_GUID IN (${list})`, 'verify candidates');
+    if (rows === null) return [...candidateIds].sort();
+    const known = new Set(rows.map((row) => String(row.candidate_id)));
+    return [...candidateIds].filter((id) => known.has(id)).sort();
   }
 
   async function ingestNow(files) {

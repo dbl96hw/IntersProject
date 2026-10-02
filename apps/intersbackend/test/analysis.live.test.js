@@ -290,7 +290,12 @@ function httpEngine(rows, { ingestError } = {}) {
       if (ingestError) throw ingestError;
       return { accepted: true, detection: { source: 'germplasm' }, rows: 1 };
     },
-    async sql() {
+    async sql(query) {
+      // The ingest service checks touched ids against the engine's candidates.
+      if (query.includes('FROM materials WHERE candidate_id IN')) {
+        const ids = [...query.matchAll(/'([^']+)'/g)].map((match) => match[1]);
+        return { columns: ['candidate_id'], rows: ids.filter((id) => byId.has(id)).map((id) => ({ candidate_id: id })) };
+      }
       return { columns: ['TRIAL_GUID', 'MATERIAL_GUID'], rows: [] };
     },
     async uploadDocument(filename) {

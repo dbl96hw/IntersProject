@@ -461,6 +461,14 @@ Step 8 is merged. 9A is done. See `context/backend-development.md` and `agents/b
 - [ ] In-memory engine state lost on restarts (persist `DATA_ENGINE_STATE_DIR` in the deployment).
 - [ ] Docker deploy with Tesseract / Poppler for OCR.
 
+### Integrated V2 data (2026-10-02)
+
+- [x] The engine loads the 8 root CSVs of Syngenta's V2 zip (`data/synthetic/uc4_v2`); the `[DEPRECATED]` folders are ignored and the 29-Sep drop stays only as a test fixture.
+- [x] Keys: `MATERIAL_GUID` (pedigree master, 152), `TRAIT_GUID` (dictionary, 6 traits), `TRIAL_ENTRY_GUID` / `FIELD_ENTITY_ID` (bridge, 72 trials, 1,728 entries). Referential integrity 100 %.
+- [x] Official candidate RAG reproduced 150/150 (32 G / 53 A / 65 R); every summary number recomputed from the plots and the lab within rounding.
+- [x] Findings in `services/data-engine/docs/FINDINGS.md` section 0: no V2 trial table (no location / year), `BREEDER_DECISION` empty for 150, 2 lines genotyped only, 2 commercial checks, operations 11 delayed / 5 missed / 140 off-system.
+- [x] Express keeps only real candidates as touched ids (the commercial checks are not candidates).
+
 ### Pending before demo (from the 2026-10-02 handoff)
 
 1. Chat: [x] English answers; [x] bold rendering; [x] stale `chatReplies` references; [ ] manual 2-minute check with "How many lines are there per colour?".

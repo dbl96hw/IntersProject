@@ -25,7 +25,7 @@ The frontend reads the API's address from `VITE_API_URL` (see `apps/intersfronte
 
 Start the three parts in this order, each in its own terminal.
 
-1. **Data engine** (port 8001). It loads `data/synthetic/uc4` on start-up; the first start also compiles the native back-ends, so start it a minute early.
+1. **Data engine** (port 8001). It loads the integrated V2 drop (`data/synthetic/uc4_v2`, the 8 root CSVs of Syngenta's 2-Oct zip) on start-up; the first start also compiles the native back-ends, so start it a minute early.
    ```bash
    cd services/data-engine
    python -m pip install -r requirements.txt
@@ -45,10 +45,10 @@ Start the three parts in this order, each in its own terminal.
 
 Demo notes:
 
-- **Create dashboard** uploads the files. With 150 candidates the analysis takes about a minute and a half; Claude explains the first 30 (red first) and the rest show the engine's reason.
+- **Create dashboard** uploads the files. `candidate_recommendations_synthetic.csv` (or any of the 8 V2 files) gives the 150 candidates: 65 Concerns, 53 Needs review, 32 Strong candidate, the same as Syngenta's `SYSTEM_RAG`. With 150 candidates the analysis takes about a minute and a half; Claude explains the first 30 (red first) and the rest show the engine's reason.
 - Upload each file once, and use one chat for overrides: an engine override is global, but it is saved on the chat where it was made.
 - Off-topic documents are refused by the engine's relevance gate and listed as "not used" with the reason. A document that names candidates or trials (for example field notes) adds those candidates to the dashboard.
-- Do not upload `data/synthetic/uc4/archive/*` or `README.md`. The archive is an older drop with other GUIDs; the engine no longer breaks on it, but it adds unrelated rows.
+- Do not upload the deprecated drops (`data/synthetic/uc4/`, the `[DEPRECATED]` folders of the zip) or `README.md`. They have other GUIDs; the engine no longer breaks on them, but they add unrelated rows.
 - Engine overrides live in `services/data-engine/.state/overrides.jsonl` (or `DATA_ENGINE_STATE_DIR`). To start a demo clean, stop the engine, move that file out of the folder and start it again.
 
 ## Tests
