@@ -1,18 +1,29 @@
 import { useRef, useState } from 'react';
 import Logo from './Logo';
-import { ACCEPTED_FILE_TYPES, APP_NAME, FILE_UPLOAD_AVAILABLE, WELCOME_TEXT } from '../constants';
+import { validateUploadFiles } from '../validateUploadFiles';
+import { ACCEPTED_FILE_TYPES, APP_NAME, UPLOAD_TEXT, WELCOME_TEXT } from '../constants';
 import './WelcomeView.css';
 
-function WelcomeView({ isAnalyzing = false }) {
+function WelcomeView({
+  isAnalyzing = false,
+  errorMessage = '',
+  rejectedFiles = [],
+  onSubmitFiles,
+  onFilesChange,
+}) {
   const fileInputRef = useRef(null);
-  const [fileNames, setFileNames] = useState([]);
+  const [files, setFiles] = useState([]);
+  const [pickErrors, setPickErrors] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
 
-  const hasFiles = fileNames.length > 0;
+  const hasFiles = files.length > 0;
 
-  function addFiles(files) {
-    const pickedNames = Array.from(files, (file) => file.name);
-    setFileNames((currentNames) => [...new Set([...currentNames, ...pickedNames])]);
+  function addFiles(pickedFiles) {
+    const { accepted, rejected } = validateUploadFiles(files, Array.from(pickedFiles));
+    setFiles([...files, ...accepted]);
+    // Each pick replaces the previous list, so old messages never linger.
+    setPickErrors(rejected);
+    onFilesChange?.();
   }
 
   function handleBrowseClick() {
@@ -48,15 +59,17 @@ function WelcomeView({ isAnalyzing = false }) {
   }
 
   function handleRemoveFile(fileName) {
-    setFileNames((currentNames) => currentNames.filter((name) => name !== fileName));
+    setFiles((currentFiles) => currentFiles.filter((file) => file.name !== fileName));
+    setPickErrors([]);
+    onFilesChange?.();
   }
 
   function handleSubmit(event) {
     event.preventDefault();
-    // File upload is a later story. This screen must not start a mock analysis.
-    if (!FILE_UPLOAD_AVAILABLE || !hasFiles || isAnalyzing) {
+    if (!hasFiles || isAnalyzing) {
       return;
     }
+    onSubmitFiles?.(files);
   }
 
   return (
@@ -109,17 +122,17 @@ function WelcomeView({ isAnalyzing = false }) {
 
         {hasFiles && (
           <ul className="welcome__files" aria-label={WELCOME_TEXT.FILES_SELECTED} data-testid="selected-files">
-            {fileNames.map((fileName) => (
-              <li key={fileName} className="welcome__file-chip">
-                <span className="welcome__file-name" title={fileName}>
-                  {fileName}
+            {files.map((file) => (
+              <li key={file.name} className="welcome__file-chip">
+                <span className="welcome__file-name" title={file.name}>
+                  {file.name}
                 </span>
                 <button
                   type="button"
                   className="welcome__file-remove"
-                  onClick={() => handleRemoveFile(fileName)}
+                  onClick={() => handleRemoveFile(file.name)}
                   disabled={isAnalyzing}
-                  aria-label={`${WELCOME_TEXT.REMOVE_FILE}: ${fileName}`}
+                  aria-label={`${WELCOME_TEXT.REMOVE_FILE}: ${file.name}`}
                 >
                   &times;
                 </button>
@@ -128,9 +141,33 @@ function WelcomeView({ isAnalyzing = false }) {
           </ul>
         )}
 
-        <p className="welcome__coming-soon" role="status" data-testid="upload-coming-soon">
-          {WELCOME_TEXT.UPLOAD_COMING_SOON}
+        <p className="welcome__formats-hint" data-testid="upload-formats-hint">
+          {UPLOAD_TEXT.FORMATS_HINT}
         </p>
+
+        {pickErrors.length > 0 && (
+          <ul className="welcome__problems" role="alert" data-testid="upload-file-errors">
+            {pickErrors.map((problem) => (
+              <li key={problem.message}>{problem.message}</li>
+            ))}
+          </ul>
+        )}
+
+        {errorMessage && (
+          <p className="welcome__problems" role="alert" data-testid="upload-error">
+            {errorMessage}
+          </p>
+        )}
+
+        {rejectedFiles.length > 0 && (
+          <ul className="welcome__problems" data-testid="upload-rejected-files">
+            {rejectedFiles.map((problem) => (
+              <li key={`${problem.name}-${problem.message}`}>
+                <strong>{problem.name}</strong>: {problem.message}
+              </li>
+            ))}
+          </ul>
+        )}
 
         {isAnalyzing ? (
           <p className="welcome__analyzing" role="status" data-testid="analysis-loading">
@@ -140,7 +177,7 @@ function WelcomeView({ isAnalyzing = false }) {
           <button
             type="submit"
             className="welcome__submit-button"
-            disabled={!FILE_UPLOAD_AVAILABLE || !hasFiles}
+            disabled={!hasFiles}
             data-testid="upload-submit"
           >
             {WELCOME_TEXT.SUBMIT}

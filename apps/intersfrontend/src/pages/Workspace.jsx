@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
-import { getChat, listChatCandidates, listChats } from '../api/client';
+import {
+  ApiError,
+  createChat,
+  getChat,
+  listChatCandidates,
+  listChats,
+  postChatFiles,
+} from '../api/client';
 import { replaceCandidate } from '../replaceCandidate';
 import BackendStatus from '../components/BackendStatus';
 import ChatWidget from '../components/ChatWidget';
@@ -7,8 +14,10 @@ import DashboardView from '../components/DashboardView';
 import LeafDecoration from '../components/LeafDecoration';
 import Sidebar from '../components/Sidebar';
 import WelcomeView from '../components/WelcomeView';
-import { BREEDER_USER, DASHBOARD_TEXT, HEALTH_TEXT } from '../constants';
+import { API_ERROR_CODES, BREEDER_USER, DASHBOARD_TEXT, HEALTH_TEXT, UPLOAD_TEXT } from '../constants';
 import './Workspace.css';
+
+const IDLE_UPLOAD_STATE = { isAnalyzing: false, errorMessage: '', rejectedFiles: [] };
 
 function latestAnalysisWarnings(messages) {
   if (!Array.isArray(messages)) {
@@ -23,11 +32,19 @@ function latestAnalysisWarnings(messages) {
   return [];
 }
 
+function uploadErrorMessage(error) {
+  if (!(error instanceof ApiError)) {
+    return HEALTH_TEXT.UNEXPECTED;
+  }
+  return error.code === API_ERROR_CODES.NETWORK ? UPLOAD_TEXT.NETWORK : error.message;
+}
+
 function Workspace() {
   const [chatsState, setChatsState] = useState({ state: 'loading', chats: [], message: '' });
   const [activeChatId, setActiveChatId] = useState(null);
   const [dashboardState, setDashboardState] = useState({ state: 'idle' });
   const [breederUser, setBreederUser] = useState(BREEDER_USER);
+  const [uploadState, setUploadState] = useState(IDLE_UPLOAD_STATE);
 
   const activeChat = chatsState.chats.find((chat) => chat.id === activeChatId) ?? null;
 
@@ -83,6 +100,56 @@ function Workspace() {
 
   function handleNewDashboard() {
     setActiveChatId(null);
+    setUploadState(IDLE_UPLOAD_STATE);
+  }
+
+  function handleFilesChange() {
+    setUploadState((current) => (current.isAnalyzing ? current : IDLE_UPLOAD_STATE));
+  }
+
+  async function handleSubmitFiles(files) {
+    setUploadState({ ...IDLE_UPLOAD_STATE, isAnalyzing: true });
+
+    try {
+      const chat = await createChat();
+      const body = await postChatFiles(chat.id, files);
+
+      // The backend renames the chat after the files. If the refresh fails, the new chat is still
+      // added locally so the dashboard can open.
+      const refreshedChats = await listChats().catch(() => null);
+      setChatsState((current) => ({
+        state: 'ready',
+        chats: refreshedChats ?? [chat, ...current.chats],
+        message: '',
+      }));
+
+      const assistantMessage = body.assistant_message;
+      if (assistantMessage?.status === 'error') {
+        const reason = assistantMessage.error?.message ?? HEALTH_TEXT.UNEXPECTED;
+        setUploadState({ ...IDLE_UPLOAD_STATE, errorMessage: `${reason} ${UPLOAD_TEXT.TRY_AGAIN}` });
+        return;
+      }
+
+      const analysis = assistantMessage?.analysis;
+      if (assistantMessage?.status !== 'ok' || !Array.isArray(analysis?.candidates)) {
+        setUploadState({ ...IDLE_UPLOAD_STATE, errorMessage: HEALTH_TEXT.UNEXPECTED });
+        return;
+      }
+
+      if (analysis.candidates.length === 0) {
+        const rejectedFiles = (analysis.ingestion ?? [])
+          .filter((item) => item.accepted === false)
+          .map((item) => ({ name: item.file ?? '', message: item.message ?? '' }));
+        setUploadState({ ...IDLE_UPLOAD_STATE, errorMessage: UPLOAD_TEXT.NO_CANDIDATES, rejectedFiles });
+        return;
+      }
+
+      handleSelectChat(chat.id);
+    } catch (error) {
+      setUploadState({ ...IDLE_UPLOAD_STATE, errorMessage: uploadErrorMessage(error) });
+    } finally {
+      setUploadState((current) => ({ ...current, isAnalyzing: false }));
+    }
   }
 
   function handleCandidateUpdated(updated) {
@@ -123,7 +190,15 @@ function Workspace() {
         <LeafDecoration position="bottom-left" />
 
         <div className="workspace__scroll" data-testid="workspace-scroll">
-          {!activeChat && <WelcomeView />}
+          {!activeChat && (
+            <WelcomeView
+              isAnalyzing={uploadState.isAnalyzing}
+              errorMessage={uploadState.errorMessage}
+              rejectedFiles={uploadState.rejectedFiles}
+              onSubmitFiles={handleSubmitFiles}
+              onFilesChange={handleFilesChange}
+            />
+          )}
 
           {dashboardLoading && (
             <p className="workspace__status" role="status" data-testid="dashboard-loading">

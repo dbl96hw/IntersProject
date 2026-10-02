@@ -5,6 +5,7 @@ import {
   CANDIDATES_PAGE_SIZE,
   HEALTH_PATH,
   MAX_CANDIDATE_PAGES,
+  UPLOAD_FIELD,
 } from '../constants/api';
 import { DASHBOARD_TEXT, HEALTH_TEXT, SIDEBAR_TEXT } from '../constants/messages';
 
@@ -88,6 +89,28 @@ export function getChat(chatId) {
 // Text only. The backend loads history from saved messages.
 export function postChatMessage(chatId, text) {
   return sendJson(`${API_PATHS.CHATS}/${chatId}/messages`, 'POST', { text });
+}
+
+export async function createChat() {
+  const body = await sendJson(API_PATHS.CHATS, 'POST', {});
+  if (!body.chat?.id) {
+    throw new ApiError({
+      code: API_ERROR_CODES.UNEXPECTED,
+      message: HEALTH_TEXT.UNEXPECTED,
+      field: null,
+    });
+  }
+  return body.chat;
+}
+
+// No Content-Type header: the browser adds the multipart boundary itself.
+export function postChatFiles(chatId, files) {
+  const formData = new FormData();
+  files.forEach((file) => formData.append(UPLOAD_FIELD, file));
+  return requestJson(`${API_PATHS.CHATS}/${chatId}/messages`, {
+    method: 'POST',
+    body: formData,
+  });
 }
 
 function sendJson(path, method, body) {
