@@ -86,7 +86,7 @@ Variable names (values only in `.env`, never committed): `PORT`, `CORS_ORIGIN`, 
   `EXPLAIN_MAX_SYNC` new explanations, RED then AMBER then GREEN). The summary counts engine colours.
   `usage` and `versions` are saved. Unchanged `evidence_hash` reuses a verified Claude justification.
 - A live message with **no files** still returns `LLM_UNAVAILABLE`. That is Step 9B.
-- `PATCH /api/candidates/:id` and `POST /api/candidates/:id/decision` validate input then **501** (ticket 3).
+- Live `PATCH /api/candidates/:id` forwards a colour change to engine `POST /overrides` and stores a `candidate_reviews` row. Live `POST /api/candidates/:id/decision` stores pass / no pass and does not change colour. Mock mode still validates, then returns **501**.
 
 ### What the frontend expects
 

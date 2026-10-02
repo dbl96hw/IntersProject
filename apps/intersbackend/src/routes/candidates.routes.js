@@ -8,7 +8,6 @@ import {
   MAX_PAGE_SIZE,
   MAX_SEARCH_LENGTH,
 } from '../constants/index.js';
-import { notImplementedError } from '../errors.js';
 import { asyncHandler, requireUuid } from './helpers.js';
 
 const OTHER_REASON_CODE = 'OTHER';
@@ -61,17 +60,18 @@ export function createCandidatesRouter({ candidatesService }) {
   }));
 
   // Ticket 3: forward colour changes to the engine's POST /overrides and append a candidate review.
-  router.patch(API_PATHS.CANDIDATE, asyncHandler(async (req) => {
-    requireUuid(req.params.id, 'Candidate');
-    updateSchema.parse(req.body ?? {});
-    throw notImplementedError('Editing a candidate is not implemented yet (ticket 3)');
+  // Mock mode still answers 501 after validation. The service enforces that.
+  router.patch(API_PATHS.CANDIDATE, asyncHandler(async (req, res) => {
+    const id = requireUuid(req.params.id, 'Candidate');
+    const body = updateSchema.parse(req.body ?? {});
+    res.json(await candidatesService.updateCandidate(id, body));
   }));
 
   // Ticket 3: store the breeder's pass / no pass as a candidate review.
-  router.post(API_PATHS.CANDIDATE_DECISION, asyncHandler(async (req) => {
-    requireUuid(req.params.id, 'Candidate');
-    decisionSchema.parse(req.body ?? {});
-    throw notImplementedError('Recording a decision is not implemented yet (ticket 3)');
+  router.post(API_PATHS.CANDIDATE_DECISION, asyncHandler(async (req, res) => {
+    const id = requireUuid(req.params.id, 'Candidate');
+    const body = decisionSchema.parse(req.body ?? {});
+    res.json(await candidatesService.recordDecision(id, body));
   }));
 
   return router;
