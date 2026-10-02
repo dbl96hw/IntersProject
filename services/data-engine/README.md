@@ -2,7 +2,7 @@
 
 Backend service for **Breeder's Desk** (Syngenta × HatchWorks AI Hackathon 2026, Use Case 4: R&D Data Source Unification).
 
-It reads the R&D sources (trial, trial summary, operations, lab, observations, germplasm, genomics) **and any document** (native or scanned PDF, image, DOCX, PPTX, XLSX, HTML, text). It unifies them into one canonical model and triages every candidate line **red / amber / green with cited evidence**. The breeder can override any colour, and every override is logged.
+It reads the R&D sources (candidate recommendations, trial-germplasm bridge, trait dictionary, field operations, lab, observations, pedigree, genomics; also the older trial-level drop) **and any document** (native or scanned PDF, image, DOCX, PPTX, XLSX, HTML, text). It unifies them into one canonical model and triages every candidate line **red / amber / green with cited evidence**. The breeder can override any colour, and every override is logged.
 
 **Design rule:** the deterministic engine decides the colour. Statistics and the LLM only qualify or explain it, and the breeder has the last word. The LLM never computes a number; it only cites values this service returns.
 
@@ -26,9 +26,10 @@ cd services/data-engine
 python -m venv .venv && source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt && pip install -e .
 
-# Data: the UC4 mocks live in <repo>/data/synthetic/uc4 (default); override with DATA_ENGINE_DATA_DIR
-python -m data_engine.evaluate --export-date 2026-09-29 --plot docs/roc.png --out report.json
-pytest -q                                                  # 54 tests
+# Data: the integrated V2 drop lives in <repo>/data/synthetic/uc4_v2 (default); override with DATA_ENGINE_DATA_DIR.
+# The 29-Sep drop (data/synthetic/uc4) is deprecated and kept as the fixture of the trial-level tests.
+python -m data_engine.evaluate --out report.json
+pytest -q                                                  # 100+ tests
 uvicorn data_engine.api:app --port 8001                    # REST API, interactive docs at /docs
 python -m data_engine.mcp_server                           # MCP server (stdio) for Claude Desktop / Cursor
 ```
@@ -37,7 +38,21 @@ Optional native back-ends: `python -m data_engine.accel.build` compiles the mult
 
 OCR needs the Tesseract binary. On Windows use the UB Mannheim installer and add Spanish; on Linux, `apt install tesseract-ocr tesseract-ocr-spa`.
 
-## Results on the mock data (`python -m data_engine.evaluate`, recomputed on every run)
+## Results on the integrated V2 drop (2026-10-02, default data)
+
+The official suggestion moved to the candidate level (`candidate_recommendations.SYSTEM_RAG`). The engine reads the 8 root CSVs of the drop (`data/synthetic/uc4_v2/`) and ignores the `[DEPRECATED]` folders.
+
+| What | Result |
+|---|---|
+| Source detection | 8/8 files routed by header signature (4 new sources: candidate recommendations, trial-germplasm bridge, trait dictionary, field operations) |
+| Keys | MATERIAL_GUID (pedigree is the master: 150 candidates + 2 commercial checks), TRAIT_GUID (6 traits), TRIAL_ENTRY_GUID / FIELD_ENTITY_ID (bridge: 72 trials, 1,728 entries). Referential integrity 100 % on 10 reference paths |
+| **Parity with the official RAG** | **150/150** (32 green · 53 amber · 65 red), two-tier rule reconstructed from the official reasons; 146/150 reason texts identical, the other 4 differ only in a rounded last digit |
+| **Official summary recomputed from the plots** | N trials, usable trials, yield vs checks (ratio of means over usable trials), disease, moisture, germination, fumonisin: **all 150 candidates within rounding** |
+| Findings | no V2 trial table (TRIAL_GUIDs match none of the deprecated table: no location/year); BREEDER_DECISION empty for 150; 2 lines genotyped only; 2 commercial checks; operations: 11 delayed, 5 missed (irrigation, which excludes the trial for 30 candidates), 140 recorded on paper / PDF / WhatsApp |
+
+Details: [`docs/FINDINGS.md`](docs/FINDINGS.md), section 0.
+
+## Results on the 29-Sep drop (deprecated; `python -m data_engine.evaluate` with `DATA_ENGINE_DATA_DIR=<repo>/data/synthetic/uc4`)
 
 | What | Result |
 |---|---|
@@ -98,7 +113,7 @@ The mathematical justification is in [`docs/DESIGN.md`](docs/DESIGN.md), the JSO
 - The trial rule is a **reconstruction** (`SYNTH_V1_RECON`) pending SME confirmation. The weights are fitted, and the margin to the cut is thin (4e-5), so one trial sits on the boundary. The candidate rule (`UC4_MATERIAL_V0`) is **our proposal**.
 - In the mocks every candidate was tested in a single location-year, so stability across environments cannot be assessed. The engine reports this instead of hiding it.
 - The mock features are nearly uncorrelated, so spectral compression is modest (16 → 13 components at 95 %). Real, correlated trait data compresses more. The canonical tables are always kept, so compression never loses data.
-- Some parts could not be run in the build environment and fall back automatically: the Julia back-ends (Julia download blocked there), Apache Tika (needs its server jar) and textract. The Python and C++ paths are tested (80+ tests).
+- Some parts could not be run in the build environment and fall back automatically: the Julia back-ends (Julia download blocked there), Apache Tika (needs its server jar) and textract. The Python and C++ paths are tested (90+ tests).
 - The relevance gate is trained on 48 short examples. It is meant to stop obviously off-topic files and to send borderline ones to a person, not to judge scientific relevance. Add examples to `config/relevance.yaml` when it errs.
 - The document text extractor reads values that are written next to known field names (English/Spanish). It does not interpret prose, and document facts never change a colour.
 

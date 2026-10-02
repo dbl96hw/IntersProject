@@ -241,3 +241,130 @@ class CandidateRules:
         return Decision("candidate", candidate_id, verdict, COLOUR[verdict], reason, evidence, self.version,
                         computed_verdict=verdict, extras={"n_trials": n, "n_fail": n_fail, "n_pass": n_pass,
                                 "trials": [d.record for d in trial_decisions]})
+
+
+# ---------------------------------------------------------------------------------------------
+# Integrated V2 drop: the official suggestion (SYSTEM_RAG) is made per candidate.
+VERDICT_OF = {"GREEN": "PASS", "AMBER": "HOLD", "RED": "FAIL"}
+
+
+def _num(value: Any) -> float | None:
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return None
+    return None if v != v else v          # NaN -> None
+
+
+class CandidateRAGRules:
+    """Two-tier candidate rule reconstructed from the V2 official reasons (config: candidate_rag).
+
+    RED   if a must-pass fails (yield vs checks < 95 %, disease > 6.0, fumonisin > 4.0);
+    AMBER if any check fails (yield < 103 %, disease > 4.0, moisture > 23.0, germination < 90 %,
+          susceptible marker, fewer than 2 usable trials) or there is no field data;
+    GREEN otherwise. The reason is written in the official wording, from the evidence only.
+    """
+
+    def __init__(self, cfg: dict | None = None):
+        cfg = cfg or load_yaml("rules")
+        self.cfg = cfg["candidate_rag"]
+        self.version = self.cfg["version"]
+        self.source = self.cfg["source"]
+
+    # -- formatting in the official style ("90.2% (below minimum 95%)", "6.6 (above limit 6.0)")
+    @staticmethod
+    def _value(c: dict, v: float) -> str:
+        return f"{v:.1f}%" if c.get("percent") else f"{v:.1f}"
+
+    @staticmethod
+    def _limit(c: dict, v: float) -> str:
+        return f"{v:g}%" if c.get("percent") else f"{v:.1f}"
+
+    def _statement(self, c: dict, v: float, word: str, threshold: float) -> str:
+        side = "below" if c["better"] == "higher" else "above"
+        return f"{c['label']} {self._value(c, v)} ({side} {word} {self._limit(c, threshold)})"
+
+    def _fails(self, c: dict, v: float, threshold: float) -> bool:
+        return v < threshold if c["better"] == "higher" else v > threshold
+
+    def evaluate(self, row: dict, record: str, official: str | None = None, official_reason: str | None = None,
+                 n_trials: int | None = None, n_fail: int | None = None,
+                 trials: list[str] | None = None, precise: dict | None = None) -> Decision:
+        """`precise`: unrounded values recomputed from the raw tables, used only to WRITE the numbers
+        (the export rounds to 2 decimals; the official text was written from the unrounded values, so
+        6.6467 reads "6.6" while the stored 6.65 would read "6.7"). Decisions use the exported values."""
+        precise = precise or {}
+        crit = self.cfg["criteria"]
+        evidence: list[Evidence] = []
+        red_parts: dict[str, str] = {}
+        amber_parts: dict[str, str] = {}
+        used = _num(row.get("N_TRIALS_USED"))
+        no_field_data = used is not None and used == 0
+
+        for name, c in crit.items():
+            v = _num(row.get(c["field"]))
+            if v is None:
+                continue
+            shown = _num(precise.get(c["field"]))
+            shown = v if shown is None else shown
+            op = ">=" if c["better"] == "higher" else "<="
+            if "must_pass" in c and self._fails(c, v, c["must_pass"]):
+                red_parts[name] = self._statement(c, shown, c["must_word"], c["must_pass"])
+                evidence.append(Evidence(name, self.source, c["field"], record, v, op, c["must_pass"], False,
+                                         red_parts[name]))
+                continue
+            if "target" in c and self._fails(c, v, c["target"]):
+                second = c.get("second")
+                if second is not None and self._fails(c, v, second):
+                    text = self._statement(c, shown, c["second_word"], second)
+                else:
+                    text = self._statement(c, shown, "target", c["target"])
+                amber_parts[name] = text
+                evidence.append(Evidence(name, self.source, c["field"], record, v, op, c["target"], False, text))
+                continue
+            threshold = c.get("target", c.get("must_pass"))
+            evidence.append(Evidence(name, self.source, c["field"], record, v, op, threshold, True,
+                                     f"{c['label']} {self._value(c, shown)} (meets {self._limit(c, threshold)})"))
+
+        m = self.cfg["marker"]
+        marker = row.get(m["field"])
+        if isinstance(marker, str) and marker:
+            bad = marker.upper() == m["bad_value"]
+            if bad:
+                amber_parts["marker"] = m["text"]
+            evidence.append(Evidence("marker", self.source, m["field"], record, marker, "!=", m["bad_value"], not bad,
+                                     m["text"] if bad else f"disease marker {marker.lower()}"))
+
+        if used is not None and 0 < used < self.cfg["min_usable_trials"]:
+            amber_parts["trials"] = f"only {int(used)} usable trial"
+            evidence.append(Evidence("trials", self.source, "N_TRIALS_USED", record, int(used), ">=",
+                                     self.cfg["min_usable_trials"], False, amber_parts["trials"]))
+
+        if no_field_data:
+            colour, reason = "AMBER", self.cfg["no_field_data_reason"]
+            evidence = [e for e in evidence if e.rule not in crit or e.field not in
+                        {crit[k]["field"] for k in ("yield_vs_check", "disease", "moisture")}]
+        elif red_parts:
+            colour = "RED"
+            reason = "Fails must-pass: " + "; ".join(red_parts[k] for k in self.cfg["order_red"] if k in red_parts)
+        elif amber_parts:
+            colour = "AMBER"
+            reason = "Check: " + "; ".join(amber_parts[k] for k in self.cfg["order_amber"] if k in amber_parts)
+        else:
+            colour = "GREEN"
+            field_ = crit["yield_vs_check"]["field"]
+            value = _num(precise.get(field_))
+            reason = self.cfg["green_reason"].format(value=value if value is not None else _num(row.get(field_)) or 0)
+
+        computed = VERDICT_OF[colour]
+        official_colour = str(official).upper() if official else None
+        official_verdict = VERDICT_OF.get(official_colour) if official_colour else None
+        extras = {"n_trials": n_trials, "n_fail": n_fail, "trials": trials or [], "official_rag": official_colour,
+                  "engine_rag": colour, "official_reason": official_reason}
+        if official_verdict and official_verdict != computed:
+            # The export is the system of record: show its colour, keep ours as an explanation flag.
+            extras["engine_disagrees"] = True
+            colour, reason = official_colour, f"{official_reason or official_colour} (engine reconstruction: {colour})"
+        verdict = VERDICT_OF[colour]
+        return Decision("candidate", record, verdict, colour, reason, evidence, self.version,
+                        official_verdict=official_verdict, computed_verdict=computed, extras=extras)

@@ -74,8 +74,21 @@ class OverrideLog:
             return [Override(**json.loads(line)) for line in fh if line.strip()]
 
     def latest(self) -> dict[tuple[str, str], Override]:
-        """Most recent override per (level, record)."""
+        """Most recent override per (level, record).
+
+        Cached by the file's (mtime, size): the table view asks this once per candidate, and the log
+        only changes on append, so re-reading it 150 times per request is pure waste.
+        """
+        try:
+            st = self.path.stat()
+            stamp = (st.st_mtime_ns, st.st_size)
+        except FileNotFoundError:
+            stamp = None
+        cached = getattr(self, "_latest_cache", None)
+        if cached is not None and cached[0] == stamp:
+            return cached[1]
         out: dict[tuple[str, str], Override] = {}
         for o in self.all():
             out[(o.level, o.record)] = o
+        self._latest_cache = (stamp, out)
         return out

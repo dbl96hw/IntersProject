@@ -38,7 +38,8 @@ Day-to-day commands (from the repo root):
   `RowContextMenu`, `EditCandidateModal`, `ChatWidget`, `WelcomeView`, `Sidebar`, decorations.
 - `apps/intersfrontend/src/constants/` - `triage.js` (`TRIAGE_STATUS`, `OVERRIDE_REASONS`,
   `TABLE_COLUMNS`, mock delays), `messages.js` (UI copy, `APP_NAME`), `api.js` (`API_BASE_URL`).
-- `apps/intersfrontend/src/mocks/` - `dashboards.js`, `chatReplies.js`; the things to replace.
+- `apps/intersfrontend/src/mocks/` - `dashboards.js` only (sample rows; no screen imports it). The chat
+  mock (`chatReplies.js`) was removed when the widget went live.
 - `apps/intersfrontend/src/styles/theme.css`, `apps/intersfrontend/eslint.config.js`,
   `apps/intersfrontend/.env.example`.
 

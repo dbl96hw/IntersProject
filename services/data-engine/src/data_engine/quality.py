@@ -221,8 +221,10 @@ def assess(c: Canonical, export_date: str | None = None, date_consistency_min: f
         ref = pd.Timestamp(export_date) if export_date else op_flags["OPERATION_DATE"].max()
         stale = op_flags[(op_flags.get("OPERATION_STATUS_LID") == "PLANNED") & (op_flags["OPERATION_DATE"] <= ref)]
         if len(stale):
-            done_trials = int((trials.set_index("TRIAL_GUID").loc[stale["TRIAL_GUID"].unique(), "STATUS_LID"] == "COMPLETE").sum()) \
-                if "STATUS_LID" in trials.columns else 0
+            # reindex, not .loc: an uploaded operation may point to a trial the exports do not contain.
+            status = trials.drop_duplicates("TRIAL_GUID").set_index("TRIAL_GUID")["STATUS_LID"] \
+                if "STATUS_LID" in trials.columns else pd.Series(dtype=object)
+            done_trials = int(status.reindex(stale["TRIAL_GUID"].unique()).eq("COMPLETE").sum())
             issues.append(Issue(
                 id="status.planned_in_the_past", category="status", severity="warning",
                 title="Operations still PLANNED although their date has passed",

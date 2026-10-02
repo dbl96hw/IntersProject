@@ -251,10 +251,10 @@ test('GET /api/engine/* returns sample JSON in mock mode', async () => {
 
   assert.equal(reasons.status, 200);
   assert.ok('OTHER' in reasons.body);
-  // The samples are real engine output on the UC4 mocks (weighted-severity rule, 72/72 parity).
+  // The samples are real engine output on the integrated V2 drop (candidate-level RAG, 150/150 parity).
   assert.equal(baseline.body.sample, true);
-  assert.equal(baseline.body.parity.agree, 72);
-  assert.equal(baseline.body.mode, 'weighted_severity');
+  assert.equal(baseline.body.parity.agree, 150);
+  assert.equal(baseline.body.mode, 'candidate_rag');
   assert.ok(Array.isArray(quality.body.issues) && quality.body.issues.length > 0);
   assert.ok(quality.body.issues.every((issue) => issue.id && issue.fix_status));
 });

@@ -1,4 +1,39 @@
-# Findings on the UC4 mock data (drop of 2026-09-29)
+# Findings on the UC4 mock data
+
+## 0. Integrated V2 drop (2026-10-02) — current data
+
+Only the 8 CSVs at the root of the zip are used (`data/synthetic/uc4_v2/`); the `[DEPRECATED]` folders are ignored.
+
+**Keys.** `MATERIAL_GUID` (the pedigree is the master: 152 materials = 150 candidates + 2 commercial checks), `TRAIT_GUID` (trait dictionary, 6 traits: yield, moisture, disease in the field; germination, cold test, fumonisin in the lab), `TRIAL_ENTRY_GUID` / `FIELD_ENTITY_ID` (trial-germplasm bridge: 72 trials × 24 entries = 1,728; 6 candidates + 2 checks × 3 replications per trial). Referential integrity is 100 % on all 10 reference paths the engine checks (bridge, observations, operations, lab, genomics and recommendations against the pedigree, the bridge and the dictionary).
+
+**The official logic, reconstructed (150/150).** The suggestion is per candidate now:
+
+| Tier | Criterion (field) | RED if (must-pass) | AMBER if (check) |
+|---|---|---|---|
+| Yield | `YIELD_VS_CHECK_PCT` | < 95 % | < 103 % |
+| Disease | `DISEASE_SCORE_MEAN` | > 6.0 | > 4.0 |
+| Fumonisin | `FUMONISIN_PPM` | > 4.0 | — |
+| Moisture | `MOISTURE_PCT_MEAN` | — | > 23.0 (wording says "limit" above 25.0, still AMBER) |
+| Germination | `GERMINATION_PCT` | — | < 90 % (wording says "minimum" below 85 %, still AMBER) |
+| Marker | `MARKER_DISEASE_RESISTANCE` | — | SUSCEPTIBLE |
+| Usable trials | `N_TRIALS_USED` | — | 1 ("only 1 usable trial"); 0 → AMBER "No field data yet (genotyped only)" |
+
+GREEN otherwise ("Beats checks (x %) with all field and lab checks passing"). Thresholds live in `config/rules.yaml` (`candidate_rag`).
+
+**Recomputed from raw data.** A trial is unusable for its candidates when its IRRIGATION operation was MISSED (the official caveat "1 trial(s) excluded: irrigation missed"). With that rule, the engine recomputes from the plots and the lab every number of the official summary: number of trials and usable trials (exact), yield vs checks as mean candidate yield ÷ mean check yield over the usable trials (≤ 0.05 points), disease and moisture means (≤ rounding), germination and fumonisin (≤ rounding). All 150 candidates agree, so the sources are joined correctly.
+
+| Finding | Records | Root cause | What the engine does |
+|---|---|---|---|
+| No trial table in V2 | 72 trials | the TRIAL_GUIDs match none of the deprecated trial table | location unknown; year derived from the SOWING date; G×E cannot be assessed |
+| BREEDER_DECISION empty | 150 | no decision recorded yet (system: 32 G / 53 A / 65 R) | the app records pass / no pass and overrides with a reason |
+| Genotyped without trials | 2 (SYN-MZ-00149, 00150) | in pedigree and genomics, not in the bridge | AMBER "No field data yet" |
+| Commercial checks | 2 (SYN-MZ-CHK01, CHK02) | ENTRY_ROLE_LID = CHECK | yield reference only, never triaged |
+| Operations delayed | 11 | actual after planned date | reported |
+| Operations missed | 5 (all IRRIGATION) | not done | trial excluded for its candidates (30 candidates) |
+| Recorded off-system | 140 (paper 124, WhatsApp 11, PDF 5) | re-typed by hand | upload the original: the document pipeline reads it and links what it names |
+| Pedigree parents empty | 152 | exported without values | lineage reported as unavailable |
+
+# Findings on the 29-Sep drop (deprecated; kept as the fixture of the trial-level tests)
 
 These findings were produced by the data engine as a **test run** on the Syngenta mock exports committed in `data/synthetic/uc4/`. Every number can be reproduced with:
 

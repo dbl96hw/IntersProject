@@ -27,10 +27,16 @@ def config_dir() -> Path:
 def data_dir() -> Path:
     """Directory with the UC4 exports (CSV / XLSX / JSON).
 
-    Default follows the team convention of keeping synthetic data under
-    `data/synthetic/` at the repo root; override with DATA_ENGINE_DATA_DIR.
+    Default: the integrated V2 drop of 2026-10-02 (`data/synthetic/uc4_v2`, the 8 root CSVs of the
+    Syngenta zip). The 29-Sep drop in `data/synthetic/uc4` is deprecated and kept as a test fixture.
+    Override with DATA_ENGINE_DATA_DIR.
     """
-    return Path(os.environ.get("DATA_ENGINE_DATA_DIR", _REPO_ROOT / "data" / "synthetic" / "uc4"))
+    return Path(os.environ.get("DATA_ENGINE_DATA_DIR", _REPO_ROOT / "data" / "synthetic" / "uc4_v2"))
+
+
+def legacy_data_dir() -> Path:
+    """The deprecated 29-Sep drop (trial-level verdicts), used by the tests of the trial-level logic."""
+    return _REPO_ROOT / "data" / "synthetic" / "uc4"
 
 
 def state_dir() -> Path:

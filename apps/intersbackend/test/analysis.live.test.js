@@ -6,7 +6,7 @@ import { createMemoryDb } from '../src/db/memory.js';
 import { emptyUsage } from '../src/llm/claude.client.js';
 import { engineFallback } from '../src/llm/evidence.check.js';
 import { getPromptVersions } from '../src/prompts/index.js';
-import { createAnalysisService, evidenceHash } from '../src/services/analysis.service.js';
+import { createAnalysisService, dedupeWarnings, evidenceHash } from '../src/services/analysis.service.js';
 import { DataEngineError } from '../src/services/dataEngineClient.js';
 import { createMemoryFileStorage } from '../src/services/fileStorage.js';
 
@@ -290,7 +290,12 @@ function httpEngine(rows, { ingestError } = {}) {
       if (ingestError) throw ingestError;
       return { accepted: true, detection: { source: 'germplasm' }, rows: 1 };
     },
-    async sql() {
+    async sql(query) {
+      // The ingest service checks touched ids against the engine's candidates.
+      if (query.includes('FROM materials WHERE candidate_id IN')) {
+        const ids = [...query.matchAll(/'([^']+)'/g)].map((match) => match[1]);
+        return { columns: ['candidate_id'], rows: ids.filter((id) => byId.has(id)).map((id) => ({ candidate_id: id })) };
+      }
       return { columns: ['TRIAL_GUID', 'MATERIAL_GUID'], rows: [] };
     },
     async uploadDocument(filename) {
@@ -448,4 +453,32 @@ test('an unreachable engine saves an error and does not start explaining', async
   } finally {
     downServer.close();
   }
+});
+
+test('evidence hash ignores trial_counts, which the engine derives from the hashed trials', () => {
+  const payload = { candidate_id: 'SYN-MZ-00001', colour: 'RED', trials: ['SYN-TR-0001 LOC-01 2024: FAIL'] };
+  const withCounts = { ...payload, trial_counts: { total: 1, PASS: 0, HOLD: 0, FAIL: 1, ambiguous: 0 } };
+
+  assert.equal(evidenceHash(withCounts), evidenceHash(payload));
+});
+
+test('near-duplicate Claude notes from different batches are shown once', () => {
+  const note = (message) => ({ code: 'CLAUDE_NOTE', message, file: null });
+  const warnings = [
+    note('Pedigree data cannot be reconstructed as FEMALE_PARENT_MATERIAL_GUID is empty in every record across all candidates'),
+    note('Lab traits are identified only by TRAIT_GUID; names and units require the trait dictionary from the SME'),
+    note('20 trials across the dataset have no PLANTING operation recorded'),
+    note('Pedigree information cannot be reconstructed: FEMALE_PARENT_MATERIAL_GUID is empty in every record'),
+    note('Lab traits are identified only by TRAIT_GUID (7 traits): names and units require the trait dictionary from the SME'),
+    note('20 trials have no PLANTING operation recorded'),
+    note('12 trials have no PLANTING operation recorded'),
+    { code: 'EXPLANATION_DEFERRED', message: '62 candidates were not explained in this response.', file: null },
+  ];
+
+  const kept = dedupeWarnings(warnings);
+
+  assert.equal(kept.length, 5);
+  assert.deepEqual(kept.map((item) => item.message.slice(0, 12)), [
+    'Pedigree dat', 'Lab traits a', '20 trials ac', '12 trials ha', '62 candidate',
+  ]);
 });

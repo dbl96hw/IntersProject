@@ -3,201 +3,141 @@
   "summary": {
     "issues": 10,
     "by_fix_status": {
-      "applied": 4,
-      "not_fixable": 5,
-      "proposed": 1
+      "not_fixable": 2,
+      "proposed": 2,
+      "none_needed": 5,
+      "applied": 1
     },
-    "records_flagged": 845,
-    "excluded_features": [
-      "PLANTING_DATE"
-    ]
+    "records_flagged": 534,
+    "excluded_features": []
   },
   "issues": [
     {
-      "id": "aggregation.genomic_breeding_value_mean",
-      "category": "aggregation",
+      "id": "design.no_trial_master",
+      "category": "design",
       "severity": "warning",
-      "title": "Trial genomic breeding value mean does not match the materials observed in the trial",
-      "count": 64,
+      "title": "No trial table in the V2 drop: trial location and year are unknown",
+      "count": 72,
       "affected": [
-        "SYN-TR-0002",
-        "SYN-TR-0003",
-        "SYN-TR-0004",
-        "SYN-TR-0005",
-        "SYN-TR-0006"
+        "SYN-TR-0053",
+        "SYN-TR-0014",
+        "SYN-TR-0030",
+        "SYN-TR-0016",
+        "SYN-TR-0058"
       ],
-      "root_cause": "the trial summary is not derived from the observed materials: correlation between reported and recomputed values is -0.20 (1.0 if one were computed from the other); the summary was probably generated from a different material set or independently",
+      "root_cause": "the drop ships the trial-germplasm bridge but no trial master; its TRIAL_GUIDs do not match the deprecated trial table (0 of 72 match), so location and year cannot be joined",
       "evidence": {
-        "median_abs_gap": 4.26,
-        "max_abs_gap": 15.77,
-        "tolerance": 1.0,
-        "correlation_reported_vs_recomputed": -0.202
-      },
-      "fix_status": "applied",
-      "fix": "derived column GBV_MEAN_RECOMPUTED added next to the original; the rules keep the reported value because the official verdicts were computed on it",
-      "impact": "see what_if_recomputed_aggregates in the quality report",
-      "sme_question": "Which material set is the trial-level genomic breeding value mean computed from?"
-    },
-    {
-      "id": "aggregation.resistant_material_pct",
-      "category": "aggregation",
-      "severity": "warning",
-      "title": "Trial resistant-material share does not match the materials observed in the trial",
-      "count": 62,
-      "affected": [
-        "SYN-TR-0002",
-        "SYN-TR-0003",
-        "SYN-TR-0004",
-        "SYN-TR-0005",
-        "SYN-TR-0006"
-      ],
-      "root_cause": "the trial summary is not derived from the observed materials: correlation between reported and recomputed values is -0.13 (1.0 if one were computed from the other); the summary was probably generated from a different material set or independently",
-      "evidence": {
-        "median_abs_gap": 20.0,
-        "max_abs_gap": 60.0,
-        "tolerance": 5.0,
-        "correlation_reported_vs_recomputed": -0.13
-      },
-      "fix_status": "applied",
-      "fix": "derived column RESISTANT_PCT_RECOMPUTED added next to the original; the rules keep the reported value because the official verdicts were computed on it",
-      "impact": "see what_if_recomputed_aggregates in the quality report",
-      "sme_question": "Which material set is the trial-level resistant-material share computed from?"
-    },
-    {
-      "id": "linkage.operation_material_not_in_trial",
-      "category": "linkage",
-      "severity": "warning",
-      "title": "Field operations reference a material that was not observed in that trial",
-      "count": 131,
-      "affected": [
-        "372ED14B-F396-F334-0000-000000000001",
-        "372ED14B-F396-F334-0000-000000000002",
-        "372ED14B-F396-F334-0000-000000000003",
-        "372ED14B-F396-F334-0000-000000000004",
-        "372ED14B-F396-F334-0000-000000000005"
-      ],
-      "root_cause": "wrong trial key on the operation: in 131/131 cases the material IS observed at the same location, in another trial of the same season, i.e. the operation was booked against a sibling trial",
-      "evidence": {
-        "orphans": 131,
-        "material_observed_same_location": 131,
-        "unique_reassignment_possible": 0,
-        "candidate_trials_distribution": {
-          "5": 102,
-          "4": 29
-        }
-      },
-      "fix_status": "applied",
-      "fix": "quarantined: excluded from every trial-level computation; a unique reassignment is proposed when only one sibling trial contains the material (none is unique here: each material appears in 4-5 sibling trials, so a human must decide)",
-      "impact": "no effect on verdicts (operations do not enter the rules); planting dates use linked operations only",
-      "sme_question": "Are operations recorded per trial or per location/season block?"
-    },
-    {
-      "id": "temporal.operation_year_mismatch",
-      "category": "temporal",
-      "severity": "critical",
-      "title": "Operation dates fall in a different year than their trial",
-      "count": 144,
-      "affected": [
-        "SYN-TR-0002",
-        "SYN-TR-0004",
-        "SYN-TR-0005",
-        "SYN-TR-0007",
-        "SYN-TR-0008"
-      ],
-      "root_cause": "every operation is dated within 2026-04-01 .. 2026-09-26 whatever the trial year: the dates look like export/generation timestamps rather than field dates",
-      "evidence": {
-        "year_offsets": {
-          "1": 72,
-          "2": 72
-        },
-        "date_span": "2026-04-01 .. 2026-09-26"
-      },
-      "fix_status": "applied",
-      "fix": "dates flagged YEAR_OK=False; they are not used for seasonality features",
-      "impact": "planting-date seasonality removed from the calibrated model (see excluded_features)",
-      "sme_question": "Is OPERATION_DATE the field date or the record's creation date?"
-    },
-    {
-      "id": "temporal.operation_order",
-      "category": "temporal",
-      "severity": "critical",
-      "title": "Harvest or irrigation dated before planting",
-      "count": 6,
-      "affected": [
-        "SYN-TR-0004",
-        "SYN-TR-0013",
-        "SYN-TR-0029",
-        "SYN-TR-0042",
-        "SYN-TR-0051"
-      ],
-      "root_cause": "planting-to-harvest offsets are not physically consistent (median 0 d, std 52 d, min -28 d): the dates are not usable as a timeline",
-      "evidence": {
-        "trials": 6,
-        "harvest_minus_planting_days": {
-          "median": 0.0,
-          "std": 51.588112,
-          "min": -28.0
-        }
+        "trials": 72,
+        "matching_deprecated_trial_guids": 0,
+        "year_source": "SOWING operation date (derived)"
       },
       "fix_status": "not_fixable",
-      "fix": "flagged; not imputed (the offset dispersion is too large for any defensible imputation)",
-      "impact": "no timeline features are derived from operations",
+      "fix": "season year derived from the SOWING date; location left empty, never guessed",
+      "impact": "G x E (location / year effects) cannot be assessed; candidate colours do not depend on it",
+      "sme_question": "Can you share the V2 trial master (location, year, design)?"
+    },
+    {
+      "id": "decision.breeder_decision_empty",
+      "category": "completeness",
+      "severity": "info",
+      "title": "No breeder decision recorded yet",
+      "count": 150,
+      "affected": [
+        "SYN-MZ-00001",
+        "SYN-MZ-00002",
+        "SYN-MZ-00003",
+        "SYN-MZ-00004",
+        "SYN-MZ-00005"
+      ],
+      "root_cause": "BREEDER_DECISION and BREEDER_COMMENT are empty for 150 of 150 candidates; the system suggestion is {'RED': 65, 'AMBER': 53, 'GREEN': 32}",
+      "evidence": {
+        "empty": 150,
+        "system_rag": {
+          "RED": 65,
+          "AMBER": 53,
+          "GREEN": 32
+        }
+      },
+      "fix_status": "proposed",
+      "fix": "the Breeder's Desk records it: pass / no pass per candidate and colour overrides with a reason, append-only",
+      "impact": "this is the gap the product closes: suggestion -> decision with an audit trail",
+      "sme_question": null
+    },
+    {
+      "id": "completeness.genotyped_without_trials",
+      "category": "completeness",
+      "severity": "info",
+      "title": "Lines genotyped but not yet in any trial",
+      "count": 2,
+      "affected": [
+        "SYN-MZ-00149",
+        "SYN-MZ-00150"
+      ],
+      "root_cause": "present in pedigree and genomics, absent from the trial-germplasm bridge",
+      "evidence": {
+        "lines": [
+          "SYN-MZ-00149",
+          "SYN-MZ-00150"
+        ]
+      },
+      "fix_status": "none_needed",
+      "fix": "kept AMBER with the official reason 'No field data yet (genotyped only)'",
+      "impact": "no performance claim is made for them",
+      "sme_question": null
+    },
+    {
+      "id": "design.commercial_checks",
+      "category": "design",
+      "severity": "info",
+      "title": "Commercial checks are reference entries, not candidates",
+      "count": 2,
+      "affected": [
+        "SYN-MZ-CHK01",
+        "SYN-MZ-CHK02"
+      ],
+      "root_cause": "the bridge marks them ENTRY_ROLE_LID = CHECK; they are in the pedigree but not in the candidate recommendations",
+      "evidence": {
+        "checks": [
+          "SYN-MZ-CHK01",
+          "SYN-MZ-CHK02"
+        ],
+        "check_plots_per_trial_material": 144
+      },
+      "fix_status": "none_needed",
+      "fix": "used only as the yield reference ('yield vs checks'); never triaged",
+      "impact": "yield vs checks is recomputed per trial against the mean of both checks",
+      "sme_question": null
+    },
+    {
+      "id": "operations.delayed",
+      "category": "temporal",
+      "severity": "info",
+      "title": "Field operations done late",
+      "count": 11,
+      "affected": [
+        "SYN-TR-0001",
+        "SYN-TR-0020",
+        "SYN-TR-0025",
+        "SYN-TR-0029",
+        "SYN-TR-0030"
+      ],
+      "root_cause": "actual date after the planned date",
+      "evidence": {
+        "by_type": {
+          "FUNGICIDE_SPRAY": 6,
+          "HARVEST": 5
+        },
+        "delay_days": {
+          "min": 7.0,
+          "median": 10.0,
+          "max": 14.0
+        }
+      },
+      "fix_status": "none_needed",
+      "fix": "reported; delays do not exclude a trial in the official rule",
+      "impact": "context for the breeder",
       "sme_question": null
     }
   ],
-  "corrections": [
-    {
-      "record": "SYN-TR-0002",
-      "field": "GENOMIC_BREEDING_VALUE_MEAN",
-      "original": 99.9,
-      "derived": 101.25,
-      "status": "applied",
-      "method": "recomputed from the 10 materials observed in the trial; original kept, derived stored as GBV_MEAN_RECOMPUTED"
-    },
-    {
-      "record": "SYN-TR-0003",
-      "field": "GENOMIC_BREEDING_VALUE_MEAN",
-      "original": 106.8,
-      "derived": 98.48,
-      "status": "applied",
-      "method": "recomputed from the 10 materials observed in the trial; original kept, derived stored as GBV_MEAN_RECOMPUTED"
-    },
-    {
-      "record": "SYN-TR-0004",
-      "field": "GENOMIC_BREEDING_VALUE_MEAN",
-      "original": 108.9,
-      "derived": 107.43,
-      "status": "applied",
-      "method": "recomputed from the 10 materials observed in the trial; original kept, derived stored as GBV_MEAN_RECOMPUTED"
-    },
-    {
-      "record": "SYN-TR-0005",
-      "field": "GENOMIC_BREEDING_VALUE_MEAN",
-      "original": 108.9,
-      "derived": 97.11,
-      "status": "applied",
-      "method": "recomputed from the 10 materials observed in the trial; original kept, derived stored as GBV_MEAN_RECOMPUTED"
-    },
-    {
-      "record": "SYN-TR-0006",
-      "field": "GENOMIC_BREEDING_VALUE_MEAN",
-      "original": 98.6,
-      "derived": 106.02,
-      "status": "applied",
-      "method": "recomputed from the 10 materials observed in the trial; original kept, derived stored as GBV_MEAN_RECOMPUTED"
-    }
-  ],
-  "what_if_recomputed_aggregates": {
-    "verdicts_changed": 7,
-    "changed_trials": [
-      "SYN-TR-0003",
-      "SYN-TR-0018",
-      "SYN-TR-0033",
-      "SYN-TR-0034",
-      "SYN-TR-0037"
-    ],
-    "parity_with_reported_aggregates": 72,
-    "parity_with_recomputed_aggregates": 65,
-    "reading": "parity drops from 72 to 65 of 72 when the recomputed aggregates replace the reported ones: the official verdicts were computed on the reported trial summaries, so the rules keep using those and the recomputed values stay as evidence"
-  }
+  "corrections": []
 }

@@ -71,7 +71,16 @@ class DocumentIngestion:
                 "tables_unclassified": self.unclassified_tables,
                 "facts": len(self.facts),
                 "facts_with_values": sum(1 for f in self.facts if f["field"]),
-                "entities_mentioned": sorted({i for f in self.facts for ids in f["ids"].values() for i in ids})[:50]}
+                "entities_mentioned": sorted({i for f in self.facts for ids in f["ids"].values() for i in ids})[:50],
+                "entities_in_tables": self._table_entities()}
+
+    def _table_entities(self, limit: int = 500) -> list[str]:
+        """Key values (material / trial ids and GUIDs) of the accepted tables, so a caller can tell which
+        candidates a document touched without re-reading it."""
+        keys = ("MATERIAL_GUID", "MATERIAL_ID", "TRIAL_GUID", "TRIAL_ID")
+        found = {str(v).strip() for t in self.accepted_tables for k in keys if k in t.frame.columns
+                 for v in t.frame[k].dropna().unique() if str(v).strip()}
+        return sorted(found)[:limit]
 
 
 def structure(doc: Document, id_patterns=None) -> DocumentIngestion:

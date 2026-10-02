@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { postChatMessage } from '../api/client';
+import { renderChatText } from '../chatText';
 import { ANSWER_WARNING_CODES, API_ERROR_CODES, CHAT_TEXT } from '../constants';
 import Logo from './Logo';
 import './ChatWidget.css';
@@ -235,7 +236,9 @@ function ChatWidget({ chatId = null, storedMessages = EMPTY_MESSAGES }) {
                     {message.errorMessage}
                   </p>
                 ) : (
-                  <p className="chat-message__text" style={{ whiteSpace: 'pre-wrap' }}>{message.text}</p>
+                  <p className="chat-message__text" style={{ whiteSpace: 'pre-wrap' }}>
+                    {message.sender === SENDER.BOT ? renderChatText(message.text) : message.text}
+                  </p>
                 )}
                 {hasUnverifiedNumbers(message.warnings) && (
                   <p className="chat-message__warning" data-testid="chat-number-warning">

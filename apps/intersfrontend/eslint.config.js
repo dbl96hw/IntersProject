@@ -20,6 +20,7 @@ export default [
         clearInterval: 'readonly',
         URL: 'readonly',
         URLSearchParams: 'readonly',
+        FormData: 'readonly',
       },
       parserOptions: {
         ecmaFeatures: { jsx: true },

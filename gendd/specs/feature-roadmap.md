@@ -6,6 +6,8 @@ readiness: conversational channels (WhatsApp, voice), authentication hardening, 
 and Cropwise packaging are out of this roadmap.
 
 Last synced with the working tree on 2026-10-02, after the F2.1 chat widget on `feature/chatbot` (not merged).
+Branch `fix/demo-readiness` (2026-10-02): engine backlog fixes, documents that name candidates now classify
+them, upload from the welcome screen, bold rendering in the chat, CI for all tests, root README runbook.
 Merged on `dev` so far for the backend gateway and Claude layer: PR #9 (API contract and paths), PR #10
 and #11 (`feature/backend-core`: Supabase schema, mock/live routes, ingest service, data engine client),
 PR #12 (Claude client, evidence check, live `claude:smoke`), PR #13 (Step 8 explanation prompt). PR #7
@@ -298,13 +300,15 @@ Phase 4 feature, re-run the F3.1 checklist.
   - [x] Claude client, tool schemas, evidence check and explanation prompt (`submit_justifications` only; documents ingested by the engine)
   - [x] Wire chat agent (`agent.service.ask`) through engine tools on `POST /api/chats/:id/messages` (text-only path); cap rounds with `MAX_TOOL_ROUNDS` and the question with `CHAT_QUESTION_DEADLINE_MS`
   - [x] Replace `getMockChatReply` with the live answer path. The widget posts `{ text }` only; the backend reads saved messages and does not trust a history from the browser
-  - [ ] Answers render the colour, the one-line reason and the cited evidence as their own fields, plus the "you decide" reminder from the system prompt. Today the widget shows the answer text as plain text, including any markdown marks the model wrote
+  - [ ] Answers render the colour, the one-line reason and the cited evidence as their own fields, plus the "you decide" reminder from the system prompt
+  - [x] Bold marks (`**x**`, `*x*`) render as bold; lists, line breaks and any HTML stay plain text (`src/chatText.jsx`, no innerHTML)
+  - [x] Answers in English whatever the question's language (engine system prompt, `agent_tools.py`)
   - [x] Clear message in the widget when the API key is missing, the engine is unreachable, the question times out, or the network fails, instead of a crash
   - [x] No override or colour-changing path through the chat (overrides stay in F1.5)
   - [x] Tests for the route with a mocked Claude client and a mocked engine, and for the widget with a fake `fetch`
 - Known issues:
-  - `query_candidates` returns at most 20 rows, with no total and no truncated flag. A live answer said "20 red lines" when the rule colour count is 54.
-  - `apply_scoring` counts rule colour (RED 54). `query_candidates` filters effective colour after overrides (50 on that check). With overrides, the chat can report two different numbers. On the widget check the chat said 54 / 71 / 25 while the open board showed 53 / 72 / 25.
+  - Fixed on `fix/demo-readiness`: `query_candidates` (tool) returns `total`, `returned` and `truncated`, and its description names the default limit of 20. Before, a live answer said "20 red lines" when the count was 54.
+  - Fixed on `fix/demo-readiness`: `apply_scoring` returns `counts` (rule colour), `effective_counts` (after overrides, what the board shows) and `overridden`; the prompt tells the model to report the effective counts. Before, the chat said 54 / 71 / 25 while the board showed 53 / 72 / 25.
   - `ANSWER_UNVERIFIED_NUMBERS` is a partial net. It fired on 3 of 4 answers in the first live chat, several times for a correct count written as a word (`dos`). Digits 1, 3, 4 and 5 can match another field and pass. No warning does not mean the answer was verified. The widget never shows a verified mark.
   - The chat answers with the engine's effective colour, which is global. The board shows the colour saved on that chat. They can differ after an override in another chat.
   - Ingested documents can appear in `search` results. The chat is read-only, so the risk is misleading text, not a write.
@@ -326,10 +330,10 @@ Phase 4 feature, re-run the F3.1 checklist.
 - Checklist:
   - [ ] Written demo script: flagged candidate, explanation, breeder challenges it, override logged, question answered in chat
   - [ ] End-to-end test of that script (tool chosen with a mentor and recorded in `gendd/adr/`), targeting the existing `data-testid`s
-  - [ ] Continuous integration runs the data engine's `pytest -q` and the new frontend and backend tests, not only lint
-  - [ ] No screen in the demo path still imports from `src/mocks/`
+  - [x] Continuous integration runs the data engine's `pytest -q` and the new frontend and backend tests, not only lint (`.github/workflows/test.yml`)
+  - [x] No screen in the demo path still imports from `src/mocks/` (only `dashboards.js` is left, and nothing imports it)
   - [ ] `npm audit` findings at Medium or above triaged (fixed or recorded with a reason)
-  - [ ] Root `README.md` explains how to run all three processes (engine, backend, frontend), the required `.env` values, and how to reset the override and correction logs (`DATA_ENGINE_STATE_DIR`)
+  - [x] Root `README.md` explains how to run all three processes (engine, backend, frontend), the required `.env` values, and how to reset the override and correction logs (`DATA_ENGINE_STATE_DIR`)
   - [ ] Clean demo data the day before, from a read-only inventory: overrides in `services/data-engine/.state/overrides.jsonl`, `candidate_reviews` rows, test chats and messages in Supabase, and the engine's in-memory state. An engine override is global, so a test override changes what new chats show
   - [ ] Promotion `dev` -> `stg` through a pull request with the demo script passing
 - Done when: the demo script passes end to end on a fresh clone and on `stg`.
@@ -369,8 +373,9 @@ Phase 4 feature, re-run the F3.1 checklist.
   - [x] Drag-and-drop / browse upload with accepted types matching the engine's formats and removable file chips (F0.5)
   - [x] Relevance gate: off-topic documents are refused before the engine indexes them (`POST /relevance`), with an `IRRELEVANT_FILE` warning
   - [x] Uploads never overwrite the exports: identical rows are ignored, contradicting rows are counted as `conflicts` and shown (`UPLOAD_CONFLICTS` warning, engine quality report)
-  - [ ] Send each file through `POST /api/chats/:id/messages` (multipart) with a size limit shown to the user
-  - [ ] Show the ingestion result per file: accepted source and rows, or rejected with the best-guess detection
+  - [x] Send each file through `POST /api/chats/:id/messages` (multipart) with a size limit shown to the user (Create dashboard: new chat, then the files; "Analyzing" status while it runs, no second submit, no abort)
+  - [x] Show the ingestion result per file: accepted source and rows, or rejected with the engine's reason (`IngestionList`, also on an empty dashboard)
+  - [x] A document that names candidates or trials (field notes, a lab report) touches those candidates, checked against the engine (`entities_mentioned`, `entities_in_tables`). Before, a document alone gave an empty dashboard
   - [ ] Triage and evidence card refresh after an accepted upload; document evidence appears on the card
   - [ ] Replace the client-side search (id, crop, reason) with, or complement it by, engine search exposed on Express (not mounted yet)
   - [ ] Search results link to the matching candidate or trial
@@ -448,12 +453,29 @@ Step 8 is merged. 9A is done. See `context/backend-development.md` and `agents/b
 
 ### Engine owner backlog (Sebastián)
 
-- `query_candidates`: return the total and a truncated flag, and say in the tool description that the default limit is 20.
-- Engine system prompt: use `apply_scoring` for colour counts, and do not treat the page length as the total. Spell out rule colour versus effective colour after overrides.
-- Trial status counts in llm-context evidence (reduces warnings when the model writes a count as a word, such as "dos" or "tres ensayos en HOLD").
-- Dedupe in `POST /ingest/records`.
-- In-memory engine state lost on restarts.
-- Docker deploy with Tesseract / Poppler for OCR.
+- [x] `query_candidates`: return the total and a truncated flag, and say in the tool description that the default limit is 20.
+- [x] Engine system prompt: use `apply_scoring` for colour counts, and do not treat the page length as the total. Spell out rule colour versus effective colour after overrides. Also: always answer in English, write numbers with digits, bold and "- " bullets only.
+- [x] Trial status counts in llm-context (`trial_counts`). It is derived from `trials`, so the backend leaves it out of `evidence_hash` and saved justifications are still reused.
+- [x] Dedupe in `POST /ingest/records` (exports win; duplicates ignored; conflicts reported).
+- [x] A failing upload no longer poisons the engine: an ingest that fails is rolled back and answered with `accepted: false` (before: 500 on every later ingest until a restart). The archive drop's `operations_synthetic.csv` (unknown TRIAL_GUIDs) caused it; `quality.assess` now tolerates it, and the archive `trial_synthetic.csv` (same TRIAL_ID, new GUID) is reported as 72 conflicts instead of duplicating every trial.
+- [ ] In-memory engine state lost on restarts (persist `DATA_ENGINE_STATE_DIR` in the deployment).
+- [ ] Docker deploy with Tesseract / Poppler for OCR.
+
+### Integrated V2 data (2026-10-02)
+
+- [x] The engine loads the 8 root CSVs of Syngenta's V2 zip (`data/synthetic/uc4_v2`); the `[DEPRECATED]` folders are ignored and the 29-Sep drop stays only as a test fixture.
+- [x] Keys: `MATERIAL_GUID` (pedigree master, 152), `TRAIT_GUID` (dictionary, 6 traits), `TRIAL_ENTRY_GUID` / `FIELD_ENTITY_ID` (bridge, 72 trials, 1,728 entries). Referential integrity 100 %.
+- [x] Official candidate RAG reproduced 150/150 (32 G / 53 A / 65 R); every summary number recomputed from the plots and the lab within rounding.
+- [x] Findings in `services/data-engine/docs/FINDINGS.md` section 0: no V2 trial table (no location / year), `BREEDER_DECISION` empty for 150, 2 lines genotyped only, 2 commercial checks, operations 11 delayed / 5 missed / 140 off-system.
+- [x] Express keeps only real candidates as touched ids (the commercial checks are not candidates).
+
+### Pending before demo (from the 2026-10-02 handoff)
+
+1. Chat: [x] English answers; [x] bold rendering; [x] stale `chatReplies` references; [ ] manual 2-minute check with "How many lines are there per colour?".
+2. Engine requests: all done above, except persistence and Docker.
+3. Product: [x] upload from the screen (F4.2); optional: evidence card (F1.3), ids as filter buttons, Phase 4.
+4. Demo ready (F3.1): [ ] decide local or `stg`; [x] demo script (`gendd/specs/demo-script.md`); [ ] e2e test decision with the mentor; [x] CI; [x] no demo screen imports mocks; [ ] `npm audit` triage; [x] README runbook; [ ] Step 10 (baseline.js, warmup.js, Render, key rotation); [ ] Trello; [ ] dev -> stg PR.
+5. Clean test data once, the day before, from a read-only inventory (engine `overrides.jsonl`, `candidate_reviews`, test chats). Keep one chat with the 150 saved justifications, because reuse reads saved rows.
 
 ### Claude tooling note
 

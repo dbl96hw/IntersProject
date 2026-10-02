@@ -3,16 +3,22 @@ import Logo from './Logo';
 import { ACCEPTED_FILE_TYPES, APP_NAME, FILE_UPLOAD_AVAILABLE, WELCOME_TEXT } from '../constants';
 import './WelcomeView.css';
 
-function WelcomeView({ isAnalyzing = false }) {
+function WelcomeView({ isAnalyzing = false, errorMessage = '', onSubmitFiles = () => {} }) {
   const fileInputRef = useRef(null);
-  const [fileNames, setFileNames] = useState([]);
+  const [files, setFiles] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
 
-  const hasFiles = fileNames.length > 0;
+  const hasFiles = files.length > 0;
+  const fileNames = files.map((file) => file.name);
 
-  function addFiles(files) {
-    const pickedNames = Array.from(files, (file) => file.name);
-    setFileNames((currentNames) => [...new Set([...currentNames, ...pickedNames])]);
+  // The File objects are kept (not only their names) because they are what gets uploaded.
+  // A second file with the same name replaces the first.
+  function addFiles(picked) {
+    const added = Array.from(picked);
+    setFiles((current) => {
+      const addedNames = new Set(added.map((file) => file.name));
+      return [...current.filter((file) => !addedNames.has(file.name)), ...added];
+    });
   }
 
   function handleBrowseClick() {
@@ -48,15 +54,16 @@ function WelcomeView({ isAnalyzing = false }) {
   }
 
   function handleRemoveFile(fileName) {
-    setFileNames((currentNames) => currentNames.filter((name) => name !== fileName));
+    setFiles((current) => current.filter((file) => file.name !== fileName));
   }
 
   function handleSubmit(event) {
     event.preventDefault();
-    // File upload is a later story. This screen must not start a mock analysis.
+    // One analysis at a time: the button is gone while analysing, and this guard covers Enter.
     if (!FILE_UPLOAD_AVAILABLE || !hasFiles || isAnalyzing) {
       return;
     }
+    onSubmitFiles(files);
   }
 
   return (
@@ -86,6 +93,7 @@ function WelcomeView({ isAnalyzing = false }) {
             {isDragging ? WELCOME_TEXT.DROPZONE_ACTIVE : WELCOME_TEXT.DROPZONE_TITLE}
           </p>
           <p className="welcome__dropzone-hint">{WELCOME_TEXT.DROPZONE_HINT}</p>
+          <p className="welcome__dropzone-hint" data-testid="upload-limits">{WELCOME_TEXT.LIMITS}</p>
 
           <input
             ref={fileInputRef}
@@ -128,9 +136,17 @@ function WelcomeView({ isAnalyzing = false }) {
           </ul>
         )}
 
-        <p className="welcome__coming-soon" role="status" data-testid="upload-coming-soon">
-          {WELCOME_TEXT.UPLOAD_COMING_SOON}
-        </p>
+        {!FILE_UPLOAD_AVAILABLE && (
+          <p className="welcome__coming-soon" role="status" data-testid="upload-coming-soon">
+            {WELCOME_TEXT.UPLOAD_COMING_SOON}
+          </p>
+        )}
+
+        {errorMessage && !isAnalyzing && (
+          <p className="welcome__coming-soon" role="alert" data-testid="upload-error">
+            {errorMessage}
+          </p>
+        )}
 
         {isAnalyzing ? (
           <p className="welcome__analyzing" role="status" data-testid="analysis-loading">

@@ -200,7 +200,9 @@ export function createIngestService({ dataEngine }) {
     return true;
   }
 
-  // The engine reads the file. We do not turn it into records here.
+  // The engine reads the file. We do not turn it into records here. The engine returns the ids the
+  // document mentions and the key values of any table it accepted from it; those decide which
+  // candidates the document touched (before, a PDF alone touched none, so nothing was classified).
   async function ingestDocumentFile(file, state) {
     if (!(await passesRelevanceGate(file, state))) return;
     const item = {
@@ -215,8 +217,18 @@ export function createIngestService({ dataEngine }) {
       message: null,
     };
     try {
-      await dataEngine.uploadDocument(file.name, file.buffer);
-      item.accepted = true;
+      const result = await dataEngine.uploadDocument(file.name, file.buffer);
+      // The engine has the last word: its own gate or a failed rebuild can still refuse the file.
+      item.accepted = result?.accepted !== false;
+      item.message = result?.message ?? null;
+      const tables = Array.isArray(result?.tables_accepted) ? result.tables_accepted : [];
+      if (tables.length > 0) {
+        item.source = tables[0].source ?? null;
+        item.rows = tables.reduce((total, table) => addCount(total, table.rows), null);
+      }
+      if (item.accepted) {
+        state.mentionedIds.push(...(result?.entities_mentioned ?? []), ...(result?.entities_in_tables ?? []));
+      }
     } catch (err) {
       if (!(err instanceof DataEngineError) || isEngineUnavailable(err)) throw err;
       logFailure(file.name, 'upload', err);
@@ -257,6 +269,20 @@ export function createIngestService({ dataEngine }) {
       if (key) keys[key].add(keyValue(record, key));
     }
 
+    // Ids from documents are checked against the engine: one that is no candidate, trial or known GUID
+    // simply matches nothing, so free text can never invent a candidate.
+    const mentioned = new Set(state.mentionedIds.map((id) => String(id).trim()).filter(isSafeId));
+    if (mentioned.size > 0) {
+      const rows = await queryIds(mentioned, (list) => `SELECT DISTINCT candidate_id FROM materials WHERE candidate_id IN (${list}) OR MATERIAL_GUID IN (${list})`, 'resolve document ids');
+      for (const row of rows ?? []) {
+        if (row.candidate_id) candidateIds.add(String(row.candidate_id));
+      }
+      mentioned.forEach((id) => {
+        keys.TRIAL_ID.add(id);
+        keys.TRIAL_GUID.add(id);
+      });
+    }
+
     const queries = [];
     if (keys.MATERIAL_GUID.size > 0) {
       queries.push([keys.MATERIAL_GUID, (list) => `SELECT DISTINCT candidate_id FROM materials WHERE MATERIAL_GUID IN (${list})`]);
@@ -271,11 +297,22 @@ export function createIngestService({ dataEngine }) {
         if (row.candidate_id) candidateIds.add(String(row.candidate_id));
       }
     }
-    return [...candidateIds].sort();
+    return verifyCandidates(candidateIds);
+  }
+
+  // Only ids the engine lists as candidates reach the analysis: a commercial check (SYN-MZ-CHK01 in the
+  // V2 drop) or a typo in a MATERIAL_ID column would otherwise come back as "not found" warnings.
+  // If the check itself fails (not an outage), the ids are kept as they were.
+  async function verifyCandidates(candidateIds) {
+    if (candidateIds.size === 0) return [];
+    const rows = await queryIds(candidateIds, (list) => `SELECT DISTINCT candidate_id FROM materials WHERE candidate_id IN (${list}) OR MATERIAL_GUID IN (${list})`, 'verify candidates');
+    if (rows === null) return [...candidateIds].sort();
+    const known = new Set(rows.map((row) => String(row.candidate_id)));
+    return [...candidateIds].filter((id) => known.has(id)).sort();
   }
 
   async function ingestNow(files) {
-    const state = { ingestion: [], warnings: [], acceptedRecords: [] };
+    const state = { ingestion: [], warnings: [], acceptedRecords: [], mentionedIds: [] };
     for (const file of files) {
       if (fileKindOf(file.name) === FILE_KINDS.TABLE) await ingestTableFile(file, state);
       else await ingestDocumentFile(file, state);

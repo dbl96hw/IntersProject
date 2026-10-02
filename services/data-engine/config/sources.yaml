@@ -67,3 +67,29 @@ sources:
       - [GENOMIC_SAMPLE_GUID, MATERIAL_GUID, MARKER_DROUGHT_TOLERANCE,
          MARKER_DISEASE_RESISTANCE, MARKER_YIELD_POTENTIAL, MARKER_MATURITY,
          GENOMIC_BREEDING_VALUE, QC_CALL_RATE_PCT]
+
+  # ---- Integrated V2 drop (2026-10-02, "integrated V2 (fixed)") ---------------------------
+  # The official decision moved to the candidate level, a bridge links trials to germplasm,
+  # and a trait dictionary names every trait. Built by data_engine.integrated_v2.
+  candidate_recommendations:
+    description: Candidate-level summary with the official RAG suggestion (SYSTEM_RAG) and the breeder's decision.
+    variants:
+      - [MATERIAL_GUID, MATERIAL_ID, N_TRIALS, N_TRIALS_USED, YIELD_VS_CHECK_PCT, DISEASE_SCORE_MEAN,
+         MOISTURE_PCT_MEAN, GERMINATION_PCT, FUMONISIN_PPM, SYSTEM_RAG, SYSTEM_REASON, BREEDER_DECISION]
+
+  trial_germplasm_bridge:
+    description: One row per trial entry (plot); links TRIAL_GUID to MATERIAL_GUID, with the entry role (entry or check).
+    variants:
+      - [TRIAL_ENTRY_GUID, TRIAL_GUID, TRIAL_ID, MATERIAL_GUID, MATERIAL_ID, FIELD_ENTITY_ID,
+         PLOT_NO, REPLICATION_NO, ENTRY_ROLE_LID]
+
+  trait_dictionary:
+    description: Trait names, units, scale and better direction per TRAIT_GUID.
+    variants:
+      - [TRAIT_GUID, TRAIT_CODE, TRAIT_NAME, SOURCE_TABLE, UNIT, SCALE, BETTER_DIRECTION]
+
+  field_operations:
+    description: Field operation updates per trial entry (planned vs actual date, status, how it was recorded).
+    variants:
+      - [ATTACHED_TO_FIELD_ENTITY_ID, OPERATION_TYPE_LID, PLANNED_DATE, ACTUAL_DATE, STATUS_LID,
+         DELAY_DAYS, RECORDED_VIA]

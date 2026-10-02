@@ -61,7 +61,48 @@ function mockAnswer() {
 }
 
 const COLOUR_RANK = { [COLOURS.RED]: 0, [COLOURS.AMBER]: 1, [COLOURS.GREEN]: 2 };
-const HASH_SKIP = new Set(['instructions', 'tokens']);
+// trial_counts is derived from `trials`, which is hashed, so skipping it loses nothing and keeps the
+// hashes of justifications saved before the engine added it (they are still reused).
+const HASH_SKIP = new Set(['instructions', 'tokens', 'trial_counts']);
+const MIN_WORD_LENGTH = 3;
+const NEAR_DUPLICATE_JACCARD = 0.5;
+
+const numbersIn = (words) => [...words].filter((word) => /^\d+$/.test(word)).sort().join(',');
+
+function warningWords(message) {
+  return new Set((String(message).toLowerCase().match(/[\p{L}\p{N}_]+/gu) ?? [])
+    .filter((word) => word.length >= MIN_WORD_LENGTH || /^\d+$/.test(word)));
+}
+
+function jaccard(a, b) {
+  let shared = 0;
+  a.forEach((word) => { if (b.has(word)) shared += 1; });
+  const union = a.size + b.size - shared;
+  return union === 0 ? 1 : shared / union;
+}
+
+// Claude explains in batches and each batch may repeat the same note in other words
+// ("20 trials have no PLANTING operation" twice). A warning is dropped when one with the same code
+// and file already shares at least half of its words (Jaccard index on word sets). When both notes
+// contain numbers, the numbers must also match: "12 trials" and "20 trials" are different facts.
+export function dedupeWarnings(warnings) {
+  const kept = [];
+  const keptWords = [];
+  for (const item of warnings) {
+    const words = warningWords(item.message);
+    const isRepeat = kept.some((other, index) => {
+      if (other.code !== item.code || other.file !== item.file) return false;
+      const [mine, theirs] = [numbersIn(words), numbersIn(keptWords[index])];
+      if (mine && theirs && mine !== theirs) return false;
+      return jaccard(keptWords[index], words) >= NEAR_DUPLICATE_JACCARD;
+    });
+    if (!isRepeat) {
+      kept.push(item);
+      keptWords.push(words);
+    }
+  }
+  return kept;
+}
 
 function canonical(value) {
   if (Array.isArray(value)) return value.map(canonical);
@@ -225,7 +266,7 @@ async function liveAnalysis({ text, files, ingest, claude, dataEngine, db, model
       status: MESSAGE_STATUS.OK,
       analysis: {
         summary: buildSummary(candidates),
-        warnings,
+        warnings: dedupeWarnings(warnings),
         ingestion: ingested.ingestion,
       },
       usage: explained.usage ?? emptyUsage(),

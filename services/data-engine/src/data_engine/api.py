@@ -126,7 +126,7 @@ class SqlIn(BaseModel):
 def health():
     e = engine()
     return {"healthy": True, "version": __version__, "candidates": len(e.candidate_decisions),
-            "trials": len(e.trial_decisions), "calibration": e.calibration is not None,
+            "trials": len(e.model.trials), "calibration": e.calibration is not None, "profile": e.profile,
             "documents": len(e.documents)}
 
 

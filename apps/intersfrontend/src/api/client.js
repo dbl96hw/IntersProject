@@ -85,6 +85,25 @@ export function getChat(chatId) {
   return requestJson(`${API_PATHS.CHATS}/${chatId}`);
 }
 
+export async function createChat(title) {
+  const body = await sendJson(API_PATHS.CHATS, 'POST', title ? { title } : {});
+  if (!body?.chat?.id) {
+    throw new ApiError({ code: API_ERROR_CODES.UNEXPECTED, message: HEALTH_TEXT.UNEXPECTED, field: null });
+  }
+  return body.chat;
+}
+
+// Files go as multipart, one `files` field per file. No Content-Type header: the browser sets the
+// multipart boundary itself. No timeout: an analysis of 150 candidates takes about 90 seconds.
+export function postChatFiles(chatId, files, text = '') {
+  const form = new FormData();
+  if (text) {
+    form.append('text', text);
+  }
+  files.forEach((file) => form.append('files', file, file.name));
+  return requestJson(`${API_PATHS.CHATS}/${chatId}/messages`, { method: 'POST', body: form });
+}
+
 // Text only. The backend loads history from saved messages.
 export function postChatMessage(chatId, text) {
   return sendJson(`${API_PATHS.CHATS}/${chatId}/messages`, 'POST', { text });

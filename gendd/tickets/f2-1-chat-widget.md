@@ -55,7 +55,7 @@ The widget always posts the question and renders the saved answer. It does not s
 
 ## Known risks
 
-- `query_candidates` returns at most 20 rows, with no total and no truncated flag. A live answer said "20 red lines" when the rule colour count is 54.
+- (Fixed on `fix/demo-readiness`: the tool returns `total` and `truncated`.) `query_candidates` returned at most 20 rows, with no total and no truncated flag. A live answer said "20 red lines" when the rule colour count is 54.
 - `apply_scoring` counts rule colour (RED 54). `query_candidates` filters effective colour after overrides (50 on that check). The chat can report both. On the widget check it said 54 / 71 / 25 while the open board showed 53 / 72 / 25.
 - `ANSWER_UNVERIFIED_NUMBERS` is a partial net. It fired on 3 of 4 answers in the first live chat, including correct counts written as words (`dos`). Digits 1, 3, 4 and 5 can match another field and pass. The widget shows a calm notice when the warning is present and never a verified mark. No warning does not mean the numbers were checked.
 - The chat uses the engine's effective colour, which is global. The board uses the colour saved on that chat. They can differ after an override in another chat.

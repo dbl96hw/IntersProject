@@ -115,6 +115,9 @@ CANDIDATE_SPECS = [
     Spec("MEAN_YIELD_T_HA", "affine"), Spec("MEAN_MOISTURE_PCT", "affine"),
     Spec("MEAN_DISEASE_SCORE", "affine"), Spec("MEAN_PLANT_HEIGHT_CM", "affine"),
     Spec("MEAN_FLOWERING_DAYS", "affine"), Spec("FAIL_SHARE", "affine"),
+    # Integrated V2 drop: named lab traits and the candidate summary (absent columns are skipped).
+    Spec("YIELD_VS_CHECK_PCT", "affine"), Spec("DISEASE_SCORE_MEAN", "affine"), Spec("MOISTURE_PCT_MEAN", "affine"),
+    Spec("GERMINATION_PCT", "affine"), Spec("COLD_TEST_PCT", "affine"), Spec("FUMONISIN_PPM", "affine"),
 ]
 
 TRIAL_SPECS = [

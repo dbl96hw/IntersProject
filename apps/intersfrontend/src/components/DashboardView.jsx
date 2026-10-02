@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import DashboardFilters from './DashboardFilters';
 import EditCandidateModal from './EditCandidateModal';
+import IngestionList from './IngestionList';
 import RowContextMenu from './RowContextMenu';
 import TriageSection from './TriageSection';
 import {
@@ -29,7 +30,14 @@ function matchesSearch(candidate, searchText) {
     .includes(query);
 }
 
-function DashboardView({ title, candidates, warnings = [], breederUser = '', onCandidateUpdated = () => {} }) {
+function DashboardView({
+  title,
+  candidates,
+  warnings = [],
+  ingestion = [],
+  breederUser = '',
+  onCandidateUpdated = () => {},
+}) {
   const [expandedIds, setExpandedIds] = useState(() => new Set());
   const [contextMenu, setContextMenu] = useState(null);
   const [editingCandidate, setEditingCandidate] = useState(null);
@@ -110,6 +118,8 @@ function DashboardView({ title, candidates, warnings = [], breederUser = '', onC
         onStatusFilterChange={setStatusFilter}
         statusCounts={statusCounts}
       />
+
+      <IngestionList ingestion={ingestion} />
 
       {warnings.length > 0 && (
         <ul className="dashboard__warnings" data-testid="analysis-warnings">

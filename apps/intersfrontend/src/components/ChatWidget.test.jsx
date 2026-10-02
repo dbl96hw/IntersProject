@@ -98,6 +98,46 @@ describe('ChatWidget', () => {
     expect(answer).toHaveStyle({ whiteSpace: 'pre-wrap' });
   });
 
+  it('renders **bold** and *bold* from the model as strong text, without the asterisks', async () => {
+    const user = userEvent.setup();
+    mockFetch(() => Promise.resolve(jsonResponse(answerMessage('**RED**: 54\n- *GREEN*: 25\n- 2 * 3 stays'))));
+    render(<ChatWidget chatId="chat-1" />);
+
+    await sendQuestion(user, 'How many lines are there per colour?');
+
+    const red = screen.getByText('RED');
+    expect(red.tagName).toBe('STRONG');
+    expect(screen.getByText('GREEN').tagName).toBe('STRONG');
+    const answer = red.closest('p');
+    expect(answer.textContent).toBe('RED: 54\n- GREEN: 25\n- 2 * 3 stays');
+    expect(answer.textContent).not.toContain('**');
+  });
+
+  it('shows HTML in an answer as text and never runs it', async () => {
+    const user = userEvent.setup();
+    const html = '<script>window.hacked = true</script><b>x</b>';
+    mockFetch(() => Promise.resolve(jsonResponse(answerMessage(html))));
+    render(<ChatWidget chatId="chat-1" />);
+
+    await sendQuestion(user, 'why?');
+
+    expect(screen.getByText(html)).toBeInTheDocument();
+    expect(document.querySelector('.chat-message__text script')).toBeNull();
+    expect(document.querySelector('.chat-message__text b')).toBeNull();
+    expect(window.hacked).toBeUndefined();
+  });
+
+  it('leaves an answer without markdown unchanged', async () => {
+    const user = userEvent.setup();
+    mockFetch(() => Promise.resolve(jsonResponse(answerMessage('SYN-MZ-00001 is RED: yield 6.07 t/ha.'))));
+    render(<ChatWidget chatId="chat-1" />);
+
+    await sendQuestion(user, 'why?');
+
+    const answer = screen.getByText('SYN-MZ-00001 is RED: yield 6.07 t/ha.');
+    expect(answer.querySelector('strong')).toBeNull();
+  });
+
   it('shows a calm notice when numbers could not be checked and never a verified mark', async () => {
     const user = userEvent.setup();
     mockFetch(() => Promise.resolve(jsonResponse(answerMessage('20 lines are red.', [

@@ -1,1074 +1,147 @@
 {
   "sample": true,
-  "rule_version": "SYNTH_V1_RECON_2026-09-30",
-  "mode": "weighted_severity",
+  "rule_version": "SYNTH_V2_RAG_RECON_2026-10-02",
+  "mode": "candidate_rag",
+  "level": "candidate",
   "parity": {
-    "agree": 72,
-    "total": 72,
+    "agree": 150,
+    "total": 150,
     "accuracy": 1.0
   },
   "confusion_official_vs_engine": {
-    "PASS": {
-      "PASS": 7,
-      "HOLD": 0,
-      "FAIL": 0
+    "GREEN": {
+      "GREEN": 32,
+      "AMBER": 0,
+      "RED": 0
     },
-    "HOLD": {
-      "PASS": 0,
-      "HOLD": 35,
-      "FAIL": 0
+    "AMBER": {
+      "GREEN": 0,
+      "AMBER": 53,
+      "RED": 0
     },
-    "FAIL": {
-      "PASS": 0,
-      "HOLD": 0,
-      "FAIL": 30
+    "RED": {
+      "GREEN": 0,
+      "AMBER": 0,
+      "RED": 65
     }
   },
   "not_explained": [],
-  "mismatch_root_causes": {
-    "gate": {
-      "mismatches": 17,
-      "by_category": {
-        "WEIGHTING": 17
-      },
-      "cases": [
-        {
-          "trial_id": "SYN-TR-0001",
-          "official": "FAIL",
-          "engine": "HOLD",
-          "category": "WEIGHTING",
-          "why": "the weighted-severity rule reproduces the official verdict",
-          "shortfalls": {
-            "disease": 0.54
-          },
-          "p_fail_model": 0.5763,
-          "nearest_trials": {
-            "SYN-TR-0061": "HOLD",
-            "SYN-TR-0025": "FAIL",
-            "SYN-TR-0007": "FAIL",
-            "SYN-TR-0042": "FAIL",
-            "SYN-TR-0072": "HOLD"
-          }
-        },
-        {
-          "trial_id": "SYN-TR-0004",
-          "official": "FAIL",
-          "engine": "HOLD",
-          "category": "WEIGHTING",
-          "why": "the weighted-severity rule reproduces the official verdict",
-          "shortfalls": {
-            "disease": 0.44
-          },
-          "p_fail_model": 0.8807,
-          "nearest_trials": {
-            "SYN-TR-0069": "FAIL",
-            "SYN-TR-0065": "FAIL",
-            "SYN-TR-0048": "FAIL",
-            "SYN-TR-0054": "FAIL",
-            "SYN-TR-0013": "HOLD"
-          }
-        },
-        {
-          "trial_id": "SYN-TR-0007",
-          "official": "FAIL",
-          "engine": "HOLD",
-          "category": "WEIGHTING",
-          "why": "the weighted-severity rule reproduces the official verdict",
-          "shortfalls": {
-            "disease": 0.64
-          },
-          "p_fail_model": 0.276,
-          "nearest_trials": {
-            "SYN-TR-0001": "FAIL",
-            "SYN-TR-0042": "FAIL",
-            "SYN-TR-0041": "HOLD",
-            "SYN-TR-0061": "HOLD",
-            "SYN-TR-0025": "FAIL"
-          }
-        },
-        {
-          "trial_id": "SYN-TR-0008",
-          "official": "FAIL",
-          "engine": "HOLD",
-          "category": "WEIGHTING",
-          "why": "the weighted-severity rule reproduces the official verdict",
-          "shortfalls": {
-            "disease": 0.66
-          },
-          "p_fail_model": 0.6761,
-          "nearest_trials": {
-            "SYN-TR-0023": "FAIL",
-            "SYN-TR-0068": "HOLD",
-            "SYN-TR-0061": "HOLD",
-            "SYN-TR-0021": "FAIL",
-            "SYN-TR-0007": "FAIL"
-          }
-        },
-        {
-          "trial_id": "SYN-TR-0023",
-          "official": "FAIL",
-          "engine": "HOLD",
-          "category": "WEIGHTING",
-          "why": "the weighted-severity rule reproduces the official verdict",
-          "shortfalls": {
-            "moisture": 0.023,
-            "disease": 0.56
-          },
-          "p_fail_model": 0.9013,
-          "nearest_trials": {
-            "SYN-TR-0008": "FAIL",
-            "SYN-TR-0068": "HOLD",
-            "SYN-TR-0061": "HOLD",
-            "SYN-TR-0021": "FAIL",
-            "SYN-TR-0067": "HOLD"
-          }
-        },
-        {
-          "trial_id": "SYN-TR-0025",
-          "official": "FAIL",
-          "engine": "HOLD",
-          "category": "WEIGHTING",
-          "why": "the weighted-severity rule reproduces the official verdict",
-          "shortfalls": {
-            "disease": 0.66
-          },
-          "p_fail_model": 0.4222,
-          "nearest_trials": {
-            "SYN-TR-0041": "HOLD",
-            "SYN-TR-0001": "FAIL",
-            "SYN-TR-0019": "HOLD",
-            "SYN-TR-0039": "FAIL",
-            "SYN-TR-0042": "FAIL"
-          }
-        },
-        {
-          "trial_id": "SYN-TR-0027",
-          "official": "FAIL",
-          "engine": "HOLD",
-          "category": "WEIGHTING",
-          "why": "the weighted-severity rule reproduces the official verdict",
-          "shortfalls": {
-            "disease": 0.64,
-            "genomic_value": 0.012
-          },
-          "p_fail_model": 0.9524,
-          "nearest_trials": {
-            "SYN-TR-0042": "FAIL",
-            "SYN-TR-0072": "HOLD",
-            "SYN-TR-0061": "HOLD",
-            "SYN-TR-0032": "HOLD",
-            "SYN-TR-0002": "HOLD"
-          }
-        },
-        {
-          "trial_id": "SYN-TR-0028",
-          "official": "HOLD",
-          "engine": "FAIL",
-          "category": "WEIGHTING",
-          "why": "the weighted-severity rule reproduces the official verdict",
-          "shortfalls": {
-            "yield": 0.208
-          },
-          "p_fail_model": 0.2509,
-          "nearest_trials": {
-            "SYN-TR-0071": "HOLD",
-            "SYN-TR-0058": "HOLD",
-            "SYN-TR-0003": "PASS",
-            "SYN-TR-0063": "FAIL",
-            "SYN-TR-0050": "PASS"
-          }
-        },
-        {
-          "trial_id": "SYN-TR-0031",
-          "official": "HOLD",
-          "engine": "FAIL",
-          "category": "WEIGHTING",
-          "why": "the weighted-severity rule reproduces the official verdict",
-          "shortfalls": {
-            "yield": 0.056
-          },
-          "p_fail_model": 0.5061,
-          "nearest_trials": {
-            "SYN-TR-0061": "HOLD",
-            "SYN-TR-0059": "HOLD",
-            "SYN-TR-0056": "HOLD",
-            "SYN-TR-0016": "FAIL",
-            "SYN-TR-0049": "HOLD"
-          }
-        },
-        {
-          "trial_id": "SYN-TR-0039",
-          "official": "FAIL",
-          "engine": "HOLD",
-          "category": "WEIGHTING",
-          "why": "the weighted-severity rule reproduces the official verdict",
-          "shortfalls": {
-            "disease": 0.54
-          },
-          "p_fail_model": 0.403,
-          "nearest_trials": {
-            "SYN-TR-0024": "HOLD",
-            "SYN-TR-0019": "HOLD",
-            "SYN-TR-0025": "FAIL",
-            "SYN-TR-0041": "HOLD",
-            "SYN-TR-0005": "HOLD"
-          }
-        },
-        {
-          "trial_id": "SYN-TR-0042",
-          "official": "FAIL",
-          "engine": "HOLD",
-          "category": "WEIGHTING",
-          "why": "the weighted-severity rule reproduces the official verdict",
-          "shortfalls": {
-            "disease": 0.54,
-            "genomic_value": 0.012
-          },
-          "p_fail_model": 0.5114,
-          "nearest_trials": {
-            "SYN-TR-0027": "FAIL",
-            "SYN-TR-0072": "HOLD",
-            "SYN-TR-0002": "HOLD",
-            "SYN-TR-0025": "FAIL",
-            "SYN-TR-0001": "FAIL"
-          }
-        },
-        {
-          "trial_id": "SYN-TR-0045",
-          "official": "FAIL",
-          "engine": "HOLD",
-          "category": "WEIGHTING",
-          "why": "the weighted-severity rule reproduces the official verdict",
-          "shortfalls": {
-            "moisture": 0.155,
-            "disease": 0.64,
-            "genomic_value": 0.066
-          },
-          "p_fail_model": 0.8978,
-          "nearest_trials": {
-            "SYN-TR-0021": "FAIL",
-            "SYN-TR-0032": "HOLD",
-            "SYN-TR-0029": "FAIL",
-            "SYN-TR-0027": "FAIL",
-            "SYN-TR-0066": "HOLD"
-          }
-        },
-        {
-          "trial_id": "SYN-TR-0049",
-          "official": "HOLD",
-          "engine": "FAIL",
-          "category": "WEIGHTING",
-          "why": "the weighted-severity rule reproduces the official verdict",
-          "shortfalls": {
-            "yield": 0.181,
-            "moisture": 0.018
-          },
-          "p_fail_model": 0.3345,
-          "nearest_trials": {
-            "SYN-TR-0056": "HOLD",
-            "SYN-TR-0010": "FAIL",
-            "SYN-TR-0031": "HOLD",
-            "SYN-TR-0050": "PASS",
-            "SYN-TR-0058": "HOLD"
-          }
-        },
-        {
-          "trial_id": "SYN-TR-0058",
-          "official": "HOLD",
-          "engine": "FAIL",
-          "category": "WEIGHTING",
-          "why": "the weighted-severity rule reproduces the official verdict",
-          "shortfalls": {
-            "yield": 0.152,
-            "disease": 0.06
-          },
-          "p_fail_model": 0.9136,
-          "nearest_trials": {
-            "SYN-TR-0063": "FAIL",
-            "SYN-TR-0048": "FAIL",
-            "SYN-TR-0013": "HOLD",
-            "SYN-TR-0028": "HOLD",
-            "SYN-TR-0049": "HOLD"
-          }
-        },
-        {
-          "trial_id": "SYN-TR-0065",
-          "official": "FAIL",
-          "engine": "HOLD",
-          "category": "WEIGHTING",
-          "why": "the weighted-severity rule reproduces the official verdict",
-          "shortfalls": {
-            "disease": 0.58
-          },
-          "p_fail_model": 0.2943,
-          "nearest_trials": {
-            "SYN-TR-0004": "FAIL",
-            "SYN-TR-0005": "HOLD",
-            "SYN-TR-0039": "FAIL",
-            "SYN-TR-0069": "FAIL",
-            "SYN-TR-0024": "HOLD"
-          }
-        },
-        {
-          "trial_id": "SYN-TR-0066",
-          "official": "HOLD",
-          "engine": "FAIL",
-          "category": "WEIGHTING",
-          "why": "the weighted-severity rule reproduces the official verdict",
-          "shortfalls": {
-            "yield": 0.011,
-            "disease": 0.28,
-            "genomic_value": 0.033
-          },
-          "p_fail_model": 0.8881,
-          "nearest_trials": {
-            "SYN-TR-0006": "FAIL",
-            "SYN-TR-0021": "FAIL",
-            "SYN-TR-0072": "HOLD",
-            "SYN-TR-0027": "FAIL",
-            "SYN-TR-0042": "FAIL"
-          }
-        },
-        {
-          "trial_id": "SYN-TR-0071",
-          "official": "HOLD",
-          "engine": "FAIL",
-          "category": "WEIGHTING",
-          "why": "the weighted-severity rule reproduces the official verdict",
-          "shortfalls": {
-            "yield": 0.149
-          },
-          "p_fail_model": 0.3529,
-          "nearest_trials": {
-            "SYN-TR-0028": "HOLD",
-            "SYN-TR-0022": "FAIL",
-            "SYN-TR-0050": "PASS",
-            "SYN-TR-0070": "PASS",
-            "SYN-TR-0046": "HOLD"
-          }
-        }
-      ]
+  "reason_text_identical": {
+    "agree": 146,
+    "total": 150
+  },
+  "recomputed_from_raw_data": {
+    "N_TRIALS": {
+      "compared": 150,
+      "max_abs_diff": 0.0,
+      "tolerance": 0.0,
+      "outside_tolerance": 0,
+      "examples": [],
+      "missing_on_one_side": 0
     },
-    "severity": {
-      "mismatches": 4,
-      "by_category": {
-        "WEIGHTING": 4
-      },
-      "cases": [
-        {
-          "trial_id": "SYN-TR-0022",
-          "official": "FAIL",
-          "engine": "HOLD",
-          "category": "WEIGHTING",
-          "why": "the weighted-severity rule reproduces the official verdict",
-          "shortfalls": {
-            "yield": 0.326
-          },
-          "p_fail_model": 0.7476,
-          "nearest_trials": {
-            "SYN-TR-0071": "HOLD",
-            "SYN-TR-0046": "HOLD",
-            "SYN-TR-0064": "FAIL",
-            "SYN-TR-0036": "FAIL",
-            "SYN-TR-0031": "HOLD"
-          }
-        },
-        {
-          "trial_id": "SYN-TR-0036",
-          "official": "FAIL",
-          "engine": "HOLD",
-          "category": "WEIGHTING",
-          "why": "the weighted-severity rule reproduces the official verdict",
-          "shortfalls": {
-            "yield": 0.302,
-            "genomic_value": 0.033
-          },
-          "p_fail_model": 0.3056,
-          "nearest_trials": {
-            "SYN-TR-0015": "FAIL",
-            "SYN-TR-0066": "HOLD",
-            "SYN-TR-0059": "HOLD",
-            "SYN-TR-0022": "FAIL",
-            "SYN-TR-0030": "FAIL"
-          }
-        },
-        {
-          "trial_id": "SYN-TR-0061",
-          "official": "HOLD",
-          "engine": "FAIL",
-          "category": "WEIGHTING",
-          "why": "the weighted-severity rule reproduces the official verdict",
-          "shortfalls": {
-            "disease": 0.4
-          },
-          "p_fail_model": 0.6722,
-          "nearest_trials": {
-            "SYN-TR-0001": "FAIL",
-            "SYN-TR-0031": "HOLD",
-            "SYN-TR-0027": "FAIL",
-            "SYN-TR-0072": "HOLD",
-            "SYN-TR-0004": "FAIL"
-          }
-        },
-        {
-          "trial_id": "SYN-TR-0068",
-          "official": "HOLD",
-          "engine": "FAIL",
-          "category": "WEIGHTING",
-          "why": "the weighted-severity rule reproduces the official verdict",
-          "shortfalls": {
-            "moisture": 0.164,
-            "disease": 0.34
-          },
-          "p_fail_model": 0.2646,
-          "nearest_trials": {
-            "SYN-TR-0023": "FAIL",
-            "SYN-TR-0067": "HOLD",
-            "SYN-TR-0008": "FAIL",
-            "SYN-TR-0014": "HOLD",
-            "SYN-TR-0051": "HOLD"
-          }
-        }
-      ]
+    "N_TRIALS_USED": {
+      "compared": 150,
+      "max_abs_diff": 0.0,
+      "tolerance": 0.0,
+      "outside_tolerance": 0,
+      "examples": [],
+      "missing_on_one_side": 0
     },
-    "weighted_severity": {
-      "mismatches": 0,
-      "by_category": {},
-      "cases": []
+    "YIELD_VS_CHECK_PCT": {
+      "compared": 148,
+      "max_abs_diff": 0.0491,
+      "tolerance": 0.0501,
+      "outside_tolerance": 0,
+      "examples": [],
+      "missing_on_one_side": 0
+    },
+    "DISEASE_SCORE_MEAN": {
+      "compared": 148,
+      "max_abs_diff": 0.0044,
+      "tolerance": 0.00501,
+      "outside_tolerance": 0,
+      "examples": [],
+      "missing_on_one_side": 0
+    },
+    "MOISTURE_PCT_MEAN": {
+      "compared": 148,
+      "max_abs_diff": 0.05,
+      "tolerance": 0.0501,
+      "outside_tolerance": 0,
+      "examples": [],
+      "missing_on_one_side": 0
+    },
+    "GERMINATION_PCT": {
+      "compared": 150,
+      "max_abs_diff": 0.05,
+      "tolerance": 0.0501,
+      "outside_tolerance": 0,
+      "examples": [],
+      "missing_on_one_side": 0
+    },
+    "FUMONISIN_PPM": {
+      "compared": 150,
+      "max_abs_diff": 0.0,
+      "tolerance": 0.00501,
+      "outside_tolerance": 0,
+      "examples": [],
+      "missing_on_one_side": 0
     }
   },
-  "calibration": {
-    "n_trials": 72,
-    "n_non_pass": 65,
-    "ceiling": {
-      "max_correct": 60,
-      "total": 72,
-      "ceiling_accuracy": 0.8333,
-      "distinct_inputs": 25,
-      "inputs_with_conflicting_labels": 8,
-      "rows_in_conflict": 34
-    },
-    "rule_auc": 0.7881,
-    "severity_auc": 0.9857,
-    "severity_cv_accuracy": 0.9018,
-    "severity_cv_std": 0.0708,
-    "severity_cut_interval": [
-      0.325,
-      0.42
+  "mismatch_root_causes": {},
+  "calibration": null,
+  "rules": {
+    "min_usable_trials": 2,
+    "exclude_trial_if_missed": [
+      "IRRIGATION"
     ],
-    "weighted": {
-      "criteria": [
-        "yield",
-        "moisture",
-        "disease",
-        "genomic_value"
-      ],
-      "weights_fitted": {
-        "yield": 1.0,
-        "moisture": 0.1904,
-        "disease": 0.5644,
-        "genomic_value": 0.0758
+    "criteria": {
+      "yield_vs_check": {
+        "field": "YIELD_VS_CHECK_PCT",
+        "label": "yield vs checks",
+        "better": "higher",
+        "percent": true,
+        "must_pass": 95,
+        "must_word": "minimum",
+        "target": 103
       },
-      "cut_fitted": 0.2483,
-      "weights_config": {
-        "yield": 1.0,
-        "moisture": 0.1904,
-        "disease": 0.5644,
-        "genomic_value": 0.0758
+      "disease": {
+        "field": "DISEASE_SCORE_MEAN",
+        "label": "disease score",
+        "better": "lower",
+        "must_pass": 6.0,
+        "must_word": "limit",
+        "target": 4.0
       },
-      "cut_config": 0.2483,
-      "train_accuracy_config": 1.0,
-      "cv_accuracy": 0.9865,
-      "cv_std": 0.0345,
-      "cv_weights_p05": {
-        "yield": 1.0,
-        "moisture": -0.007,
-        "disease": 0.544,
-        "genomic_value": 0.0,
-        "cut": 0.239
+      "moisture": {
+        "field": "MOISTURE_PCT_MEAN",
+        "label": "harvest moisture",
+        "better": "lower",
+        "target": 23.0,
+        "second": 25.0,
+        "second_word": "limit"
       },
-      "cv_weights_p95": {
-        "yield": 1.0,
-        "moisture": 0.28,
-        "disease": 0.603,
-        "genomic_value": 0.205,
-        "cut": 0.265
+      "germination": {
+        "field": "GERMINATION_PCT",
+        "label": "germination",
+        "better": "higher",
+        "percent": true,
+        "target": 90,
+        "second": 85,
+        "second_word": "minimum"
       },
-      "auc_in_sample": 1.0,
-      "min_margin_to_cut": 4e-05,
-      "near_cut_trials": [
-        "SYN-TR-0004"
-      ]
+      "fumonisin": {
+        "field": "FUMONISIN_PPM",
+        "label": "fumonisin",
+        "better": "lower",
+        "must_pass": 4.0,
+        "must_word": "limit"
+      }
     },
-    "model_auc_mean": 0.9069,
-    "model_auc_std": 0.0876,
-    "model_train_auc": 0.9799,
-    "overtraining_gap": 0.073,
-    "rule_accuracy": 0.7385,
-    "coefficients": {
-      "YIELD_T_HA": -1.4662,
-      "MOISTURE_PCT": 0.2413,
-      "DISEASE_SCORE": 1.7191,
-      "PLANT_HEIGHT_CM": -0.0806,
-      "FLOWERING_DAYS": -0.3309,
-      "GENOMIC_BREEDING_VALUE_MEAN": 0.4215,
-      "RESISTANT_MATERIAL_PCT": -0.6235,
-      "location[h1]": 0.0868,
-      "location[h2]": -0.9677,
-      "location[h3]": -0.4012,
-      "location[h4]": -0.0073,
-      "location[h5]": -0.0596
-    },
-    "features_used": [
-      "YIELD_T_HA",
-      "MOISTURE_PCT",
-      "DISEASE_SCORE",
-      "PLANT_HEIGHT_CM",
-      "FLOWERING_DAYS",
-      "GENOMIC_BREEDING_VALUE_MEAN",
-      "RESISTANT_MATERIAL_PCT",
-      "location[h1]",
-      "location[h2]",
-      "location[h3]",
-      "location[h4]",
-      "location[h5]"
-    ],
-    "features_excluded": [
-      "PLANTING_DATE"
-    ],
-    "ambiguous_trials": [
-      "SYN-TR-0001",
-      "SYN-TR-0016",
-      "SYN-TR-0024",
-      "SYN-TR-0025",
-      "SYN-TR-0031",
-      "SYN-TR-0039",
-      "SYN-TR-0042",
-      "SYN-TR-0046",
-      "SYN-TR-0048",
-      "SYN-TR-0051",
-      "SYN-TR-0071"
-    ],
-    "roc": {
-      "rule_fpr": [
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0286,
-        0.0571,
-        0.0571,
-        0.0857,
-        0.1143,
-        0.1143,
-        0.1143,
-        0.1429,
-        0.1429,
-        0.1429,
-        0.1714,
-        0.2,
-        0.2286,
-        0.2571,
-        0.2857,
-        0.2857,
-        0.3429,
-        0.3714,
-        0.3714,
-        0.4,
-        0.4,
-        0.4286,
-        0.4286,
-        0.4571,
-        0.4857,
-        0.5143,
-        0.5143,
-        0.5143,
-        0.5429,
-        0.5714,
-        0.5714,
-        0.6,
-        0.6571,
-        0.6857,
-        0.6857,
-        0.6857,
-        0.7143,
-        0.7429,
-        0.7714,
-        0.8,
-        0.8286,
-        0.8571,
-        0.8857,
-        0.9143,
-        0.9143,
-        0.9429,
-        0.9714,
-        1.0
-      ],
-      "rule_tpr": [
-        0.0,
-        0.0333,
-        0.0667,
-        0.1,
-        0.1333,
-        0.1667,
-        0.2,
-        0.2333,
-        0.2667,
-        0.3,
-        0.3333,
-        0.3667,
-        0.4,
-        0.4333,
-        0.4667,
-        0.4667,
-        0.4667,
-        0.5,
-        0.5,
-        0.5,
-        0.5333,
-        0.5667,
-        0.5667,
-        0.6,
-        0.6333,
-        0.6333,
-        0.6333,
-        0.6333,
-        0.6333,
-        0.6333,
-        0.6667,
-        0.6667,
-        0.6667,
-        0.7,
-        0.7,
-        0.7333,
-        0.7667,
-        0.8,
-        0.8,
-        0.8,
-        0.8,
-        0.8333,
-        0.8667,
-        0.8667,
-        0.8667,
-        0.9,
-        0.9,
-        0.9,
-        0.9,
-        0.9333,
-        0.9667,
-        0.9667,
-        0.9667,
-        0.9667,
-        0.9667,
-        0.9667,
-        0.9667,
-        0.9667,
-        0.9667,
-        1.0,
-        1.0,
-        1.0,
-        1.0
-      ],
-      "model_fpr": [
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0286,
-        0.0286,
-        0.0286,
-        0.0286,
-        0.0286,
-        0.0571,
-        0.0571,
-        0.0571,
-        0.0571,
-        0.0571,
-        0.0571,
-        0.0857,
-        0.0857,
-        0.0857,
-        0.1143,
-        0.1429,
-        0.1429,
-        0.1714,
-        0.1714,
-        0.1714,
-        0.1714,
-        0.2,
-        0.2286,
-        0.2571,
-        0.2857,
-        0.3143,
-        0.3143,
-        0.3143,
-        0.3429,
-        0.3429,
-        0.3714,
-        0.4,
-        0.4286,
-        0.4571,
-        0.4857,
-        0.4857,
-        0.5143,
-        0.5429,
-        0.5714,
-        0.6,
-        0.6286,
-        0.6571,
-        0.6857,
-        0.7143,
-        0.7429,
-        0.7714,
-        0.8,
-        0.8286,
-        0.8571,
-        0.8857,
-        0.9143,
-        0.9429,
-        0.9714,
-        1.0
-      ],
-      "model_tpr": [
-        0.0,
-        0.0333,
-        0.0667,
-        0.1,
-        0.1333,
-        0.1667,
-        0.2,
-        0.2333,
-        0.2667,
-        0.3,
-        0.3333,
-        0.3667,
-        0.3667,
-        0.4,
-        0.4333,
-        0.4667,
-        0.5,
-        0.5,
-        0.5333,
-        0.5667,
-        0.6,
-        0.6333,
-        0.6667,
-        0.6667,
-        0.7,
-        0.7333,
-        0.7333,
-        0.7333,
-        0.7667,
-        0.7667,
-        0.8,
-        0.8333,
-        0.8667,
-        0.8667,
-        0.8667,
-        0.8667,
-        0.8667,
-        0.8667,
-        0.9,
-        0.9333,
-        0.9333,
-        0.9667,
-        0.9667,
-        0.9667,
-        0.9667,
-        0.9667,
-        0.9667,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0
-      ],
-      "severity_fpr": [
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0286,
-        0.0286,
-        0.0286,
-        0.0286,
-        0.0286,
-        0.0286,
-        0.0571,
-        0.0571,
-        0.0857,
-        0.1143,
-        0.1143,
-        0.1143,
-        0.1429,
-        0.1714,
-        0.2,
-        0.2286,
-        0.2571,
-        0.2857,
-        0.3143,
-        0.3429,
-        0.3714,
-        0.4,
-        0.4286,
-        0.4571,
-        0.4857,
-        0.5143,
-        0.5429,
-        0.5714,
-        0.6,
-        0.6286,
-        0.6571,
-        0.6857,
-        0.7143,
-        0.7429,
-        0.7714,
-        0.8,
-        0.8286,
-        0.8571,
-        0.8857,
-        1.0
-      ],
-      "severity_tpr": [
-        0.0,
-        0.0333,
-        0.0667,
-        0.1,
-        0.1333,
-        0.1667,
-        0.2,
-        0.2333,
-        0.2667,
-        0.3,
-        0.3333,
-        0.3667,
-        0.4333,
-        0.4667,
-        0.5,
-        0.5333,
-        0.5667,
-        0.6,
-        0.6333,
-        0.6667,
-        0.7333,
-        0.7333,
-        0.7667,
-        0.8,
-        0.8333,
-        0.8667,
-        0.9,
-        0.9,
-        0.9333,
-        0.9333,
-        0.9333,
-        0.9667,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0
-      ],
-      "weighted_fpr": [
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0286,
-        0.0571,
-        0.0857,
-        0.1143,
-        0.1429,
-        0.1714,
-        0.2,
-        0.2286,
-        0.2571,
-        0.2857,
-        0.3143,
-        0.3429,
-        0.3714,
-        0.4,
-        0.4286,
-        0.4571,
-        0.4857,
-        0.5143,
-        0.5429,
-        0.5714,
-        0.6,
-        0.6286,
-        0.6571,
-        0.6857,
-        0.7143,
-        0.7429,
-        0.7714,
-        0.8,
-        0.8286,
-        0.8571,
-        0.8857,
-        1.0
-      ],
-      "weighted_tpr": [
-        0.0,
-        0.0333,
-        0.0667,
-        0.1,
-        0.1333,
-        0.1667,
-        0.2,
-        0.2333,
-        0.2667,
-        0.3,
-        0.3333,
-        0.3667,
-        0.4,
-        0.4333,
-        0.4667,
-        0.5,
-        0.5667,
-        0.6,
-        0.6333,
-        0.6667,
-        0.7,
-        0.7333,
-        0.7667,
-        0.8,
-        0.8333,
-        0.9,
-        0.9333,
-        0.9667,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0
-      ]
-    },
-    "verdict": "yield-gate rule AUC 0.79 < calibrated model 0.91 (out of sample) < equal-weight severity 0.99 (CV accuracy 0.90 +- 0.07) <= weighted severity (CV accuracy 0.986 +- 0.034): the size of the misses carries the signal the flags lose, and a readable weighted rule captures it; the rule decides, the model only marks ambiguous trials"
+    "marker": {
+      "field": "MARKER_DISEASE_RESISTANCE",
+      "bad_value": "SUSCEPTIBLE",
+      "text": "disease-susceptible marker"
+    }
   }
 }

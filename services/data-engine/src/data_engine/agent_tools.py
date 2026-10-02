@@ -26,22 +26,34 @@ from typing import Any
 SYSTEM_PROMPT = """You are Breeder's Desk, an assistant for senior plant breeders deciding which candidate lines advance.
 
 How to answer:
-1. Reply in the breeder's language (Spanish or English), in plain words, no jargon.
+1. Always reply in English, even when the question is written in another language. Plain words, no jargon.
 2. Start with one line: the candidate or trial, its colour (GREEN / AMBER / RED) and the one-line reason from the tool.
 3. Then 2-5 bullet points of evidence, each quoting a value exactly as a tool returned it, with its source
    (for example: "yield 6.07 t/ha, below 9 (trial summary)").
 4. The colours come from a deterministic rules engine. Never change, compute or re-derive a colour, a threshold
    or any number. If a number is not in a tool result, say you do not have it.
-5. Say so explicitly when a trial is "not explained by the data", "ambiguous", or when data gaps apply
+5. Counts: never count the rows of a list yourself. Lists are cut at `limit` (20 by default). For "how many"
+   questions use apply_scoring, or the `total` returned by query_candidates. apply_scoring gives two counts:
+   `effective_counts` (after the breeders' overrides, what the dashboard shows) and `counts` (as the rules
+   decided). Report effective_counts; if `overridden` is above 0, also give the rule counts and say why they differ.
+6. Write every number with digits, exactly as the tool returned it (54, not "fifty-four"). For a candidate's
+   trials, cite `trial_counts` from get_candidate_context instead of counting the trial list.
+7. Say so explicitly when a trial is "not explained by the data", "ambiguous", or when data gaps apply
    (for example: pedigree unavailable, lab trait names unknown).
-6. You recommend, the breeder decides. End by reminding that they can override the colour in the table
+8. You recommend, the breeder decides. End by reminding that they can override the colour in the table
    and that the override is logged with their reason.
-7. Keep it short: a breeder reads this between field visits."""
+9. Format: plain text. You may use **bold** for a colour or an id and lines starting with "- " for bullets.
+   No headings, tables, links or code blocks.
+10. Keep it short: a breeder reads this between field visits."""
+
+DEFAULT_LIMIT = 20
 
 TOOLS: list[dict[str, Any]] = [
     {"name": "query_candidates",
-     "description": "List candidate lines with their colour (GREEN/AMBER/RED) and one-line reason. Use to answer "
-                    "'which lines are red?', 'show me the atypical ones', 'what should I look at first?'.",
+     "description": "List candidate lines with their colour (GREEN/AMBER/RED, after overrides) and one-line reason. "
+                    "Use to answer 'which lines are red?', 'show me the atypical ones', 'what should I look at "
+                    "first?'. Returns at most `limit` rows (default 20), red first, plus `total` (all matching "
+                    "candidates) and `truncated`. For counts use `total` or apply_scoring, never the number of rows.",
      "input_schema": {"type": "object", "properties": {
          "colour": {"type": "string", "enum": ["GREEN", "AMBER", "RED"]},
          "atypical": {"type": "boolean", "description": "only candidates whose profile is statistically atypical"},
@@ -67,7 +79,9 @@ TOOLS: list[dict[str, Any]] = [
      "description": "Parents / pedigree of a candidate, or an explicit statement that lineage is unavailable.",
      "input_schema": {"type": "object", "properties": {"candidate_id": {"type": "string"}}, "required": ["candidate_id"]}},
     {"name": "apply_scoring",
-     "description": "Colour counts and rule version for all candidates or all trials.",
+     "description": "Colour counts for all candidates or all trials: `effective_counts` (after the breeders' "
+                    "overrides, what the dashboard shows), `counts` (as the rules decided), `overridden` and the "
+                    "rule version. Use it for every 'how many' question.",
      "input_schema": {"type": "object", "properties": {"level": {"type": "string", "enum": ["candidate", "trial"]}}}},
     {"name": "explain_scoring_logic",
      "description": "How the colours are decided, how well the rules reproduce the official verdicts (parity), and "
@@ -112,8 +126,12 @@ def call_tool(engine, name: str, arguments: dict | None = None) -> str:
     args = arguments or {}
     try:
         if name == "query_candidates":
-            result: Any = engine.query_candidates(colour=args.get("colour"), atypical=args.get("atypical"),
-                                                  min_trials=args.get("min_trials"), limit=args.get("limit", 20))
+            # The full match is computed so the model gets the true total; only `limit` rows are sent.
+            limit = int(args.get("limit") or DEFAULT_LIMIT)
+            rows = engine.query_candidates(colour=args.get("colour"), atypical=args.get("atypical"),
+                                           min_trials=args.get("min_trials"))
+            result: Any = {"total": len(rows), "returned": min(limit, len(rows)), "truncated": len(rows) > limit,
+                           "limit": limit, "candidates": rows[:limit]}
         elif name == "get_candidate_context":
             result = engine.llm_context(args["candidate_id"])["payload"]
         elif name == "get_trial":

@@ -154,6 +154,10 @@ The exports are the system of record: an uploaded row whose key is already in an
 
 Documents pass the engine's relevance gate (`POST /relevance`) and, if they pass, go as bytes to `POST /documents/base64`. The gate is the engine's own check. It does not call Claude, and Claude does not extract the file. An off-topic file is not indexed: `accepted: false`, a message starting with "Not about breeding or trial data", and an `IRRELEVANT_FILE` warning. A file the gate cannot place is uploaded with a `RELEVANCE_UNCERTAIN` warning, so the breeder can check it. Tables skip the gate because the engine already rejects tables whose columns match no known source.
 
+A document's item is `accepted` only if the engine accepted it (its own gate or a failed rebuild can still refuse it; the engine's `message` is passed on). `source` and `rows` come from the tables the engine read from the document, if any. The candidates a document adds to the analysis are the ones it names: the engine returns the ids in the text (`entities_mentioned`) and the key values of its tables (`entities_in_tables`), and Express keeps only those that the engine knows (candidate ids, material GUIDs, and the candidates of a named trial). A document that names no known candidate gives an analysis with 0 candidates and its file item.
+
+Claude explains in batches, so the same note can come back in other words. `analysis.warnings` drops a warning when an earlier one with the same `code` and `file` shares at least half of its words and has the same numbers.
+
 ### Usage
 
 Totals for every Claude call made for this message. All zeros in mock mode.

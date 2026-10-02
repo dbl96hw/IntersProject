@@ -283,6 +283,13 @@ def full_report(engine, previous_run: dict | None) -> dict:
     frames = {s: pd.concat([t.frame for t in engine.tables if t.detection.source == s], ignore_index=True)
               for s in {t.detection.source for t in engine.tables if t.detection.confident}}
     integ = integrity(engine.tables, engine.model)
+    if getattr(engine, "profile", "v1") == "v2":
+        # In V2 the alias columns changed meaning (FIELD_ID is the trial, ATTACHED_TO_FIELD_ENTITY_ID the plot),
+        # so key loss is judged on the explicit references resolved by integrated_v2 instead.
+        refs = engine.v2.references
+        integ["references"] = refs
+        integ["material_keys_lost"] = integ["trial_keys_lost"] = None
+        integ["no_key_lost"] = all(r["share"] in (None, 1.0) for r in refs.values())
     rep = {
         "numerical": numerical(x, engine.spectral, evidence_mismatches) if x.shape[1] > 1 else None,
         "integrity": integ,
