@@ -270,7 +270,8 @@ Phase 4 feature, re-run the F3.1 checklist.
   - [x] Edit modal from the row context menu with status change, reason required when the status changes, comment, and an "Overridden" badge (F0.5)
   - [ ] Load reasons from `GET /api/engine/override-reasons` instead of the hardcoded `OVERRIDE_REASONS`
   - [ ] Comment required when the reason is `OTHER` (the engine rejects it otherwise; the UI says "optional")
-  - [ ] Save sends a colour change via `PATCH /api/candidates/:id` (forwards to engine `POST /overrides`) and records reviews in Supabase; field edits per F1.4 when available
+  - [x] Save sends a colour change via `PATCH /api/candidates/:id` (forwards to engine `POST /overrides`) and records reviews in Supabase
+  - [ ] Field edits per F1.4 when available
   - [ ] Table and card show `engine_colour` next to `colour` when overridden, and original next to corrected values
   - [ ] Real breeder name instead of `MOCK_USER`; override and correction history visible per candidate
   - [ ] Tests: override accepted, `OTHER` without comment rejected, engine colour unchanged, correction shown beside the original
@@ -429,8 +430,8 @@ Step 8 is merged. 9A is done. See `context/backend-development.md` and `agents/b
 
 ### Ticket 3 — Candidate decisions
 
-- Implement `PATCH /api/candidates/:id` and `POST /api/candidates/:id/decision` (today 501 after validation).
-- Colour changes forward to engine `POST /overrides`; keep `engine_colour` vs effective `colour` visible.
+- [x] Live `PATCH /api/candidates/:id` and `POST /api/candidates/:id/decision` (mock still returns 501 after validation).
+- [x] Colour changes forward to engine `POST /overrides`; `engine_colour` and the effective `colour` stay separate on the candidate row.
 
 ### Step 10 — Demo ops
 
