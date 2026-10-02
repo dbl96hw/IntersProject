@@ -47,7 +47,7 @@ function mockFetch(impl) {
 }
 
 async function openPanel(user) {
-  await user.click(screen.getByTestId('chat-minimize-button'));
+  await user.click(screen.getByTestId('chat-widget-header'));
 }
 
 async function sendQuestion(user, text) {
@@ -66,7 +66,35 @@ describe('ChatWidget', () => {
 
     expect(screen.getByTestId('chat-widget')).toBeInTheDocument();
     expect(screen.queryByTestId('chat-messages')).not.toBeInTheDocument();
-    expect(screen.getByTestId('chat-minimize-button')).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('chat-minimize-button')).not.toBeInTheDocument();
+    expect(screen.getByTestId('chat-widget-header')).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('expands from the header and shows the minus button only while open', async () => {
+    const user = userEvent.setup();
+    render(<ChatWidget chatId="chat-1" />);
+
+    await user.click(screen.getByRole('button', { name: CHAT_TEXT.EXPAND }));
+
+    expect(screen.getByTestId('chat-messages')).toBeInTheDocument();
+    expect(screen.getByTestId('chat-minimize-button')).toHaveAttribute('aria-expanded', 'true');
+
+    await user.click(screen.getByTestId('chat-minimize-button'));
+
+    expect(screen.queryByTestId('chat-messages')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('chat-minimize-button')).not.toBeInTheDocument();
+    expect(screen.getByTestId('chat-widget-header')).toBeInTheDocument();
+  });
+
+  it('closes from the minimized bar without expanding', async () => {
+    const user = userEvent.setup();
+    render(<ChatWidget chatId="chat-1" />);
+
+    await user.click(screen.getByTestId('chat-close-button'));
+
+    expect(screen.queryByTestId('chat-widget')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('chat-messages')).not.toBeInTheDocument();
+    expect(screen.getByTestId('chat-toggle-button')).toBeInTheDocument();
   });
 
   it('posts only the question text and shows the answer', async () => {

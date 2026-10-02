@@ -16,11 +16,11 @@ export default [
         window: 'readonly',
         document: 'readonly',
         fetch: 'readonly',
+        FormData: 'readonly',
         setInterval: 'readonly',
         clearInterval: 'readonly',
         URL: 'readonly',
         URLSearchParams: 'readonly',
-        FormData: 'readonly',
       },
       parserOptions: {
         ecmaFeatures: { jsx: true },

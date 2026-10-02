@@ -26,6 +26,9 @@ export const CANDIDATES_PAGE_SIZE = 100;
 // Stop paging if the list never reaches `total`. 150 candidates need 2 pages.
 export const MAX_CANDIDATE_PAGES = 10;
 
+// Multipart field name the backend reads files from; repeated once per file.
+export const UPLOAD_FIELD = 'files';
+
 export const API_ERROR_CODES = {
   NETWORK: 'NETWORK_ERROR',
   UNEXPECTED: 'UNEXPECTED_RESPONSE',

@@ -18,6 +18,7 @@ function EditCandidateModal({ candidate, breederUser, onUpdated, onClose }) {
   const [colour, setColour] = useState(candidate.colour);
   const [reasonCode, setReasonCode] = useState('');
   const [comment, setComment] = useState('');
+  const [decision, setDecision] = useState(candidate.decision || CANDIDATE_DECISIONS.PENDING);
   const [userError, setUserError] = useState('');
   const [reasonError, setReasonError] = useState('');
   const [commentError, setCommentError] = useState('');
@@ -27,6 +28,9 @@ function EditCandidateModal({ candidate, breederUser, onUpdated, onClose }) {
   const isSavingRef = useRef(false);
 
   const isStatusChanged = colour !== candidate.colour;
+  const originalDecision = candidate.decision || CANDIDATE_DECISIONS.PENDING;
+  const isDecisionChanged = decision !== originalDecision
+    && (decision === CANDIDATE_DECISIONS.PASS || decision === CANDIDATE_DECISIONS.NO_PASS);
   const commentLabel = reasonCode === OTHER_REASON_CODE ? EDIT_TEXT.COMMENT_REQUIRED : EDIT_TEXT.COMMENT_OPTIONAL;
 
   useEffect(() => {
@@ -129,43 +133,44 @@ function EditCandidateModal({ candidate, breederUser, onUpdated, onClose }) {
       setUserError(EDIT_TEXT.USER_REQUIRED);
       return;
     }
-    if (!isStatusChanged) {
+    if (!isStatusChanged && !isDecisionChanged) {
       return;
     }
-    if (reasonsState.state !== 'ready') {
-      return;
-    }
-    if (!reasonCode) {
-      setReasonError(EDIT_TEXT.REASON_REQUIRED);
-      return;
-    }
-    if (reasonCode === OTHER_REASON_CODE && !comment.trim()) {
-      setCommentError(EDIT_TEXT.COMMENT_REQUIRED_ERROR);
-      return;
-    }
-
-    send(() => updateCandidate(candidate.id, {
-      new_colour: colour,
-      reason_code: reasonCode,
-      comment: comment.trim(),
-      user: breederUser.trim(),
-    }));
-  }
-
-  function handleDecision(decision) {
-    if (isSavingRef.current || !CANDIDATE_SAVE_AVAILABLE) {
-      return;
-    }
-    clearErrors();
-    if (!breederUser.trim()) {
-      setUserError(EDIT_TEXT.USER_REQUIRED);
-      return;
+    if (isStatusChanged) {
+      if (reasonsState.state !== 'ready') {
+        return;
+      }
+      if (!reasonCode) {
+        setReasonError(EDIT_TEXT.REASON_REQUIRED);
+        return;
+      }
+      if (reasonCode === OTHER_REASON_CODE && !comment.trim()) {
+        setCommentError(EDIT_TEXT.COMMENT_REQUIRED_ERROR);
+        return;
+      }
     }
 
-    send(() => recordCandidateDecision(candidate.id, {
-      decision,
-      user: breederUser.trim(),
-    }));
+    const user = breederUser.trim();
+    send(async () => {
+      let saved = null;
+      if (isStatusChanged) {
+        const colourBody = await updateCandidate(candidate.id, {
+          new_colour: colour,
+          reason_code: reasonCode,
+          comment: comment.trim(),
+          user,
+        });
+        saved = colourBody.candidate;
+      }
+      if (isDecisionChanged) {
+        const decisionBody = await recordCandidateDecision(candidate.id, {
+          decision,
+          user,
+        });
+        saved = decisionBody.candidate;
+      }
+      return { candidate: saved };
+    });
   }
 
   function handleOverlayMouseDown(event) {
@@ -191,7 +196,7 @@ function EditCandidateModal({ candidate, breederUser, onUpdated, onClose }) {
         </h2>
 
         <p className="edit-modal__readonly" data-testid="edit-engine-reason">
-          <span className="edit-modal__readonly-label">{DASHBOARD_TEXT.ENGINE_REASON}</span>
+          <span className="edit-modal__readonly-label">{EDIT_TEXT.STATUS_REASON}</span>
           {candidate.reason}
         </p>
 
@@ -225,27 +230,27 @@ function EditCandidateModal({ candidate, breederUser, onUpdated, onClose }) {
 
         {isStatusChanged && reasonsState.state === 'ready' && (
           <>
-            <div className="edit-modal__field">
-              <label htmlFor="edit-override-reason">{EDIT_TEXT.OVERRIDE_REASON}</label>
-              <select
-                id="edit-override-reason"
-                value={reasonCode}
-                onChange={(event) => setReasonCode(event.target.value)}
-                data-testid="edit-override-reason-select"
-              >
-                <option value="">{EDIT_TEXT.OVERRIDE_REASON_PLACEHOLDER}</option>
-                {Object.entries(reasonsState.reasons).map(([code, description]) => (
-                  <option key={code} value={code}>
-                    {description}
-                  </option>
-                ))}
-              </select>
+            <fieldset className="edit-modal__reasons" data-testid="edit-override-reason-select">
+              <legend>{EDIT_TEXT.OVERRIDE_REASON}</legend>
+              {Object.entries(reasonsState.reasons).map(([code, description]) => (
+                <label key={code} className="edit-modal__reason">
+                  <input
+                    type="radio"
+                    name="edit-override-reason"
+                    value={code}
+                    checked={reasonCode === code}
+                    onChange={() => setReasonCode(code)}
+                    data-testid={`edit-override-reason-${code}`}
+                  />
+                  <span>{description}</span>
+                </label>
+              ))}
               {reasonError && (
                 <p className="edit-modal__error" role="alert" data-testid="edit-reason-error">
                   {reasonError}
                 </p>
               )}
-            </div>
+            </fieldset>
 
             <div className="edit-modal__field">
               <label htmlFor="edit-comment">{commentLabel}</label>
@@ -283,26 +288,18 @@ function EditCandidateModal({ candidate, breederUser, onUpdated, onClose }) {
           </p>
         )}
 
-        <div className="edit-modal__actions">
-          <span className="edit-modal__decision-label">{DASHBOARD_TEXT.DECISION_LABEL}</span>
-          <button
-            type="button"
-            className="edit-modal__button"
-            onClick={() => handleDecision(CANDIDATE_DECISIONS.PASS)}
-            disabled={isSaving || !CANDIDATE_SAVE_AVAILABLE}
-            data-testid="decision-pass-button"
+        <div className="edit-modal__field">
+          <label htmlFor="edit-decision">{DASHBOARD_TEXT.DECISION_LABEL}</label>
+          <select
+            id="edit-decision"
+            value={decision}
+            onChange={(event) => setDecision(event.target.value)}
+            data-testid="edit-decision-select"
           >
-            {EDIT_TEXT.PASS}
-          </button>
-          <button
-            type="button"
-            className="edit-modal__button"
-            onClick={() => handleDecision(CANDIDATE_DECISIONS.NO_PASS)}
-            disabled={isSaving || !CANDIDATE_SAVE_AVAILABLE}
-            data-testid="decision-no-pass-button"
-          >
-            {EDIT_TEXT.NO_PASS}
-          </button>
+            <option value={CANDIDATE_DECISIONS.PENDING}>{DASHBOARD_TEXT.DECISION_PENDING}</option>
+            <option value={CANDIDATE_DECISIONS.PASS}>{EDIT_TEXT.PASS}</option>
+            <option value={CANDIDATE_DECISIONS.NO_PASS}>{EDIT_TEXT.NO_PASS}</option>
+          </select>
         </div>
 
         <div className="edit-modal__actions">

@@ -5,6 +5,7 @@ import {
   CANDIDATES_PAGE_SIZE,
   HEALTH_PATH,
   MAX_CANDIDATE_PAGES,
+  UPLOAD_FIELD,
 } from '../constants/api';
 import { DASHBOARD_TEXT, HEALTH_TEXT, SIDEBAR_TEXT } from '../constants/messages';
 
@@ -100,7 +101,7 @@ export function postChatFiles(chatId, files, text = '') {
   if (text) {
     form.append('text', text);
   }
-  files.forEach((file) => form.append('files', file, file.name));
+  files.forEach((file) => form.append(UPLOAD_FIELD, file, file.name));
   return requestJson(`${API_PATHS.CHATS}/${chatId}/messages`, { method: 'POST', body: form });
 }
 

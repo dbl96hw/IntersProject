@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { DASHBOARD_TEXT, missingReasonText } from '../constants';
+import { missingReasonText } from '../constants';
 import DashboardView from './DashboardView';
 
 function candidate(overrides) {
@@ -31,7 +31,7 @@ function many(colour, count) {
 }
 
 describe('DashboardView live rows', () => {
-  it('shows red then amber then green, 54, 71 and 25, each with its reason', () => {
+  it('shows green then amber then red, 25, 71 and 54, each with its reason', () => {
     render(
       <DashboardView
         title="Germplasm"
@@ -41,15 +41,18 @@ describe('DashboardView live rows', () => {
 
     const sections = screen.getAllByTestId(/^triage-section-/);
     expect(sections.map((section) => section.getAttribute('data-testid'))).toEqual([
-      'triage-section-red',
-      'triage-section-amber',
       'triage-section-green',
+      'triage-section-amber',
+      'triage-section-red',
     ]);
-    expect(screen.getByTestId('triage-count-red')).toHaveTextContent('54');
-    expect(screen.getByTestId('triage-count-amber')).toHaveTextContent('71');
     expect(screen.getByTestId('triage-count-green')).toHaveTextContent('25');
-    expect(screen.getByTestId('dashboard-summary')).toHaveTextContent('150');
+    expect(screen.getByTestId('triage-count-amber')).toHaveTextContent('71');
+    expect(screen.getByTestId('triage-count-red')).toHaveTextContent('54');
+    expect(screen.getByTestId('dashboard-summary')).toHaveTextContent('150 candidates evaluated');
+    expect(screen.getByTestId('dashboard-summary')).not.toHaveTextContent('Germplasm');
     expect(screen.getByTestId('candidate-reason-RED-0')).toHaveTextContent('RED reason 0');
+    expect(screen.getByTestId('candidate-decision-RED-0')).toHaveTextContent('Pending');
+    expect(screen.getAllByRole('columnheader', { name: 'Decision' })).toHaveLength(3);
     expect(screen.queryByRole('columnheader', { name: 'Crop' })).not.toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: 'Mean yield (t/ha)' })).not.toBeInTheDocument();
   });
@@ -72,7 +75,7 @@ describe('DashboardView live rows', () => {
     expect(screen.getByTestId('dashboard-summary')).toHaveTextContent('2');
   });
 
-  it('shows ambiguous trials, atypical, justification source, unverified and engine colour', () => {
+  it('shows the engine reason and a breeder override without status badges', () => {
     render(
       <DashboardView
         title="Germplasm"
@@ -97,16 +100,17 @@ describe('DashboardView live rows', () => {
       />,
     );
 
-    expect(screen.getByTestId('engine-colour-SYN-FLAGGED')).toHaveTextContent('RED');
-    expect(screen.getByTestId('engine-reason-label-SYN-FLAGGED')).toHaveTextContent(DASHBOARD_TEXT.ENGINE_REASON);
-    expect(screen.getByTestId('breeder-override-label-SYN-FLAGGED')).toHaveTextContent(DASHBOARD_TEXT.BREEDER_OVERRIDE);
+    expect(screen.queryByTestId('engine-colour-SYN-FLAGGED')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('justification-source-SYN-FLAGGED')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('unverified-badge-SYN-FLAGGED')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ambiguous-trials-SYN-FLAGGED')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('atypical-flag-SYN-FLAGGED')).not.toBeInTheDocument();
     expect(screen.getByTestId('breeder-override-SYN-FLAGGED')).toHaveTextContent('FIELD_OBSERVATION');
     expect(screen.getByTestId('breeder-override-SYN-FLAGGED')).toHaveTextContent('vigour in plot 12');
-    expect(screen.getByTestId('justification-source-SYN-FLAGGED')).toHaveTextContent('engine');
-    expect(screen.getByTestId('unverified-badge-SYN-FLAGGED')).toHaveTextContent(DASHBOARD_TEXT.UNVERIFIED_BADGE);
-    expect(screen.getByTestId('ambiguous-trials-SYN-FLAGGED')).toBeInTheDocument();
-    expect(screen.getByTestId('atypical-flag-SYN-FLAGGED')).toBeInTheDocument();
     expect(screen.getByTestId('candidate-reason-SYN-FLAGGED')).toHaveTextContent('fails in 3 of 5 trials');
-    expect(screen.getByTestId('analysis-warning-EXPLANATION_DEFERRED')).toHaveTextContent('EXPLANATION_DEFERRED');
+    expect(screen.getByTestId('candidate-decision-SYN-FLAGGED')).toHaveTextContent('Pending');
+    expect(screen.queryByTestId('ingestion-list')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('analysis-warning-EXPLANATION_DEFERRED')).not.toBeInTheDocument();
+    expect(screen.queryByText('Click a row to expand it.')).not.toBeInTheDocument();
   });
 });

@@ -1,7 +1,6 @@
 import { useCallback, useState } from 'react';
 import DashboardFilters from './DashboardFilters';
 import EditCandidateModal from './EditCandidateModal';
-import IngestionList from './IngestionList';
 import RowContextMenu from './RowContextMenu';
 import TriageSection from './TriageSection';
 import {
@@ -31,10 +30,7 @@ function matchesSearch(candidate, searchText) {
 }
 
 function DashboardView({
-  title,
   candidates,
-  warnings = [],
-  ingestion = [],
   breederUser = '',
   onCandidateUpdated = () => {},
 }) {
@@ -104,7 +100,6 @@ function DashboardView({
         </div>
 
         <div className="dashboard__summary" data-testid="dashboard-summary">
-          <span className="dashboard__summary-title">{title}</span>
           <span className="dashboard__summary-detail">
             {candidates.length} {DASHBOARD_TEXT.CANDIDATES_EVALUATED}
           </span>
@@ -118,18 +113,6 @@ function DashboardView({
         onStatusFilterChange={setStatusFilter}
         statusCounts={statusCounts}
       />
-
-      <IngestionList ingestion={ingestion} />
-
-      {warnings.length > 0 && (
-        <ul className="dashboard__warnings" data-testid="analysis-warnings">
-          {warnings.map((warning, index) => (
-            <li key={`${warning.code}-${index}`} data-testid={`analysis-warning-${warning.code}`}>
-              {warning.code}: {warning.message}
-            </li>
-          ))}
-        </ul>
-      )}
 
       {missingReasonCount > 0 && (
         <p className="dashboard__empty" role="status" data-testid="candidates-without-reason">

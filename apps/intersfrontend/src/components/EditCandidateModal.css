@@ -53,11 +53,41 @@
 .edit-modal__field input,
 .edit-modal__field select,
 .edit-modal__field textarea {
+  width: 100%;
   padding: 0.6rem 0.75rem;
   border: 1px solid var(--color-divider);
   border-radius: 10px;
   background: var(--color-page-bg);
   color: var(--color-text-main);
+}
+
+.edit-modal__reasons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.edit-modal__reasons legend {
+  margin-bottom: 0.15rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.edit-modal__reason {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: var(--color-text-main);
+}
+
+.edit-modal__reason input {
+  margin-top: 0.2rem;
 }
 
 .edit-modal__field textarea {
@@ -124,8 +154,7 @@
   margin: 0;
 }
 
-.edit-modal__readonly-label,
-.edit-modal__decision-label {
+.edit-modal__readonly-label {
   font-size: 0.85rem;
   font-weight: 500;
   color: var(--color-text-secondary);

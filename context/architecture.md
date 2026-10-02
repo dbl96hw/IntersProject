@@ -53,7 +53,10 @@ flowchart LR
 Current state versus target (synced with `dev` on 2026-10-01, after PR #12):
 
 - Data engine: implemented; reads documents and serves llm-context payloads.
-- Frontend: full workspace UI on mock data only (PR #7); no `fetch` to Express yet.
+- Frontend: workspace UI wired to Express through `src/api/client.js` (chats, candidates, health,
+  overrides, chat answers). The welcome screen uploads files (`.csv .xlsx .xls .pdf .docx .png .jpg
+  .jpeg .webp`, up to 10 files of 10 MB, checked in the browser first) through `POST /api/chats` and
+  `POST /api/chats/:id/messages`, then opens the dashboard with green, amber, red in that order.
 - Express: gateway implemented — chats, multipart messages, candidates (with engine detail refresh),
   engine trust passthrough, mock/live modes, Supabase + in-memory db. Claude justification layer
   (`src/llm/`) is tested and used by `claude:smoke`; **live analysis orchestration** (upload → ingest →

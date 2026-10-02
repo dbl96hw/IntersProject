@@ -70,6 +70,21 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-sidebar-secondary) transparent;
+}
+
+.sidebar__recent::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sidebar__recent::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar__recent::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: var(--color-sidebar-secondary);
 }
 
 .sidebar__section-title {

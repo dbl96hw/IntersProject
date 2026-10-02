@@ -5,7 +5,7 @@ Phased, priority-ordered list of the features that cover the hackathon use case
 readiness: conversational channels (WhatsApp, voice), authentication hardening, deployment beyond `stg`
 and Cropwise packaging are out of this roadmap.
 
-Last synced with the working tree on 2026-10-02, after the F2.1 chat widget on `feature/chatbot` (not merged).
+Last synced with the working tree on 2026-10-02. This is the workspace that ships: upload, triage, override, pass / no pass, and chat. Anything not built is an improvement below, not leftover work for this commit.
 Branch `fix/demo-readiness` (2026-10-02): engine backlog fixes, documents that name candidates now classify
 them, upload from the welcome screen, bold rendering in the chat, CI for all tests, root README runbook.
 Merged on `dev` so far for the backend gateway and Claude layer: PR #9 (API contract and paths), PR #10
@@ -13,6 +13,26 @@ and #11 (`feature/backend-core`: Supabase schema, mock/live routes, ingest servi
 PR #12 (Claude client, evidence check, live `claude:smoke`), PR #13 (Step 8 explanation prompt). PR #7
 added the mock workspace UI. Step 9A (live upload) is implemented on `feature/9a-live-upload`. PR #8 does
 not appear in `dev`'s merge history.
+
+## Improvements
+
+Not part of this commit. The phase sections below keep the longer specification. Open checklist items there are the same list.
+
+### Left panel
+
+- Edit the name of a chat. The sidebar shows `chat.title`, which the backend sets from the uploaded file names. There is no control to change it. `POST /api/chats` accepts an optional `title` on create; there is no route to rename an existing chat.
+- Delete a chat from the left panel. There is no delete route. Deleting should take that chat off the list, and return to the welcome screen when it was the one open.
+
+### Workspace
+
+- Backend / engine status indicator. `GET /health` still reports `mode` and `engine`, and `getHealth()` is on the frontend client. `Workspace` does not call it.
+- Ingestion result per file, and the analysis warnings (`IRRELEVANT_FILE`, `UPLOAD_CONFLICTS`, `EXPLANATION_DEFERRED`). `IngestionList.jsx` is unused. `Workspace` still stores `analysis.ingestion` and `analysis.warnings`.
+- On an overridden row, show `engine_colour` beside the effective colour, and an Overridden badge. The row shows `candidate.reason` and, when present, `override.reason_code` and `override.comment`.
+- `ambiguous_trials` and `atypical` on the row. The candidate payload can still carry them.
+
+### Later
+
+Evidence card (F1.3), crop and yield corrections (F1.4), structured colour and evidence in the chat bubble (F2.1), an end-to-end demo test and promotion to `stg` (F3.1), trust panel, engine search, comparison, and disagreements (Phase 4), persisting engine state across restarts, and a Docker image with Tesseract and Poppler.
 
 ## How to read and use this file
 
@@ -32,8 +52,8 @@ not appear in `dev`'s merge history.
 - Every feature must respect the use case's non-negotiables: the breeder makes the final call, every
   colour shows its reason, and the product is an assistant, not a replacement
   (`context/architecture.md`, "Architectural invariants").
-- "In progress" with ticked items means part of the feature exists. For the frontend this is usually
-  the UI built on mock data in `apps/intersfrontend/src/mocks/`, waiting to be wired to the API.
+- "In progress" with ticked items means part of the feature exists. Open checklist items are
+  improvements (see Improvements). They are not part of this commit.
 
 ## Feature template
 
@@ -176,7 +196,7 @@ Phase 4 feature, re-run the F3.1 checklist.
 ## Phase 1 - Demo critical path
 
 ### F1.1 Express to data engine integration
-- Status: in progress
+- Status: done for this commit. The workspace status indicator is an improvement.
 - Priority: 1 of 5 in Phase 1
 - Depends on: F0.4
 - Goal: The frontend can reach all breeder data through the Express backend, with the engine's errors
@@ -192,15 +212,15 @@ Phase 4 feature, re-run the F3.1 checklist.
   - [x] `DATA_ENGINE_URL` and related timeouts in `apps/intersbackend/.env.example`
   - [x] `GET /health` reports `{ healthy, mode, engine: up|down|skipped }`
   - [x] Engine errors forwarded in the team shape; 502 `DATA_ENGINE_UNAVAILABLE` when the engine is down
-  - [x] Frontend API helper (base URL from `src/constants/api.js`, path constants, `res.ok` check) and a
-    backend / engine status indicator in the workspace
+  - [x] Frontend API helper (base URL from `src/constants/api.js`, path constants, `res.ok` check).
+    `getHealth()` stays on `src/api/client.js`. The workspace status indicator is an improvement
   - [x] Record backend test choice in `gendd/adr/` (`node:test`, see `0002-backend-tests-use-node-test.md`)
   - [x] `npm run lint` passes
-- Done when: the UI calls `GET /api/candidates` on port 3000 (mock or live) and shows whether the backend
-  and engine are reachable.
+- Done when: the UI calls `GET /api/candidates` on port 3000 (mock or live). Showing whether the backend
+  and engine are reachable is an improvement.
 
 ### F1.2 Connect the triage dashboard to the engine
-- Status: in progress (UI built on mocks in F0.5)
+- Status: done for this commit. Row flags are an improvement.
 - Priority: 2 of 5 in Phase 1
 - Depends on: F1.1
 - Goal: The breeder opens a dashboard and sees the engine's real candidates with colour and a one-line
@@ -211,10 +231,10 @@ Phase 4 feature, re-run the F3.1 checklist.
   candidate row").
 - Checklist:
   - [x] Colour-grouped tables, search, status chips, counts and empty states (F0.5)
-  - [x] Replace `RECENT_DASHBOARDS` / `createMockDashboard` with `GET /api/chats` (latest 8) and `GET /api/candidates?chat_id=`, with visible loading and error states
-  - [x] Align columns with the contract. Crop and mean yield are not on the Express candidate, so those columns are dropped. `mean_yield_t_ha` stays on the engine until Express exposes it
-  - [x] Show the `ambiguous_trials` and `atypical` flags on each row
-  - [x] Section order is red, then amber, then green (`TRIAGE_STATUS_ORDER`)
+  - [x] Replace `RECENT_DASHBOARDS` / `createMockDashboard` with `GET /api/chats` (every chat; the sidebar scrolls) and `GET /api/candidates?chat_id=`, with visible loading and error states. `RECENT_DASHBOARD_LIMIT` was removed
+  - [x] Align columns with the contract. Crop and mean yield are not on the Express candidate, so those columns are dropped. Columns are candidate id, trials failed/total, justification, and decision (Pending, Pass, or No pass). `mean_yield_t_ha` stays on the engine until Express exposes it
+  - [ ] Show the `ambiguous_trials` and `atypical` flags on each row (improvement; the candidate payload can still carry them)
+  - [x] Section order is green, then amber, then red (`TRIAGE_STATUS_ORDER`)
   - [x] Recent dashboards are chats. Create dashboard stays the welcome screen until file upload
   - [x] Frontend tests use Vitest (`gendd/adr/0001-frontend-tests-use-vitest.md`), including loading, empty, error and populated states
 - Done when: the breeder sees the engine's 150 candidates grouped by colour with their reasons, and can
@@ -260,21 +280,21 @@ Phase 4 feature, re-run the F3.1 checklist.
   value, and the engine's source data is unchanged.
 
 ### F1.5 Override and correction flow
-- Status: in progress (modal built on mocks in F0.5)
+- Status: done for this commit (modal saves a colour change and a pass / no pass). Open items are improvements.
 - Priority: 5 of 5 in Phase 1
 - Depends on: F1.3, F1.4
 - Goal: The breeder can disagree with a colour or correct a value, say why, and see that the decision
   was recorded without the engine's recommendation being erased.
 - Evidence / pointers: `apps/intersfrontend/src/components/EditCandidateModal.jsx`, `RowContextMenu.jsx`,
-  `TriageSection.jsx` (overridden badge), `src/constants/triage.js` (`OVERRIDE_REASONS`),
+  `TriageSection.jsx` (justification and decision columns), `src/constants/api.js` (`API_PATHS.OVERRIDE_REASONS`),
   `services/data-engine/src/data_engine/audit.py`, `CONTRACTS.md` ("Override").
 - Checklist:
-  - [x] Edit modal from the row context menu with status change, reason required when the status changes, comment, and an "Overridden" badge (F0.5)
-  - [ ] Load reasons from `GET /api/engine/override-reasons` instead of the hardcoded `OVERRIDE_REASONS`
-  - [ ] Comment required when the reason is `OTHER` (the engine rejects it otherwise; the UI says "optional")
-  - [x] Save sends a colour change via `PATCH /api/candidates/:id` (forwards to engine `POST /overrides`) and records reviews in Supabase
+  - [x] Edit modal from the row context menu with status change, reason required when the status changes, and comment (F0.5). Override reasons are radios. Decision is a select on the same Save
+  - [x] Load reasons from `GET /api/engine/override-reasons` (`listOverrideReasons` in `EditCandidateModal`)
+  - [x] Comment required when the reason is `OTHER` (the label switches to required, and Save is blocked without a comment)
+  - [x] Save sends a colour change via `PATCH /api/candidates/:id` (forwards to engine `POST /overrides`) and records reviews in Supabase. Pass / no pass is `POST /api/candidates/:id/decision` from the same Save. Pending is not sent
   - [ ] Field edits per F1.4 when available
-  - [ ] Table and card show `engine_colour` next to `colour` when overridden, and original next to corrected values
+  - [ ] Table and card show `engine_colour` next to `colour` when overridden, an Overridden badge, and original next to corrected values (improvement). The row shows `candidate.reason` and, when present, `override.reason_code` and `override.comment`, plus the Decision column
   - [ ] Real breeder name instead of `MOCK_USER`; override and correction history visible per candidate
   - [ ] Tests: override accepted, `OTHER` without comment rejected, engine colour unchanged, correction shown beside the original
 - Done when: the use case's demo-ready definition is met - a flagged candidate with a one-line
@@ -360,21 +380,21 @@ Phase 4 feature, re-run the F3.1 checklist.
 - Done when: the breeder can answer "can I trust this?" from one screen.
 
 ### F4.2 New data from the UI and global search
-- Status: in progress (upload screen built on mocks in F0.5)
+- Status: upload is done for this commit. Showing ingestion results, warnings, and engine search are improvements.
 - Priority: 2 of 4 in Phase 4
 - Depends on: F1.3
 - Goal: The breeder can drop in new files (tables, PDF, scan, DOCX) and find any id or word across
   candidates, reasons and documents.
 - Evidence / pointers: `apps/intersfrontend/src/components/WelcomeView.jsx`, `Workspace.jsx`
-  (`handleSubmitFiles` is a mock), `docs/api-contract.md` (`POST /api/chats/:id/messages` multipart),
+  (`handleSubmitFiles` posts multipart), `docs/api-contract.md` (`POST /api/chats/:id/messages` multipart),
   `apps/intersbackend/src/services/ingest.service.js` (tables via `/ingest/records`; documents via engine
   `/documents/base64` after the relevance gate, wired to live analysis), engine `POST /ingest/records`, `GET /search`.
 - Checklist:
   - [x] Drag-and-drop / browse upload with accepted types matching the engine's formats and removable file chips (F0.5)
-  - [x] Relevance gate: off-topic documents are refused before the engine indexes them (`POST /relevance`), with an `IRRELEVANT_FILE` warning
-  - [x] Uploads never overwrite the exports: identical rows are ignored, contradicting rows are counted as `conflicts` and shown (`UPLOAD_CONFLICTS` warning, engine quality report)
-  - [x] Send each file through `POST /api/chats/:id/messages` (multipart) with a size limit shown to the user (Create dashboard: new chat, then the files; "Analyzing" status while it runs, no second submit, no abort)
-  - [x] Show the ingestion result per file: accepted source and rows, or rejected with the engine's reason (`IngestionList`, also on an empty dashboard)
+  - [x] Relevance gate: off-topic documents are refused before the engine indexes them (`POST /relevance`). The API can still return an `IRRELEVANT_FILE` warning; the workspace does not render it
+  - [x] Uploads never overwrite the exports: identical rows are ignored, contradicting rows are counted as `conflicts` (engine quality report). A `UPLOAD_CONFLICTS` warning is not rendered in the workspace
+  - [x] Send each file through `POST /api/chats/:id/messages` (multipart) with a size limit shown to the user (Create dashboard: new chat, then the files; the greeting becomes `analysis-loading` while it runs, no second submit, no abort)
+  - [ ] Show the ingestion result per file: accepted source and rows, or rejected with the engine's reason (`IngestionList`, also on an empty dashboard). Improvement: the component is unused, and `Workspace` still stores `analysis.ingestion` and `analysis.warnings`
   - [x] A document that names candidates or trials (field notes, a lab report) touches those candidates, checked against the engine (`entities_mentioned`, `entities_in_tables`). Before, a document alone gave an empty dashboard
   - [ ] Triage and evidence card refresh after an accepted upload; document evidence appears on the card
   - [ ] Replace the client-side search (id, crop, reason) with, or complement it by, engine search exposed on Express (not mounted yet)
@@ -444,7 +464,7 @@ Step 8 is merged. 9A is done. See `context/backend-development.md` and `agents/b
 ### Ticket 3 — Candidate decisions
 
 - [x] Live `PATCH /api/candidates/:id` and `POST /api/candidates/:id/decision` (mock still returns 501 after validation).
-- [x] Colour changes forward to engine `POST /overrides`; `engine_colour` and the effective `colour` stay separate on the candidate row.
+- [x] Colour changes forward to engine `POST /overrides`; `engine_colour` and the effective `colour` stay separate on the candidate. The table does not render `engine_colour` (F1.5).
 
 ### Step 10 — Demo ops
 

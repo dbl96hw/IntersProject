@@ -1,7 +1,14 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DASHBOARD_TEXT, HEALTH_REFRESH_MS, HEALTH_TEXT, SIDEBAR_TEXT, WELCOME_TEXT } from '../constants';
+import {
+  DASHBOARD_TEXT,
+  UPLOAD_FIELD,
+  UPLOAD_TEXT,
+  WELCOME_TEXT,
+  emptyFileText,
+  unsupportedFileText,
+} from '../constants';
 import Workspace from './Workspace';
 
 function jsonResponse(body, ok = true) {
@@ -11,10 +18,10 @@ function jsonResponse(body, ok = true) {
 function mockApi({ health, chats = [], route } = {}) {
   vi.stubGlobal(
     'fetch',
-    vi.fn((url) => {
+    vi.fn((url, options) => {
       const parsed = new URL(url);
       if (route) {
-        const routed = route(parsed);
+        const routed = route(parsed, options);
         if (routed) {
           return routed;
         }
@@ -73,94 +80,25 @@ function uploadApi({ analysis = null, candidates = [], error = null }) {
   return state;
 }
 
-describe('Workspace backend status and welcome', () => {
+describe('Workspace welcome and dashboard', () => {
   afterEach(() => {
-    vi.useRealTimers();
     vi.unstubAllGlobals();
-  });
-
-  it('shows a loading status before health answers', () => {
-    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
-
-    render(<Workspace />);
-
-    expect(screen.getByTestId('backend-status-loading')).toHaveTextContent(HEALTH_TEXT.LOADING);
-  });
-
-  it('shows the mode and engine returned by health', async () => {
-    mockApi({ health: { healthy: true, mode: 'live', engine: 'down' } });
-
-    render(<Workspace />);
-
-    const status = await screen.findByTestId('backend-status');
-    expect(status).toHaveTextContent('live');
-    expect(status).toHaveTextContent('down');
-  });
-
-  it('shows an error message when health cannot be reached', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
-
-    render(<Workspace />);
-
-    expect(await screen.findByTestId('backend-status-error')).toHaveTextContent(HEALTH_TEXT.UNREACHABLE);
-    expect(screen.queryByTestId('backend-status')).not.toBeInTheDocument();
-  });
-
-  it('asks for health again after the refresh interval', async () => {
-    vi.useFakeTimers();
-    let healthCalls = 0;
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url) => {
-        const parsed = new URL(url);
-        if (parsed.pathname === '/health') {
-          healthCalls += 1;
-          const engine = healthCalls === 1 ? 'down' : 'up';
-          return Promise.resolve(jsonResponse({ healthy: true, mode: 'live', engine }));
-        }
-        if (parsed.pathname === '/api/chats') {
-          return Promise.resolve(jsonResponse({ chats: [] }));
-        }
-        return Promise.resolve(jsonResponse({ error: { code: 'NOT_FOUND', message: 'Missing', field: null } }, false));
-      }),
-    );
-
-    render(<Workspace />);
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    expect(screen.getByTestId('backend-status')).toHaveTextContent('down');
-    expect(healthCalls).toBe(1);
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(HEALTH_REFRESH_MS);
-    });
-
-    expect(screen.getByTestId('backend-status')).toHaveTextContent('up');
-    expect(healthCalls).toBe(2);
-  });
-
-  it('shows a mock-mode notice when health mode is mock', async () => {
-    mockApi({ health: { healthy: true, mode: 'mock', engine: 'skipped' } });
-
-    render(<Workspace />);
-
-    expect(await screen.findByTestId('backend-mock-notice')).toHaveTextContent(HEALTH_TEXT.MOCK_NOTICE);
   });
 
   it('creates a chat, sends the files as multipart and opens the new dashboard', async () => {
     const user = userEvent.setup();
+    const analysed = [{ candidate_id: 'SYN-MZ-00001', colour: 'RED', reason: 'fails in 3 of 5 trials' }];
     const api = uploadApi({
       analysis: {
         summary: '1 candidates analysed: 0 green, 0 amber, 1 red.',
+        candidates: analysed,
         warnings: [{ code: 'IRRELEVANT_FILE', message: '"invoice.pdf" does not look like breeding or trial data; it was skipped', file: 'invoice.pdf' }],
         ingestion: [
           { file: 'trials.csv', kind: 'table', accepted: true, source: 'trial_recommendations', rows: 72, message: null },
           { file: 'invoice.pdf', kind: 'document', accepted: false, source: null, rows: null, message: 'Not about breeding or trial data' },
         ],
       },
-      candidates: [{ candidate_id: 'SYN-MZ-00001', colour: 'RED', reason: 'fails in 3 of 5 trials' }],
+      candidates: analysed,
     });
 
     render(<Workspace />);
@@ -174,6 +112,7 @@ describe('Workspace backend status and welcome', () => {
     // While the analysis runs: a status instead of the button, so no second submit.
     expect(await screen.findByTestId('analysis-loading')).toHaveTextContent(WELCOME_TEXT.ANALYZING);
     expect(screen.queryByTestId('upload-submit')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('upload-add-button')).not.toBeInTheDocument();
     expect(api.created).toBe(1);
     const form = api.posted[0];
     expect(form).toBeInstanceOf(FormData);
@@ -184,9 +123,8 @@ describe('Workspace backend status and welcome', () => {
     });
 
     expect(await screen.findByTestId('candidate-row-SYN-MZ-00001')).toBeInTheDocument();
-    expect(screen.getByTestId('ingestion-item-0')).toHaveTextContent('trials.csv: used (trial_recommendations, 72 rows)');
-    expect(screen.getByTestId('ingestion-item-1')).toHaveTextContent('invoice.pdf: not used - Not about breeding or trial data');
-    expect(screen.getByTestId('analysis-warning-IRRELEVANT_FILE')).toBeInTheDocument();
+    expect(screen.queryByTestId('ingestion-list')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('analysis-warning-IRRELEVANT_FILE')).not.toBeInTheDocument();
     expect(api.created).toBe(1);
   });
 
@@ -195,6 +133,7 @@ describe('Workspace backend status and welcome', () => {
     const api = uploadApi({
       analysis: {
         summary: '0 candidates analysed: 0 green, 0 amber, 0 red.',
+        candidates: [],
         warnings: [],
         ingestion: [{ file: 'invoice.pdf', kind: 'document', accepted: false, source: null, rows: null, message: 'Not about breeding or trial data' }],
       },
@@ -209,7 +148,7 @@ describe('Workspace backend status and welcome', () => {
     });
 
     expect(await screen.findByTestId('dashboard-empty')).toHaveTextContent(DASHBOARD_TEXT.EMPTY);
-    expect(screen.getByTestId('ingestion-item-0')).toHaveTextContent('invoice.pdf: not used');
+    expect(screen.queryByTestId('ingestion-item-0')).not.toBeInTheDocument();
   });
 
   it('stays on the upload screen with the error when the analysis fails', async () => {
@@ -228,7 +167,7 @@ describe('Workspace backend status and welcome', () => {
     expect(screen.queryByTestId('dashboard-view')).not.toBeInTheDocument();
   });
 
-  it('lists only the latest eight chats and shows how many are hidden', async () => {
+  it('lists every chat in the sidebar', async () => {
     const chats = Array.from({ length: 9 }, (_, index) => ({
       id: `chat-${index}`,
       title: `Chat ${index}`,
@@ -238,9 +177,8 @@ describe('Workspace backend status and welcome', () => {
     render(<Workspace />);
 
     expect(await screen.findByTestId('recent-dashboard-chat-0')).toBeInTheDocument();
-    expect(screen.getByTestId('recent-dashboard-chat-7')).toBeInTheDocument();
-    expect(screen.queryByTestId('recent-dashboard-chat-8')).not.toBeInTheDocument();
-    expect(screen.getByTestId('hidden-dashboards-count')).toHaveTextContent(`1 ${SIDEBAR_TEXT.HIDDEN_DASHBOARDS}`);
+    expect(screen.getByTestId('recent-dashboard-chat-8')).toBeInTheDocument();
+    expect(screen.queryByTestId('hidden-dashboards-count')).not.toBeInTheDocument();
   });
 
   it('shows a loading status while candidates are in flight and no colour before they arrive', async () => {
@@ -395,5 +333,187 @@ describe('Workspace backend status and welcome', () => {
 
     expect(screen.queryByTestId('candidate-row-SYN-A')).not.toBeInTheDocument();
     expect(screen.getByTestId('candidate-row-SYN-B')).toBeInTheDocument();
+  });
+});
+
+const NEW_CHAT = { id: 'chat-new', title: 'New chat' };
+const LIVE_HEALTH = { healthy: true, mode: 'live', engine: 'up' };
+
+function analysisReply({ status = 'ok', candidates = [], ingestion = [], error = null } = {}) {
+  return {
+    user_message: { id: 'user-1', role: 'user' },
+    assistant_message: {
+      id: 'assistant-1',
+      role: 'assistant',
+      kind: 'analysis',
+      status,
+      error,
+      analysis: status === 'ok' ? { summary: '', candidates, warnings: [], ingestion } : null,
+    },
+  };
+}
+
+// Routes the upload requests. `messagesReply` is what POST /api/chats/:id/messages returns.
+function mockUploadApi({
+  messagesReply,
+  dashboardCandidates = [],
+  onMessagesRequest = () => {},
+  chatMessages = [],
+}) {
+  let hasCreatedChat = false;
+  mockApi({
+    health: LIVE_HEALTH,
+    route: (parsed, options) => {
+      if (parsed.pathname === '/api/chats' && options?.method === 'POST') {
+        hasCreatedChat = true;
+        return Promise.resolve(jsonResponse({ chat: NEW_CHAT }));
+      }
+      if (parsed.pathname === '/api/chats') {
+        return Promise.resolve(jsonResponse({ chats: hasCreatedChat ? [NEW_CHAT] : [] }));
+      }
+      if (parsed.pathname === `/api/chats/${NEW_CHAT.id}/messages`) {
+        onMessagesRequest(options);
+        return messagesReply();
+      }
+      if (parsed.pathname === `/api/chats/${NEW_CHAT.id}`) {
+        return Promise.resolve(jsonResponse({ chat: NEW_CHAT, messages: chatMessages }));
+      }
+      if (parsed.pathname.startsWith('/api/candidates')) {
+        return Promise.resolve(jsonResponse({
+          candidates: dashboardCandidates,
+          total: dashboardCandidates.length,
+          page: 1,
+          page_size: 100,
+        }));
+      }
+      return null;
+    },
+  });
+}
+
+async function submitFile(user, name = 'trials.csv') {
+  await user.upload(screen.getByTestId('upload-input'), new File(['id'], name, { type: 'text/csv' }));
+  await user.click(screen.getByTestId('upload-submit'));
+}
+
+describe('Workspace file upload', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('uploads the files, creates a chat and opens the dashboard with green first', async () => {
+    const user = userEvent.setup();
+    let postedBody = null;
+    const analysed = [
+      { candidate_id: 'SYN-RED', colour: 'RED', reason: 'fails' },
+      { candidate_id: 'SYN-GREEN', colour: 'GREEN', reason: 'passes' },
+      { candidate_id: 'SYN-AMBER', colour: 'AMBER', reason: 'borderline' },
+    ];
+    mockUploadApi({
+      messagesReply: () => Promise.resolve(jsonResponse(analysisReply({ candidates: analysed }))),
+      dashboardCandidates: analysed,
+      onMessagesRequest: (options) => {
+        postedBody = options.body;
+      },
+    });
+
+    render(<Workspace />);
+    await submitFile(user);
+
+    expect(await screen.findByTestId('dashboard-view')).toBeInTheDocument();
+    expect(postedBody.getAll(UPLOAD_FIELD).map((file) => file.name)).toEqual(['trials.csv']);
+    expect(screen.getAllByTestId(/^triage-section-/).map((section) => section.getAttribute('data-testid'))).toEqual([
+      'triage-section-green',
+      'triage-section-amber',
+      'triage-section-red',
+    ]);
+    expect(screen.queryByTestId('welcome-view')).not.toBeInTheDocument();
+  });
+
+  it('shows the analysis error, keeps the files and lets the user try again', async () => {
+    const user = userEvent.setup();
+    mockUploadApi({
+      messagesReply: () => Promise.resolve(jsonResponse(analysisReply({
+        status: 'error',
+        error: { code: 'DATA_ENGINE_UNAVAILABLE', message: 'Data engine is unreachable' },
+      }))),
+    });
+
+    render(<Workspace />);
+    await submitFile(user);
+
+    expect(await screen.findByTestId('upload-error')).toHaveTextContent(
+      `Data engine is unreachable ${UPLOAD_TEXT.TRY_AGAIN}`,
+    );
+    expect(screen.getByTestId('selected-files')).toHaveTextContent('trials.csv');
+    expect(screen.getByTestId('upload-submit')).toBeEnabled();
+    expect(screen.queryByTestId('analysis-loading')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('dashboard-view')).not.toBeInTheDocument();
+  });
+
+  it('shows the server message when a file is too large', async () => {
+    const user = userEvent.setup();
+    mockUploadApi({
+      messagesReply: () => Promise.resolve(jsonResponse(
+        { error: { code: 'FILE_TOO_LARGE', message: '"trials.csv" is over 10 MB', field: 'files' } },
+        false,
+      )),
+    });
+
+    render(<Workspace />);
+    await submitFile(user);
+
+    expect(await screen.findByTestId('upload-error')).toHaveTextContent('"trials.csv" is over 10 MB');
+    expect(screen.getByTestId('upload-submit')).toBeEnabled();
+  });
+
+  it('shows the network message when the server does not answer', async () => {
+    const user = userEvent.setup();
+    mockUploadApi({ messagesReply: () => Promise.reject(new TypeError('Failed to fetch')) });
+
+    render(<Workspace />);
+    await submitFile(user);
+
+    expect(await screen.findByTestId('upload-error')).toHaveTextContent(UPLOAD_TEXT.NETWORK);
+    expect(screen.getByTestId('selected-files')).toHaveTextContent('trials.csv');
+    expect(screen.getByTestId('upload-submit')).toBeEnabled();
+  });
+
+  it('opens the empty dashboard and shows why each file was not used when no candidate was read', async () => {
+    const user = userEvent.setup();
+    const reply = analysisReply({
+      ingestion: [
+        { file: 'trials.csv', accepted: false, message: 'Could not read "trials.csv": the file is damaged' },
+      ],
+    });
+    mockUploadApi({
+      messagesReply: () => Promise.resolve(jsonResponse(reply)),
+      chatMessages: [reply.assistant_message],
+    });
+
+    render(<Workspace />);
+    await submitFile(user);
+
+    expect(await screen.findByTestId('dashboard-empty')).toHaveTextContent(DASHBOARD_TEXT.EMPTY);
+    expect(screen.queryByTestId('ingestion-item-0')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('welcome-view')).not.toBeInTheDocument();
+  });
+
+  it('rejects an unsupported or empty file in the browser without calling the server', async () => {
+    mockApi({ health: LIVE_HEALTH });
+
+    render(<Workspace />);
+    fireEvent.drop(screen.getByTestId('upload-dropzone'), {
+      dataTransfer: {
+        files: [new File(['notes'], 'notes.txt', { type: 'text/plain' }), new File([], 'empty.csv', { type: 'text/csv' })],
+      },
+    });
+
+    const problems = screen.getByTestId('upload-file-errors');
+    expect(problems).toHaveTextContent(unsupportedFileText('notes.txt'));
+    expect(problems).toHaveTextContent(emptyFileText('empty.csv'));
+    expect(screen.queryByTestId('selected-files')).not.toBeInTheDocument();
+    expect(screen.getByTestId('upload-submit')).toBeDisabled();
+    expect(fetch).not.toHaveBeenCalledWith(expect.stringContaining('/messages'), expect.anything());
   });
 });

@@ -1,6 +1,6 @@
 import Logo from './Logo';
 import PlantDecoration from './PlantDecoration';
-import { APP_NAME, RECENT_DASHBOARD_LIMIT, SIDEBAR_TEXT } from '../constants';
+import { APP_NAME, SIDEBAR_TEXT } from '../constants';
 import './Sidebar.css';
 
 function initialsFrom(name) {
@@ -22,8 +22,6 @@ function Sidebar({
   onBreederUserChange = () => {},
 }) {
   const isNewDashboardActive = activeChatId === null;
-  const visibleChats = chats.slice(0, RECENT_DASHBOARD_LIMIT);
-  const hiddenCount = Math.max(chats.length - visibleChats.length, 0);
 
   return (
     <aside className="sidebar" data-testid="sidebar">
@@ -64,13 +62,13 @@ function Sidebar({
           </p>
         )}
 
-        {chatsStatus === 'ready' && visibleChats.length === 0 && (
+        {chatsStatus === 'ready' && chats.length === 0 && (
           <p className="sidebar__empty">{SIDEBAR_TEXT.NO_DASHBOARDS}</p>
         )}
 
-        {chatsStatus === 'ready' && visibleChats.length > 0 && (
+        {chatsStatus === 'ready' && chats.length > 0 && (
           <ul className="sidebar__list">
-            {visibleChats.map((chat) => {
+            {chats.map((chat) => {
               const isActive = chat.id === activeChatId;
 
               return (
@@ -89,12 +87,6 @@ function Sidebar({
               );
             })}
           </ul>
-        )}
-
-        {chatsStatus === 'ready' && hiddenCount > 0 && (
-          <p className="sidebar__empty" role="status" data-testid="hidden-dashboards-count">
-            {hiddenCount} {SIDEBAR_TEXT.HIDDEN_DASHBOARDS}
-          </p>
         )}
       </nav>
 
