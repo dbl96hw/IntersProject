@@ -3,11 +3,6 @@
  * candidate contract (`GET /candidates`) so swapping in the real API later is a small change.
  */
 
-export const MOCK_USER = {
-  name: 'Syngenta',
-  initials: 'SY',
-};
-
 // Values and reasons are modeled on data/synthetic/uc4/trial_recommendations_synthetic.csv.
 const CANDIDATE_TEMPLATES = [
   {

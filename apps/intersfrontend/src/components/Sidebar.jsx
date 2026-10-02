@@ -1,10 +1,26 @@
 import Logo from './Logo';
 import PlantDecoration from './PlantDecoration';
 import { APP_NAME, RECENT_DASHBOARD_LIMIT, SIDEBAR_TEXT } from '../constants';
-import { MOCK_USER } from '../mocks/dashboards';
 import './Sidebar.css';
 
-function Sidebar({ chats, chatsStatus, chatsMessage, activeChatId, onNewDashboard, onSelectChat }) {
+function initialsFrom(name) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) {
+    return '?';
+  }
+  return parts.slice(0, 2).map((part) => part[0].toUpperCase()).join('');
+}
+
+function Sidebar({
+  chats,
+  chatsStatus,
+  chatsMessage,
+  activeChatId,
+  onNewDashboard,
+  onSelectChat,
+  breederUser = '',
+  onBreederUserChange = () => {},
+}) {
   const isNewDashboardActive = activeChatId === null;
   const visibleChats = chats.slice(0, RECENT_DASHBOARD_LIMIT);
   const hiddenCount = Math.max(chats.length - visibleChats.length, 0);
@@ -84,9 +100,18 @@ function Sidebar({ chats, chatsStatus, chatsMessage, activeChatId, onNewDashboar
 
       <div className="sidebar__user" data-testid="sidebar-user">
         <span className="sidebar__avatar" aria-hidden="true">
-          {MOCK_USER.initials}
+          {initialsFrom(breederUser)}
         </span>
-        <span className="sidebar__user-name">{MOCK_USER.name}</span>
+        <label className="sidebar__user-field">
+          {SIDEBAR_TEXT.BREEDER}
+          <input
+            className="sidebar__user-input"
+            type="text"
+            value={breederUser}
+            onChange={(event) => onBreederUserChange(event.target.value)}
+            data-testid="breeder-user-input"
+          />
+        </label>
       </div>
     </aside>
   );

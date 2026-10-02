@@ -43,7 +43,7 @@ Every error has the same shape. `field` is `null` when the error is not about on
 | 400 | `UNSUPPORTED_FILE_TYPE` | A file is not `.csv .xlsx .xls .pdf .docx .png .jpg .jpeg .webp` (`field` is `"files"`) |
 | 404 | `NOT_FOUND` | Unknown or malformed (non-uuid) chat, message or candidate id, or unknown route |
 | 413 | `FILE_TOO_LARGE` | A file is over `MAX_FILE_MB` (10 MB by default), or the JSON body is over 25 MB |
-| 501 | `NOT_IMPLEMENTED` | The endpoint validates its input but is not built yet (`PATCH /api/candidates/:id`, `POST /api/candidates/:id/decision`) |
+| 501 | `NOT_IMPLEMENTED` | Mock mode only, after the body is valid. Live `PATCH /api/candidates/:id` and `POST /api/candidates/:id/decision` return 200 |
 | 502 | `DATA_ENGINE_UNAVAILABLE` | The data engine did not answer (down or timed out) |
 | 500 | `INTERNAL_ERROR` | Anything else (no stack trace in the response) |
 

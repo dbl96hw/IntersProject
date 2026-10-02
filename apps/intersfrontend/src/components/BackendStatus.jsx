@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getHealth } from '../api/client';
-import { HEALTH_TEXT } from '../constants';
+import { HEALTH_REFRESH_MS, HEALTH_TEXT } from '../constants';
 import './BackendStatus.css';
 
 function BackendStatus() {
@@ -8,21 +8,31 @@ function BackendStatus() {
 
   useEffect(() => {
     let cancelled = false;
+    let requestId = 0;
 
-    getHealth()
-      .then((health) => {
-        if (!cancelled) {
-          setStatus({ state: 'ready', health });
-        }
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          setStatus({ state: 'error', message: error.message || HEALTH_TEXT.UNREACHABLE });
-        }
-      });
+    function loadHealth() {
+      const currentRequest = requestId + 1;
+      requestId = currentRequest;
+
+      getHealth()
+        .then((health) => {
+          if (!cancelled && currentRequest === requestId) {
+            setStatus({ state: 'ready', health });
+          }
+        })
+        .catch((error) => {
+          if (!cancelled && currentRequest === requestId) {
+            setStatus({ state: 'error', message: error.message || HEALTH_TEXT.UNREACHABLE });
+          }
+        });
+    }
+
+    loadHealth();
+    const timer = setInterval(loadHealth, HEALTH_REFRESH_MS);
 
     return () => {
       cancelled = true;
+      clearInterval(timer);
     };
   }, []);
 

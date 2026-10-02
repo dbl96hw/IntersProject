@@ -1,44 +1,61 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { listOverrideReasons, recordCandidateDecision, updateCandidate } from '../api/client';
 import {
+  API_ERROR_CODES,
+  CANDIDATE_DECISIONS,
   CANDIDATE_SAVE_AVAILABLE,
+  DASHBOARD_TEXT,
   EDIT_TEXT,
-  OVERRIDE_REASONS,
+  HEALTH_TEXT,
+  OTHER_REASON_CODE,
   TRIAGE_STATUS,
   TRIAGE_STATUS_ORDER,
 } from '../constants';
 import './EditCandidateModal.css';
 
-function validateForm({ crop, meanYield, justification, isStatusChanged, reasonCode }) {
-  const errors = {};
-
-  if (!crop.trim()) {
-    errors.crop = EDIT_TEXT.CROP_REQUIRED;
-  }
-  if (meanYield === '' || Number.isNaN(Number(meanYield)) || Number(meanYield) < 0) {
-    errors.meanYield = EDIT_TEXT.YIELD_INVALID;
-  }
-  if (!justification.trim()) {
-    errors.justification = EDIT_TEXT.JUSTIFICATION_REQUIRED;
-  }
-  if (isStatusChanged && !reasonCode) {
-    errors.reasonCode = EDIT_TEXT.REASON_REQUIRED;
-  }
-
-  return errors;
-}
-
-function EditCandidateModal({ candidate, onSave, onClose }) {
-  const [crop, setCrop] = useState(candidate.crop ?? '');
-  const [meanYield, setMeanYield] = useState(
-    candidate.mean_yield_t_ha == null ? '' : String(candidate.mean_yield_t_ha),
-  );
-  const [justification, setJustification] = useState(candidate.reason ?? '');
+function EditCandidateModal({ candidate, breederUser, onUpdated, onClose }) {
+  const [reasonsState, setReasonsState] = useState({ state: 'loading', reasons: {}, message: '' });
   const [colour, setColour] = useState(candidate.colour);
   const [reasonCode, setReasonCode] = useState('');
   const [comment, setComment] = useState('');
-  const [errors, setErrors] = useState({});
+  const [userError, setUserError] = useState('');
+  const [reasonError, setReasonError] = useState('');
+  const [commentError, setCommentError] = useState('');
+  const [saveError, setSaveError] = useState('');
+  const [saveField, setSaveField] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const isSavingRef = useRef(false);
 
   const isStatusChanged = colour !== candidate.colour;
+  const commentLabel = reasonCode === OTHER_REASON_CODE ? EDIT_TEXT.COMMENT_REQUIRED : EDIT_TEXT.COMMENT_OPTIONAL;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    listOverrideReasons()
+      .then((reasons) => {
+        if (!cancelled) {
+          setReasonsState({
+            state: 'ready',
+            reasons: reasons && typeof reasons === 'object' ? reasons : {},
+            message: '',
+          });
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setReasonsState({
+            state: 'error',
+            reasons: {},
+            message: error.message || EDIT_TEXT.REASONS_FAILED,
+          });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     function handleKeyDown(event) {
@@ -51,25 +68,104 @@ function EditCandidateModal({ candidate, onSave, onClose }) {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
+  function beginSave() {
+    if (isSavingRef.current || !CANDIDATE_SAVE_AVAILABLE) {
+      return false;
+    }
+    isSavingRef.current = true;
+    setIsSaving(true);
+    return true;
+  }
+
+  function endSave() {
+    isSavingRef.current = false;
+    setIsSaving(false);
+  }
+
+  function clearErrors() {
+    setUserError('');
+    setReasonError('');
+    setCommentError('');
+    setSaveError('');
+    setSaveField('');
+  }
+
+  function showSaveError(error) {
+    if (error?.code === API_ERROR_CODES.DATA_ENGINE_UNAVAILABLE) {
+      setSaveError(EDIT_TEXT.ENGINE_DOWN);
+    } else {
+      setSaveError(error?.message || HEALTH_TEXT.UNEXPECTED);
+    }
+    setSaveField(error?.field || '');
+  }
+
+  async function send(action) {
+    if (!beginSave()) {
+      return;
+    }
+    clearErrors();
+    try {
+      const body = await action();
+      if (!body?.candidate || typeof body.candidate !== 'object') {
+        setSaveError(HEALTH_TEXT.UNEXPECTED);
+        return;
+      }
+      onUpdated(body.candidate);
+      onClose();
+    } catch (error) {
+      showSaveError(error);
+    } finally {
+      endSave();
+    }
+  }
+
   function handleSubmit(event) {
     event.preventDefault();
-    if (!CANDIDATE_SAVE_AVAILABLE) {
+    if (isSavingRef.current || !CANDIDATE_SAVE_AVAILABLE) {
+      return;
+    }
+    clearErrors();
+    if (!breederUser.trim()) {
+      setUserError(EDIT_TEXT.USER_REQUIRED);
+      return;
+    }
+    if (!isStatusChanged) {
+      return;
+    }
+    if (reasonsState.state !== 'ready') {
+      return;
+    }
+    if (!reasonCode) {
+      setReasonError(EDIT_TEXT.REASON_REQUIRED);
+      return;
+    }
+    if (reasonCode === OTHER_REASON_CODE && !comment.trim()) {
+      setCommentError(EDIT_TEXT.COMMENT_REQUIRED_ERROR);
       return;
     }
 
-    const formErrors = validateForm({ crop, meanYield, justification, isStatusChanged, reasonCode });
-    setErrors(formErrors);
-    if (Object.keys(formErrors).length > 0) {
+    send(() => updateCandidate(candidate.id, {
+      new_colour: colour,
+      reason_code: reasonCode,
+      comment: comment.trim(),
+      user: breederUser.trim(),
+    }));
+  }
+
+  function handleDecision(decision) {
+    if (isSavingRef.current || !CANDIDATE_SAVE_AVAILABLE) {
+      return;
+    }
+    clearErrors();
+    if (!breederUser.trim()) {
+      setUserError(EDIT_TEXT.USER_REQUIRED);
       return;
     }
 
-    onSave({
-      crop: crop.trim(),
-      mean_yield_t_ha: Number(meanYield),
-      reason: justification.trim(),
-      colour,
-      override: isStatusChanged ? { reason_code: reasonCode, comment: comment.trim() } : candidate.override,
-    });
+    send(() => recordCandidateDecision(candidate.id, {
+      decision,
+      user: breederUser.trim(),
+    }));
   }
 
   function handleOverlayMouseDown(event) {
@@ -94,44 +190,10 @@ function EditCandidateModal({ candidate, onSave, onClose }) {
           <span className="edit-modal__candidate-id">{candidate.candidate_id}</span>
         </h2>
 
-        <div className="edit-modal__field">
-          <label htmlFor="edit-crop">{EDIT_TEXT.CROP}</label>
-          <input
-            id="edit-crop"
-            type="text"
-            value={crop}
-            onChange={(event) => setCrop(event.target.value)}
-            autoFocus
-            data-testid="edit-crop-input"
-          />
-          {errors.crop && <p className="edit-modal__error">{errors.crop}</p>}
-        </div>
-
-        <div className="edit-modal__field">
-          <label htmlFor="edit-yield">{EDIT_TEXT.MEAN_YIELD}</label>
-          <input
-            id="edit-yield"
-            type="number"
-            step="0.01"
-            min="0"
-            value={meanYield}
-            onChange={(event) => setMeanYield(event.target.value)}
-            data-testid="edit-yield-input"
-          />
-          {errors.meanYield && <p className="edit-modal__error">{errors.meanYield}</p>}
-        </div>
-
-        <div className="edit-modal__field">
-          <label htmlFor="edit-justification">{EDIT_TEXT.JUSTIFICATION}</label>
-          <textarea
-            id="edit-justification"
-            rows={4}
-            value={justification}
-            onChange={(event) => setJustification(event.target.value)}
-            data-testid="edit-justification-input"
-          />
-          {errors.justification && <p className="edit-modal__error">{errors.justification}</p>}
-        </div>
+        <p className="edit-modal__readonly" data-testid="edit-engine-reason">
+          <span className="edit-modal__readonly-label">{DASHBOARD_TEXT.ENGINE_REASON}</span>
+          {candidate.reason}
+        </p>
 
         <div className="edit-modal__field">
           <label htmlFor="edit-status">{EDIT_TEXT.STATUS}</label>
@@ -149,7 +211,19 @@ function EditCandidateModal({ candidate, onSave, onClose }) {
           </select>
         </div>
 
-        {isStatusChanged && (
+        {reasonsState.state === 'loading' && (
+          <p className="edit-modal__error" role="status" data-testid="override-reasons-loading">
+            {EDIT_TEXT.REASONS_LOADING}
+          </p>
+        )}
+
+        {reasonsState.state === 'error' && (
+          <p className="edit-modal__error" role="alert" data-testid="override-reasons-error">
+            {reasonsState.message}
+          </p>
+        )}
+
+        {isStatusChanged && reasonsState.state === 'ready' && (
           <>
             <div className="edit-modal__field">
               <label htmlFor="edit-override-reason">{EDIT_TEXT.OVERRIDE_REASON}</label>
@@ -160,17 +234,21 @@ function EditCandidateModal({ candidate, onSave, onClose }) {
                 data-testid="edit-override-reason-select"
               >
                 <option value="">{EDIT_TEXT.OVERRIDE_REASON_PLACEHOLDER}</option>
-                {OVERRIDE_REASONS.map(({ code, label }) => (
+                {Object.entries(reasonsState.reasons).map(([code, description]) => (
                   <option key={code} value={code}>
-                    {label}
+                    {description}
                   </option>
                 ))}
               </select>
-              {errors.reasonCode && <p className="edit-modal__error">{errors.reasonCode}</p>}
+              {reasonError && (
+                <p className="edit-modal__error" role="alert" data-testid="edit-reason-error">
+                  {reasonError}
+                </p>
+              )}
             </div>
 
             <div className="edit-modal__field">
-              <label htmlFor="edit-comment">{EDIT_TEXT.COMMENT}</label>
+              <label htmlFor="edit-comment">{commentLabel}</label>
               <textarea
                 id="edit-comment"
                 rows={2}
@@ -178,15 +256,54 @@ function EditCandidateModal({ candidate, onSave, onClose }) {
                 onChange={(event) => setComment(event.target.value)}
                 data-testid="edit-comment-input"
               />
+              {commentError && (
+                <p className="edit-modal__error" role="alert" data-testid="edit-comment-error">
+                  {commentError}
+                </p>
+              )}
             </div>
           </>
         )}
 
-        {!CANDIDATE_SAVE_AVAILABLE && (
-          <p className="edit-modal__error" role="status" data-testid="edit-save-coming-soon">
-            {EDIT_TEXT.SAVE_COMING_SOON}
+        {userError && (
+          <p className="edit-modal__error" role="alert" data-testid="edit-user-required">
+            {userError}
           </p>
         )}
+
+        {saveError && (
+          <p className="edit-modal__error" role="alert" data-testid="edit-save-error">
+            {saveError}
+          </p>
+        )}
+
+        {saveField && (
+          <p className="edit-modal__error" data-testid="edit-save-field">
+            {saveField}
+          </p>
+        )}
+
+        <div className="edit-modal__actions">
+          <span className="edit-modal__decision-label">{DASHBOARD_TEXT.DECISION_LABEL}</span>
+          <button
+            type="button"
+            className="edit-modal__button"
+            onClick={() => handleDecision(CANDIDATE_DECISIONS.PASS)}
+            disabled={isSaving || !CANDIDATE_SAVE_AVAILABLE}
+            data-testid="decision-pass-button"
+          >
+            {EDIT_TEXT.PASS}
+          </button>
+          <button
+            type="button"
+            className="edit-modal__button"
+            onClick={() => handleDecision(CANDIDATE_DECISIONS.NO_PASS)}
+            disabled={isSaving || !CANDIDATE_SAVE_AVAILABLE}
+            data-testid="decision-no-pass-button"
+          >
+            {EDIT_TEXT.NO_PASS}
+          </button>
+        </div>
 
         <div className="edit-modal__actions">
           <button type="button" className="edit-modal__button" onClick={onClose} data-testid="edit-cancel-button">
@@ -195,7 +312,7 @@ function EditCandidateModal({ candidate, onSave, onClose }) {
           <button
             type="submit"
             className="edit-modal__button edit-modal__button--primary"
-            disabled={!CANDIDATE_SAVE_AVAILABLE}
+            disabled={isSaving || !CANDIDATE_SAVE_AVAILABLE}
             data-testid="edit-save-button"
           >
             {EDIT_TEXT.SAVE}

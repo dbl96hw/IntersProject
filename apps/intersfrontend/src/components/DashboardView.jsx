@@ -29,7 +29,7 @@ function matchesSearch(candidate, searchText) {
     .includes(query);
 }
 
-function DashboardView({ title, candidates, warnings = [] }) {
+function DashboardView({ title, candidates, warnings = [], breederUser = '', onCandidateUpdated = () => {} }) {
   const [expandedIds, setExpandedIds] = useState(() => new Set());
   const [contextMenu, setContextMenu] = useState(null);
   const [editingCandidate, setEditingCandidate] = useState(null);
@@ -156,7 +156,12 @@ function DashboardView({ title, candidates, warnings = [] }) {
       )}
 
       {editingCandidate && (
-        <EditCandidateModal candidate={editingCandidate} onSave={() => {}} onClose={handleCloseModal} />
+        <EditCandidateModal
+          candidate={editingCandidate}
+          breederUser={breederUser}
+          onUpdated={onCandidateUpdated}
+          onClose={handleCloseModal}
+        />
       )}
     </section>
   );

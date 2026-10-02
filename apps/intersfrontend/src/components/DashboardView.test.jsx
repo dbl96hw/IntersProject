@@ -1,8 +1,7 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { DASHBOARD_TEXT, EDIT_TEXT, missingReasonText } from '../constants';
+import { DASHBOARD_TEXT, missingReasonText } from '../constants';
 import DashboardView from './DashboardView';
-import EditCandidateModal from './EditCandidateModal';
 
 function candidate(overrides) {
   return {
@@ -89,38 +88,25 @@ describe('DashboardView live rows', () => {
             ambiguous_trials: ['SYN-TR-0025'],
             atypical: true,
             reason: 'fails in 3 of 5 trials',
+            override: {
+              reason_code: 'FIELD_OBSERVATION',
+              comment: 'vigour in plot 12',
+            },
           }),
         ]}
       />,
     );
 
     expect(screen.getByTestId('engine-colour-SYN-FLAGGED')).toHaveTextContent('RED');
+    expect(screen.getByTestId('engine-reason-label-SYN-FLAGGED')).toHaveTextContent(DASHBOARD_TEXT.ENGINE_REASON);
+    expect(screen.getByTestId('breeder-override-label-SYN-FLAGGED')).toHaveTextContent(DASHBOARD_TEXT.BREEDER_OVERRIDE);
+    expect(screen.getByTestId('breeder-override-SYN-FLAGGED')).toHaveTextContent('FIELD_OBSERVATION');
+    expect(screen.getByTestId('breeder-override-SYN-FLAGGED')).toHaveTextContent('vigour in plot 12');
     expect(screen.getByTestId('justification-source-SYN-FLAGGED')).toHaveTextContent('engine');
     expect(screen.getByTestId('unverified-badge-SYN-FLAGGED')).toHaveTextContent(DASHBOARD_TEXT.UNVERIFIED_BADGE);
     expect(screen.getByTestId('ambiguous-trials-SYN-FLAGGED')).toBeInTheDocument();
     expect(screen.getByTestId('atypical-flag-SYN-FLAGGED')).toBeInTheDocument();
     expect(screen.getByTestId('candidate-reason-SYN-FLAGGED')).toHaveTextContent('fails in 3 of 5 trials');
     expect(screen.getByTestId('analysis-warning-EXPLANATION_DEFERRED')).toHaveTextContent('EXPLANATION_DEFERRED');
-  });
-});
-
-describe('EditCandidateModal save', () => {
-  it('shows that saving is coming soon and does not record the change', () => {
-    const onSave = () => {
-      throw new Error('save should not run');
-    };
-
-    render(
-      <EditCandidateModal
-        candidate={candidate({ crop: 'Maize', mean_yield_t_ha: 10 })}
-        onSave={onSave}
-        onClose={() => {}}
-      />,
-    );
-
-    expect(screen.getByTestId('edit-save-coming-soon')).toHaveTextContent(EDIT_TEXT.SAVE_COMING_SOON);
-    expect(screen.getByTestId('edit-save-button')).toBeDisabled();
-    fireEvent.submit(screen.getByTestId('edit-candidate-modal'));
-    expect(screen.getByTestId('edit-candidate-modal')).toBeInTheDocument();
   });
 });

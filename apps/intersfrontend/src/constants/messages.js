@@ -7,6 +7,7 @@ export const SIDEBAR_TEXT = {
   LOADING: 'Loading dashboards.',
   LOAD_FAILED: 'The dashboard list could not be loaded.',
   HIDDEN_DASHBOARDS: 'more dashboards are not shown',
+  BREEDER: 'Breeder',
 };
 
 export const WELCOME_TEXT = {
@@ -49,6 +50,9 @@ export const DASHBOARD_TEXT = {
   AMBIGUOUS_TRIALS: 'Ambiguous trials',
   ATYPICAL: 'Atypical',
   SOURCE_LABEL: 'Source',
+  ENGINE_REASON: 'Engine reason',
+  BREEDER_OVERRIDE: 'Breeder override',
+  DECISION_LABEL: 'Decision',
 };
 
 export const FILTER_TEXT = {
@@ -62,20 +66,21 @@ export const FILTER_TEXT = {
 export const EDIT_TEXT = {
   MENU_EDIT_ROW: 'Edit row',
   MODAL_TITLE: 'Edit candidate',
-  CROP: 'Crop',
-  MEAN_YIELD: 'Mean yield (t/ha)',
-  JUSTIFICATION: 'Justification',
   STATUS: 'Status',
   OVERRIDE_REASON: 'Override reason',
   OVERRIDE_REASON_PLACEHOLDER: 'Select a reason',
-  COMMENT: 'Comment (optional)',
+  COMMENT_OPTIONAL: 'Comment (optional)',
+  COMMENT_REQUIRED: 'Comment (required for Other)',
   REASON_REQUIRED: 'Choose an override reason to change the status.',
-  YIELD_INVALID: 'Enter a yield of zero or more.',
-  CROP_REQUIRED: 'Enter a crop.',
-  JUSTIFICATION_REQUIRED: 'Enter a justification.',
+  COMMENT_REQUIRED_ERROR: 'A comment is required when the reason is Other.',
+  USER_REQUIRED: 'Enter a breeder name before saving. This is not a login.',
+  REASONS_LOADING: 'Loading override reasons.',
+  REASONS_FAILED: 'Override reasons could not be loaded.',
+  ENGINE_DOWN: 'The data engine is down. The row was not changed.',
+  PASS: 'Pass',
+  NO_PASS: 'No pass',
   CANCEL: 'Cancel',
-  SAVE: 'Save changes',
-  SAVE_COMING_SOON: 'Saving a colour or a decision is coming soon. This change is not recorded.',
+  SAVE: 'Save colour change',
 };
 
 export function missingReasonText(count) {

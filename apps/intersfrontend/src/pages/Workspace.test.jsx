@@ -1,7 +1,7 @@
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DASHBOARD_TEXT, HEALTH_TEXT, SIDEBAR_TEXT, WELCOME_TEXT } from '../constants';
+import { DASHBOARD_TEXT, HEALTH_REFRESH_MS, HEALTH_TEXT, SIDEBAR_TEXT, WELCOME_TEXT } from '../constants';
 import Workspace from './Workspace';
 
 function jsonResponse(body, ok = true) {
@@ -32,6 +32,7 @@ function mockApi({ health, chats = [], route } = {}) {
 
 describe('Workspace backend status and welcome', () => {
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -60,6 +61,41 @@ describe('Workspace backend status and welcome', () => {
 
     expect(await screen.findByTestId('backend-status-error')).toHaveTextContent(HEALTH_TEXT.UNREACHABLE);
     expect(screen.queryByTestId('backend-status')).not.toBeInTheDocument();
+  });
+
+  it('asks for health again after the refresh interval', async () => {
+    vi.useFakeTimers();
+    let healthCalls = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url) => {
+        const parsed = new URL(url);
+        if (parsed.pathname === '/health') {
+          healthCalls += 1;
+          const engine = healthCalls === 1 ? 'down' : 'up';
+          return Promise.resolve(jsonResponse({ healthy: true, mode: 'live', engine }));
+        }
+        if (parsed.pathname === '/api/chats') {
+          return Promise.resolve(jsonResponse({ chats: [] }));
+        }
+        return Promise.resolve(jsonResponse({ error: { code: 'NOT_FOUND', message: 'Missing', field: null } }, false));
+      }),
+    );
+
+    render(<Workspace />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getByTestId('backend-status')).toHaveTextContent('down');
+    expect(healthCalls).toBe(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(HEALTH_REFRESH_MS);
+    });
+
+    expect(screen.getByTestId('backend-status')).toHaveTextContent('up');
+    expect(healthCalls).toBe(2);
   });
 
   it('shows a mock-mode notice when health mode is mock', async () => {

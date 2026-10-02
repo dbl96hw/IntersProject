@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { getChat, listChatCandidates, listChats } from '../api/client';
+import { replaceCandidate } from '../replaceCandidate';
 import BackendStatus from '../components/BackendStatus';
 import ChatWidget from '../components/ChatWidget';
 import DashboardView from '../components/DashboardView';
 import LeafDecoration from '../components/LeafDecoration';
 import Sidebar from '../components/Sidebar';
 import WelcomeView from '../components/WelcomeView';
-import { DASHBOARD_TEXT, HEALTH_TEXT } from '../constants';
+import { BREEDER_USER, DASHBOARD_TEXT, HEALTH_TEXT } from '../constants';
 import './Workspace.css';
 
 function latestAnalysisWarnings(messages) {
@@ -26,6 +27,7 @@ function Workspace() {
   const [chatsState, setChatsState] = useState({ state: 'loading', chats: [], message: '' });
   const [activeChatId, setActiveChatId] = useState(null);
   const [dashboardState, setDashboardState] = useState({ state: 'idle' });
+  const [breederUser, setBreederUser] = useState(BREEDER_USER);
 
   const activeChat = chatsState.chats.find((chat) => chat.id === activeChatId) ?? null;
 
@@ -82,6 +84,15 @@ function Workspace() {
     setActiveChatId(null);
   }
 
+  function handleCandidateUpdated(updated) {
+    setDashboardState((current) => {
+      if (current.state !== 'ready') {
+        return current;
+      }
+      return { ...current, candidates: replaceCandidate(current.candidates, updated) };
+    });
+  }
+
   function handleSelectChat(chatId) {
     setActiveChatId(chatId);
     setDashboardState({ state: 'loading' });
@@ -101,6 +112,8 @@ function Workspace() {
         activeChatId={activeChatId}
         onNewDashboard={handleNewDashboard}
         onSelectChat={handleSelectChat}
+        breederUser={breederUser}
+        onBreederUserChange={setBreederUser}
       />
 
       <main className="workspace__main">
@@ -135,6 +148,8 @@ function Workspace() {
               title={activeChat.title}
               candidates={dashboardState.candidates}
               warnings={dashboardState.warnings}
+              breederUser={breederUser}
+              onCandidateUpdated={handleCandidateUpdated}
             />
           )}
         </div>

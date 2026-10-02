@@ -16,6 +16,8 @@ export default [
         window: 'readonly',
         document: 'readonly',
         fetch: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
         URL: 'readonly',
         URLSearchParams: 'readonly',
       },

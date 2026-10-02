@@ -85,6 +85,26 @@ export function getChat(chatId) {
   return requestJson(`${API_PATHS.CHATS}/${chatId}`);
 }
 
+function sendJson(path, method, body) {
+  return requestJson(path, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+export function listOverrideReasons() {
+  return requestJson(API_PATHS.OVERRIDE_REASONS);
+}
+
+export function updateCandidate(id, body) {
+  return sendJson(`${API_PATHS.CANDIDATES}/${id}`, 'PATCH', body);
+}
+
+export function recordCandidateDecision(id, body) {
+  return sendJson(`${API_PATHS.CANDIDATES}/${id}/decision`, 'POST', body);
+}
+
 function incompleteListError() {
   return new ApiError({
     code: API_ERROR_CODES.UNEXPECTED,
