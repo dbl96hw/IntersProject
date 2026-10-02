@@ -1,4 +1,7 @@
-# UC4 mock data (Syngenta, hackathon 2026)
+# UC4 mock data, 29-Sep drop (DEPRECATED)
+
+> Superseded by the integrated V2 drop in `data/synthetic/uc4_v2/` (2026-10-02), which the engine loads by default. This folder is kept only as the fixture of the engine's trial-level tests.
+
 
 Anonymized / synthetic exports provided by Syngenta for **Use Case 4: R&D Data Source Unification**. Every row is flagged as synthetic (`IS_SYNTHETIC = TRUE` or `REMARK = "SYNTHETIC — hackathon mock data"`). No real Syngenta data is stored here.
 

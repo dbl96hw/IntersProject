@@ -137,6 +137,21 @@ The document endpoints run the same gate. An IRRELEVANT document returns `{"acce
 
 The agent must quote `statement` or `value`, and must not compute anything new.
 
+## Output: baseline on the integrated V2 drop (`GET /baseline`)
+
+With the V2 data the official decision is per candidate, so the baseline compares colours:
+
+```json
+{"rule_version": "SYNTH_V2_RAG_RECON_2026-10-02", "mode": "candidate_rag", "level": "candidate",
+ "parity": {"agree": 150, "total": 150, "accuracy": 1.0},
+ "confusion_official_vs_engine": {"GREEN": {"GREEN": 32, "AMBER": 0, "RED": 0}, "...": "..."},
+ "reason_text_identical": {"agree": 146, "total": 150},
+ "recomputed_from_raw_data": {"YIELD_VS_CHECK_PCT": {"compared": 148, "max_abs_diff": 0.049, "tolerance": 0.0501, "outside_tolerance": 0}, "...": "..."},
+ "mismatch_root_causes": {}, "calibration": null}
+```
+
+Candidate rows keep the same shape. `verdict` maps the colour (GREEN → PASS, AMBER → HOLD, RED → FAIL); `n_fail` counts the usable trials in which the candidate fails a must-pass with the official thresholds (an engine view: V2 has no trial verdicts). In the candidate card each trial has `engine_verdict` (PASS / HOLD / FAIL / EXCLUDED) and the candidate's values in that trial; `official_verdict` is null. `GET /trials/{id}` returns the trial's entries, checks and operations. SQL tables: `materials` (the 150 candidates), `reference_checks`, `trials`, `trial_material`, `operations`, `candidate_recommendations`, `candidate_recomputed`, `trait_dictionary`.
+
 ## Output: scoring (`GET /scoring`, tool `apply_scoring`)
 
 ```json

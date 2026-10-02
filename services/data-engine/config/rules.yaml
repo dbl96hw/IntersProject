@@ -132,3 +132,63 @@ ambiguity_band: [0.35, 0.65]
 anomaly_quantile: 0.975
 # Share of variance (Frobenius energy) retained by the spectral truncation.
 spectral_energy: 0.95
+
+# ------------------------------------------------------------------------------------------
+# Integrated V2 drop (2026-10-02): the official suggestion is per CANDIDATE (SYSTEM_RAG in
+# candidate_recommendations_synthetic.csv), so the engine reproduces it at that level.
+# Reverse-engineered from the 150 SYSTEM_REASON texts; reproduces 150/150 colours.
+# Two tiers: a failed must-pass makes the candidate RED; otherwise any failed check makes it
+# AMBER; otherwise GREEN. Reason texts follow the official wording.
+candidate_rag:
+  version: SYNTH_V2_RAG_RECON_2026-10-02
+  status: reverse-engineered from the official reasons, pending SME confirmation
+  source: candidate_recommendations
+  min_usable_trials: 2            # "only 1 usable trial" -> check
+  no_field_data_reason: "No field data yet (genotyped only) - cannot judge performance"
+  green_reason: "Beats checks ({value:.0f}%) with all field and lab checks passing"
+  # A trial with one of these operations MISSED is excluded from a candidate's usable trials
+  # (official caveat "1 trial(s) excluded: irrigation missed").
+  exclude_trial_if_missed: [IRRIGATION]
+  criteria:
+    yield_vs_check:
+      field: YIELD_VS_CHECK_PCT
+      label: yield vs checks
+      better: higher
+      percent: true
+      must_pass: 95           # "below minimum 95%"  -> RED
+      must_word: minimum
+      target: 103             # "below target 103%"  -> AMBER
+    disease:
+      field: DISEASE_SCORE_MEAN
+      label: disease score
+      better: lower
+      must_pass: 6.0          # "above limit 6.0"    -> RED
+      must_word: limit
+      target: 4.0             # "above target 4.0"   -> AMBER
+    moisture:
+      field: MOISTURE_PCT_MEAN
+      label: harvest moisture
+      better: lower
+      target: 23.0            # AMBER; above 25.0 the wording says "limit" but it stays AMBER
+      second: 25.0
+      second_word: limit
+    germination:
+      field: GERMINATION_PCT
+      label: germination
+      better: higher
+      percent: true
+      target: 90              # AMBER; below 85 the wording says "minimum" but it stays AMBER
+      second: 85
+      second_word: minimum
+    fumonisin:
+      field: FUMONISIN_PPM
+      label: fumonisin
+      better: lower
+      must_pass: 4.0          # "above limit 4.0"    -> RED
+      must_word: limit
+  marker:
+    field: MARKER_DISEASE_RESISTANCE
+    bad_value: SUSCEPTIBLE
+    text: disease-susceptible marker
+  order_red: [yield_vs_check, disease, fumonisin]
+  order_amber: [yield_vs_check, disease, moisture, germination, marker, trials]

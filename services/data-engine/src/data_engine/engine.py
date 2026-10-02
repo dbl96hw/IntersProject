@@ -29,11 +29,12 @@ from . import diagnostics as diag
 from . import ingest
 from . import profile as prof
 from . import quality as qual
+from . import integrated_v2 as v2
 from . import relevance as rel
 from .audit import REASON_CODES, OverrideLog
 from .encode import CANDIDATE_SPECS, encode_frame
-from .rules import CandidateRules, Decision, TrialRules
-from .settings import data_dir, load_yaml, state_dir
+from .rules import CandidateRAGRules, CandidateRules, Decision, TrialRules
+from .settings import data_dir, legacy_data_dir, load_yaml, state_dir
 from .spectral import SpectralModel
 from .telemetry import Telemetry, previous_run
 
@@ -63,10 +64,13 @@ def _trial_counts(trials: list[dict]) -> dict:
     counting itself. Derived only from `trials` (already in the payload), so it adds no new facts."""
     out = {"total": len(trials), "PASS": 0, "HOLD": 0, "FAIL": 0, "ambiguous": 0, "not_explained_by_data": 0}
     for t in trials:
-        if t.get("official_verdict") in ("PASS", "HOLD", "FAIL"):
-            out[t["official_verdict"]] += 1
+        verdict = t.get("official_verdict") or t.get("engine_verdict")
+        if verdict in ("PASS", "HOLD", "FAIL"):
+            out[verdict] += 1
+        elif verdict == "EXCLUDED":
+            out["EXCLUDED"] = out.get("EXCLUDED", 0) + 1
         out["ambiguous"] += bool(t.get("ambiguous"))
-        out["not_explained_by_data"] += not t.get("explained_by_data", True)
+        out["not_explained_by_data"] += t.get("explained_by_data") is False
     return out
 
 
@@ -307,6 +311,32 @@ class DataEngine:
                           "columns": sum(len(t.profile.columns) for t in self.tables),
                           "informative_columns": sum(len(t.profile.kept) for t in self.tables)}
 
+        # Which drop is this? The integrated V2 drop decides per candidate (candidate_recommendations)
+        # and links trials to germplasm through a bridge; the 29-Sep drop decides per trial.
+        self.profile = "v2" if v2.is_v2(merged) else "v1"
+        (self._build_v2_core if self.profile == "v2" else self._build_v1_core)(merged, tel)
+
+        with tel.stage("diagnostics") as st:
+            runs_dir = state_dir() / "runs"
+            prev = previous_run(runs_dir) if self.save_runs else None
+            self.diagnostics = diag.full_report(self, prev)
+            st.metrics = {"numerical_passed": (self.diagnostics.get("numerical") or {}).get("passed"),
+                          "no_key_lost": self.diagnostics["integrity"]["no_key_lost"],
+                          "drift": self.diagnostics["drift"].get("status", "baseline")}
+
+        from . import accel
+        tel.context["parallel_plan"] = self.parallel_plan
+        tel.context["accelerators"] = {"available": {"cpp": accel._cpp() is not None,
+                                                     "julia": accel.julia_enabled()},
+                                       "last_knn": dict(accel.LAST_RUN)}
+        self.run_report = {**tel.as_dict(), "diagnostics": self.diagnostics,
+                           "quality": self.quality.summary(),
+                           "baseline": {"parity": self.baseline_parity()}}
+        self.run_path = tel.save(runs_dir, {"diagnostics": self.diagnostics,
+                                            "quality": self.quality.summary()}) if self.save_runs else None
+
+    def _build_v1_core(self, merged: dict, tel: Telemetry) -> None:
+        """29-Sep drop: trial-level official verdicts, candidate colour aggregated from its trials."""
         with tel.stage("canonical_model") as st:
             self.model = canon.build(merged)
             self.findings = canon.consistency_checks(self.model)
@@ -314,27 +344,7 @@ class DataEngine:
 
         with tel.stage("data_quality") as st:
             self.quality = qual.assess(self.model, export_date=self.export_date)
-            if self.document_conflicts:
-                self.quality.issues.append(qual.Issue(
-                    id="provenance.upload_conflicts_export", category="provenance", severity="warning",
-                    title="Uploaded rows contradict the system-of-record export",
-                    count=len(self.document_conflicts),
-                    affected=[f"{c['source']}:{c['key']}" for c in self.document_conflicts][:12],
-                    root_cause=("the same key arrives from an upload (document table or posted records) with "
-                                "values different from the export"),
-                    evidence={"conflicts": self.document_conflicts[:20]}, fix_status="applied",
-                    fix="the export wins; the uploaded value is kept as evidence and shown to the breeder",
-                    impact="no silent overwrite of exported data by uploads, scans or LLM-extracted records"))
-            dupes = sum(s.get("duplicates_ignored", 0) for s in self.merge_stats.values())
-            if dupes:
-                self.quality.issues.append(qual.Issue(
-                    id="provenance.duplicate_uploads_ignored", category="provenance", severity="info",
-                    title="Uploaded rows already present were ignored", count=dupes,
-                    affected=[name for name, s in self.merge_stats.items() if s.get("duplicates_ignored")][:12],
-                    root_cause="the same rows were uploaded again (re-upload of an export or of a previous upload)",
-                    evidence={"per_table": self.merge_stats}, fix_status="applied",
-                    fix="exact duplicates are not added, so re-uploading is idempotent",
-                    impact="counts, quality issues and drift are not inflated by repeated uploads"))
+            self._add_provenance_issues()
             st.metrics = self.quality.summary()
 
         with tel.stage("rules_trial", rows_in=len(self.model.trials)) as st:
@@ -365,32 +375,106 @@ class DataEngine:
         with tel.stage("calibration") as st:
             st.metrics = {"cache_hit": self._build_calibration()}
 
-        with tel.stage("diagnostics") as st:
-            runs_dir = state_dir() / "runs"
-            prev = previous_run(runs_dir) if self.save_runs else None
-            self.diagnostics = diag.full_report(self, prev)
-            st.metrics = {"numerical_passed": (self.diagnostics.get("numerical") or {}).get("passed"),
-                          "no_key_lost": self.diagnostics["integrity"]["no_key_lost"],
-                          "drift": self.diagnostics["drift"].get("status", "baseline")}
 
-        from . import accel
-        tel.context["parallel_plan"] = self.parallel_plan
-        tel.context["accelerators"] = {"available": {"cpp": accel._cpp() is not None,
-                                                     "julia": accel.julia_enabled()},
-                                       "last_knn": dict(accel.LAST_RUN)}
-        self.run_report = {**tel.as_dict(), "diagnostics": self.diagnostics,
-                           "quality": self.quality.summary(),
-                           "baseline": {"parity": self.baseline_parity()}}
-        self.run_path = tel.save(runs_dir, {"diagnostics": self.diagnostics,
-                                            "quality": self.quality.summary()}) if self.save_runs else None
+    def _build_v2_core(self, merged: dict, tel: Telemetry) -> None:
+        """Integrated V2 drop: the official suggestion is per candidate (see integrated_v2.py)."""
+        rag_cfg = self.rules_cfg["candidate_rag"]
+        with tel.stage("canonical_model") as st:
+            self.v2 = v2.build(merged, rag_cfg)
+            self.model = self.v2.canonical
+            self.findings = v2.findings(self.v2)
+            st.rows_out = len(self.model.materials) + len(self.model.trials)
+            st.metrics = {"recomputed_outside_tolerance": sum(r["outside_tolerance"]
+                                                              for r in self.v2.recomputation.values())}
+
+        with tel.stage("data_quality") as st:
+            old = legacy_data_dir() / "trial_synthetic.csv"
+            old_trials = pd.read_csv(old, usecols=["TRIAL_GUID"]) if old.exists() else None
+            self.quality = v2.quality(self.v2, old_trials)
+            self._add_provenance_issues()
+            st.metrics = self.quality.summary()
+
+        with tel.stage("rules_candidate", rows_in=len(self.v2.recommendations)) as st:
+            self.trial_rules = TrialRules(self.rules_cfg)       # kept for its version string only
+            self.trial_decisions = {}                            # V2 has no trial verdicts
+            tm = self.v2.trial_material
+            tm = tm.assign(engine_verdict=[v2.trial_verdict(r, rag_cfg) for _, r in tm.iterrows()])
+            self.v2.trial_material = tm
+            self.view = tm.merge(self.model.materials[["MATERIAL_GUID", "candidate_id"]], on="MATERIAL_GUID",
+                                 how="left")
+            entries = self.view[self.view["role"] == "TRIAL_ENTRY"]
+            trials_of = entries.groupby("MATERIAL_GUID")["TRIAL_ID"].apply(lambda s: sorted(s.unique())).to_dict()
+            fails = entries[entries["engine_verdict"] == "FAIL"].groupby("MATERIAL_GUID")["TRIAL_ID"].nunique()
+            self.candidate_rules = CandidateRAGRules(self.rules_cfg)
+            self.candidate_decisions = {}
+            for row in self.v2.recommendations.to_dict("records"):
+                guid = row["MATERIAL_GUID"]
+                self.candidate_decisions[row["MATERIAL_ID"]] = self.candidate_rules.evaluate(
+                    row, row["MATERIAL_ID"], official=row.get("SYSTEM_RAG"), official_reason=row.get("SYSTEM_REASON"),
+                    n_trials=len(trials_of.get(guid, [])), n_fail=int(fails.get(guid, 0)),
+                    trials=trials_of.get(guid, []))
+            agree = sum(1 for d in self.candidate_decisions.values() if d.agrees_with_official)
+            st.metrics = {**self.apply_scoring()["counts"], "agree_with_official": agree,
+                          "total": len(self.candidate_decisions)}
+
+        with tel.stage("features_and_spectral") as st:
+            rec = self.v2.recommendations
+            cols = [c for c in ("MATERIAL_GUID", "YIELD_VS_CHECK_PCT", "DISEASE_SCORE_MEAN", "MOISTURE_PCT_MEAN")
+                    if c in rec.columns]
+            f = (rec[["MATERIAL_ID"] + cols].rename(columns={"MATERIAL_ID": "candidate_id"})
+                 .merge(self.model.genomics.drop(columns=[c for c in ("MATERIAL_ID",) if c in self.model.genomics]),
+                        on="MATERIAL_GUID", how="left")
+                 .merge(self.model.lab, on="MATERIAL_GUID", how="left")
+                 .merge(self.v2.candidates[["MATERIAL_GUID"] + [c for c in ("MEAN_YIELD_T_HA",)
+                                                               if c in self.v2.candidates]],
+                        on="MATERIAL_GUID", how="left"))
+            n_used = rec["MATERIAL_GUID"].map(self.v2.candidates.set_index("MATERIAL_GUID")["n_trials_used"])
+            f["FAIL_SHARE"] = [self.candidate_decisions[c].extras["n_fail"] / n if n else None
+                               for c, n in zip(f["candidate_id"], n_used)]
+            self.features = f.reset_index(drop=True)
+            self.feature_matrix, self.feature_names, self.encoding_meta = encode_frame(self.features, CANDIDATE_SPECS)
+            self._build_spectral()
+            st.metrics = {"features": len(self.feature_names),
+                          "retained_components": self.spectral.k if self.spectral else None}
+
+        with tel.stage("calibration") as st:
+            # The V2 rule is reproduced exactly (see baseline); there are no trial labels to calibrate on.
+            self.calibration = None
+            st.metrics = {"skipped": "candidate-level rule reproduced exactly"}
+
+    def _add_provenance_issues(self) -> None:
+        """Upload conflicts and ignored duplicates, the same for every data profile."""
+        if self.document_conflicts:
+            self.quality.issues.append(qual.Issue(
+                id="provenance.upload_conflicts_export", category="provenance", severity="warning",
+                title="Uploaded rows contradict the system-of-record export",
+                count=len(self.document_conflicts),
+                affected=[f"{c['source']}:{c['key']}" for c in self.document_conflicts][:12],
+                root_cause=("the same key arrives from an upload (document table or posted records) with "
+                            "values different from the export"),
+                evidence={"conflicts": self.document_conflicts[:20]}, fix_status="applied",
+                fix="the export wins; the uploaded value is kept as evidence and shown to the breeder",
+                impact="no silent overwrite of exported data by uploads, scans or LLM-extracted records"))
+        dupes = sum(s.get("duplicates_ignored", 0) for s in self.merge_stats.values())
+        if dupes:
+            self.quality.issues.append(qual.Issue(
+                id="provenance.duplicate_uploads_ignored", category="provenance", severity="info",
+                title="Uploaded rows already present were ignored", count=dupes,
+                affected=[name for name, s in self.merge_stats.items() if s.get("duplicates_ignored")][:12],
+                root_cause="the same rows were uploaded again (re-upload of an export or of a previous upload)",
+                evidence={"per_table": self.merge_stats}, fix_status="applied",
+                fix="exact duplicates are not added, so re-uploading is idempotent",
+                impact="counts, quality issues and drift are not inflated by repeated uploads"))
 
     # Primary key per source, used to reconcile uploaded tables with exports.
     # lab_observations has no single-column key (several rows per material): exact duplicates are
     # removed instead.
     # Readable identifiers that must stay unique next to the GUID. The 28-Sep drop re-keyed the same trials
     # (SYN-TR-0001 under another TRIAL_GUID): merging it as "new keys" would duplicate every trial.
-    _NATURAL_KEYS = {"trial": "TRIAL_ID", "germplasm": "MATERIAL_ID"}
-    _SOURCE_KEYS = {"genomics": "MATERIAL_GUID", "germplasm": "MATERIAL_GUID", "trial": "TRIAL_GUID",
+    _NATURAL_KEYS = {"trial": "TRIAL_ID", "germplasm": "MATERIAL_ID", "candidate_recommendations": "MATERIAL_ID"}
+    _SOURCE_KEYS = {"candidate_recommendations": "MATERIAL_GUID", "trial_germplasm_bridge": "TRIAL_ENTRY_GUID",
+                    "trait_dictionary": "TRAIT_GUID",
+                    "genomics": "MATERIAL_GUID", "germplasm": "MATERIAL_GUID", "trial": "TRIAL_GUID",
                     "trial_recommendations": "TRIAL_GUID", "operations": "OPERATION_GUID",
                     "observations": "OBSERVATION_UUID"}
 
@@ -525,6 +609,15 @@ class DataEngine:
 
     def evidence_reread_mismatches(self) -> int:
         """Anti-hallucination check at the source: every cited trial value equals the table value."""
+        if self.profile == "v2":
+            rec = self.v2.recommendations.set_index("MATERIAL_ID")
+            bad = 0
+            for d in self.candidate_decisions.values():
+                for e in d.evidence:
+                    if e.field in rec.columns and isinstance(e.value, (int, float)) and \
+                            not np.isclose(float(rec.at[d.record, e.field]), float(e.value)):
+                        bad += 1
+            return bad
         trials = self.model.trials.set_index("TRIAL_ID")
         bad = 0
         for d in self.trial_decisions.values():
@@ -536,7 +629,8 @@ class DataEngine:
         return bad
 
     def baseline_parity(self) -> dict:
-        ds = [d for d in self.trial_decisions.values() if d.official_verdict is not None]
+        decisions = self.candidate_decisions if self.profile == "v2" else self.trial_decisions
+        ds = [d for d in decisions.values() if d.official_verdict is not None]
         agree = sum(1 for d in ds if d.agrees_with_official)
         return {"agree": agree, "total": len(ds), "accuracy": round(agree / len(ds), 4) if ds else None}
 
@@ -630,8 +724,8 @@ class DataEngine:
                                               "MARKER_YIELD_POTENTIAL", "MARKER_MATURITY", "GENOTYPING_DATE")
                     if k in feat.index}
         lab = {k: feat.get(k) for k in self.model.lab_traits if k in feat.index}
-        trials = []
-        for t in d.extras.get("trials", []):
+        trials = self._v2_trials(candidate_id) if self.profile == "v2" else []
+        for t in ([] if self.profile == "v2" else d.extras.get("trials", [])):
             td = self.trial_decisions[t]
             row = self.model.trials.loc[self.model.trials["TRIAL_ID"] == t].iloc[0]
             trials.append({"trial_id": t, "location": row.get("location"), "year": row.get("START_YEAR"),
@@ -656,6 +750,65 @@ class DataEngine:
             "lineage": self.get_lineage(candidate_id),
             "document_evidence": self.document_facts(candidate_id),
             "data_gaps": self.model.gaps,
+        })
+
+    # ------------------------------------------------------------ integrated V2 views
+    def _v2_trials(self, candidate_id: str) -> list[dict]:
+        """The candidate's trials in V2: its values in each trial, and whether the trial is usable."""
+        guid = self.v2.recommendations.set_index("MATERIAL_ID").at[candidate_id, "MATERIAL_GUID"]
+        rows = self.view[(self.view["MATERIAL_GUID"] == guid) & (self.view["role"] == "TRIAL_ENTRY")]
+        year = self.model.trials.set_index("TRIAL_GUID").get("START_YEAR", pd.Series(dtype=float))
+        out = []
+        for _, r in rows.sort_values("TRIAL_ID").iterrows():
+            out.append({"trial_id": r["TRIAL_ID"], "location": None, "year": year.get(r["TRIAL_GUID"]),
+                        "official_verdict": None, "engine_verdict": r["engine_verdict"], "explained_by_data": None,
+                        "reason": v2.trial_statement(r), "ambiguous": False, "p_fail": None, "used": bool(r["used"]),
+                        "yield_t_ha": r.get("YIELD_T_HA"), "yield_vs_check_pct": r.get("YIELD_VS_CHECK_PCT"),
+                        "disease_score": r.get("DISEASE_SCORE"), "moisture_pct": r.get("MOISTURE_PCT")})
+        return out
+
+    def _v2_trial(self, trial_id: str) -> dict:
+        t = self.model.trials[self.model.trials["TRIAL_ID"] == trial_id]
+        if t.empty:
+            raise KeyError(trial_id)
+        row = t.iloc[0]
+        rows = self.view[self.view["TRIAL_ID"] == trial_id]
+        entries = [{"candidate_id": r["candidate_id"], "role": r["role"], "verdict": r["engine_verdict"]
+                    if r["role"] == "TRIAL_ENTRY" else None, "statement": v2.trial_statement(r)}
+                   for _, r in rows.sort_values(["role", "candidate_id"]).iterrows()]
+        ops = self.v2.operations
+        ops = ops[ops["TRIAL_ID"] == trial_id] if not ops.empty else ops
+        return jsonable({
+            "trial_id": trial_id, "location": None, "year": row.get("START_YEAR"),
+            "official_verdict": None, "engine_verdict": None,
+            "reason": ("excluded for its candidates: irrigation missed" if row.get("excluded_for_candidates")
+                       else "usable"),
+            "check_yield_t_ha": row.get("CHECK_YIELD_T_HA"), "entries": row.get("n_entries"),
+            "candidates": [e["candidate_id"] for e in entries if e["role"] == "TRIAL_ENTRY"],
+            "results": entries,
+            "operations": [] if ops.empty else ops[["OPERATION_TYPE_LID", "PLANNED_DATE", "ACTUAL_DATE", "STATUS_LID",
+                                                    "DELAY_DAYS", "RECORDED_VIA"]].to_dict("records"),
+            "document_evidence": self.document_facts(trial_id), "rule_version": self.candidate_rules.version,
+            "note": "the V2 drop has no trial verdict; verdicts here are each candidate's result in this trial "
+                    "with the official thresholds (engine view)"})
+
+    def _v2_baseline(self) -> dict:
+        ds = list(self.candidate_decisions.values())
+        labels = ["GREEN", "AMBER", "RED"]
+        confusion = {o: {c: sum(1 for d in ds if d.extras.get("official_rag") == o and d.extras.get("engine_rag") == c)
+                         for c in labels} for o in labels}
+        reasons_equal = sum(1 for d in ds if d.extras.get("official_reason") == d.reason)
+        parity = self.baseline_parity()
+        return jsonable({
+            "rule_version": self.candidate_rules.version, "mode": "candidate_rag", "level": "candidate",
+            "parity": parity, "confusion_official_vs_engine": confusion,
+            "not_explained": [d.record for d in ds if d.agrees_with_official is False],
+            "reason_text_identical": {"agree": reasons_equal, "total": len(ds)},
+            "recomputed_from_raw_data": self.v2.recomputation,
+            "mismatch_root_causes": {}, "calibration": None,
+            "rules": {k: v for k, v in self.rules_cfg["candidate_rag"].items() if k in ("criteria", "marker",
+                                                                                     "min_usable_trials",
+                                                                                     "exclude_trial_if_missed")},
         })
 
     def compare_candidates(self, candidate_ids: list[str]) -> dict:
@@ -718,6 +871,8 @@ class DataEngine:
 
     def get_trial(self, trial_id: str) -> dict:
         """One trial: official vs engine verdict, evidence, ambiguity, documents mentioning it."""
+        if self.profile == "v2":
+            return self._v2_trial(trial_id)
         d = self.trial_decisions.get(trial_id)
         if d is None:
             raise KeyError(trial_id)
@@ -735,6 +890,8 @@ class DataEngine:
 
     # ------------------------------------------------------------ transparency
     def trials(self) -> list[dict]:
+        if self.profile == "v2":
+            return jsonable(self.model.trials.drop(columns=["SOWING_DATE"], errors="ignore").to_dict("records"))
         return jsonable([{"trial_id": d.record, "colour": d.colour, "official_verdict": d.official_verdict,
                           "engine_verdict": d.computed_verdict, "explained_by_data": d.agrees_with_official,
                           "reason": d.reason,
@@ -743,6 +900,8 @@ class DataEngine:
 
     def baseline(self) -> dict:
         """Parity with the official logic + calibration: the 'checked against a baseline' evidence."""
+        if self.profile == "v2":
+            return self._v2_baseline()
         ds = [d for d in self.trial_decisions.values() if d.official_verdict is not None]
         labels = ["PASS", "HOLD", "FAIL"]
         confusion = {o: {c: sum(1 for d in ds if d.official_verdict == o and d.computed_verdict == c) for c in labels}
@@ -764,7 +923,9 @@ class DataEngine:
     def quality_report(self) -> dict:
         """Every data issue: category, root cause, fix status (applied/proposed/not fixable), impact."""
         rep = self.quality.as_dict()
-        rep["what_if_recomputed_aggregates"] = qual.what_if_recomputed(self.quality.reconciled_trials, self.trial_rules)
+        if self.profile != "v2":
+            rep["what_if_recomputed_aggregates"] = qual.what_if_recomputed(self.quality.reconciled_trials,
+                                                                           self.trial_rules)
         return jsonable(rep)
 
     def diagnostics_report(self) -> dict:
@@ -833,7 +994,17 @@ class DataEngine:
                                    "n_trials": d.extras.get("n_trials"), "n_fail": d.extras.get("n_fail")}
                                   for k, d in self.candidate_decisions.items()])
         trial_dec = pd.DataFrame([{"trial_id": k, "official": d.official_verdict, "engine": d.computed_verdict,
-                                   "colour": d.colour, "reason": d.reason} for k, d in self.trial_decisions.items()])
+                                   "colour": d.colour, "reason": d.reason} for k, d in self.trial_decisions.items()],
+                                 columns=["trial_id", "official", "engine", "colour", "reason"])
+        if self.profile == "v2":
+            m = self.model.materials
+            return {"materials": m[m["role"] == "candidate"].reset_index(drop=True),
+                    "reference_checks": m[m["role"] == "check"].reset_index(drop=True),
+                    "trials": self.model.trials, "trial_material": self.v2.trial_material,
+                    "operations": self.v2.operations, "genomics": self.model.genomics, "lab": self.model.lab,
+                    "candidate_recommendations": self.v2.recommendations, "candidate_recomputed": self.v2.candidates,
+                    "trait_dictionary": self.v2.traits, "candidate_features": self.features,
+                    "candidate_decisions": decisions, "trial_decisions": trial_dec}
         return {"materials": self.model.materials, "trials": self.quality.reconciled_trials,
                 "trial_material": self.model.trial_material, "operations": self.quality.operations_flags,
                 "genomics": self.model.genomics, "lab": self.model.lab, "candidate_features": self.features,
@@ -873,9 +1044,11 @@ class DataEngine:
             "candidate_id": candidate_id, "colour": p["colour"], "engine_colour": p["engine_colour"],
             "verdict": p["verdict"], "reason": p["reason"], "rule_version": p["rule_version"],
             "evidence": [e["statement"] for e in p["evidence"]],
-            "trials": [f"{t['trial_id']} {t['location']} {t['year']}: {t['official_verdict']}"
-                       + ("" if t["explained_by_data"] else " (not explained by data)")
-                       + (" (ambiguous)" if t["ambiguous"] else "") for t in p["trials"]],
+            "trials": ([f"{t['trial_id']} {t['year']}: {t['engine_verdict']} ({t['reason']})" for t in p["trials"]]
+                       if self.profile == "v2" else
+                       [f"{t['trial_id']} {t['location']} {t['year']}: {t['official_verdict']}"
+                        + ("" if t["explained_by_data"] else " (not explained by data)")
+                        + (" (ambiguous)" if t["ambiguous"] else "") for t in p["trials"]]),
             "atypical": p["atypicality"]["atypical"] if p["atypicality"] else None,
             "similar": [s["candidate_id"] for s in p["similar_candidates"]],
             "document_mentions": [f"{f['source']} p.{f['page']}: {f['sentence']}" for f in p["document_evidence"]][:5],
