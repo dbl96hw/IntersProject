@@ -16,6 +16,17 @@ export const WELCOME_TEXT = {
   SUBMIT: 'Create dashboard',
   ANALYZING: 'Analyzing your files...',
   FILES_SELECTED: 'Selected files',
+  UPLOAD_COMING_SOON: 'File upload is coming soon. Creating a dashboard from files is not available yet.',
+};
+
+export const HEALTH_TEXT = {
+  LOADING: 'Checking whether the backend and the data engine are reachable.',
+  UNREACHABLE: 'The backend is not reachable.',
+  UNEXPECTED: 'The backend returned an unexpected error.',
+  STATUS_LABEL: 'Backend status',
+  MODE_LABEL: 'Mode',
+  ENGINE_LABEL: 'Engine',
+  MOCK_NOTICE: 'The backend is in mock mode. Colour changes are not saved.',
 };
 
 export const DASHBOARD_TEXT = {

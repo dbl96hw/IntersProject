@@ -9,6 +9,8 @@
 /* The main area itself never scrolls, so the corner leaves stay pinned to the visible corners. */
 .workspace__main {
   position: relative;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -18,6 +20,7 @@
 .workspace__scroll {
   position: relative;
   z-index: 1;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }

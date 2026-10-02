@@ -190,9 +190,9 @@ Phase 4 feature, re-run the F3.1 checklist.
   - [x] `DATA_ENGINE_URL` and related timeouts in `apps/intersbackend/.env.example`
   - [x] `GET /health` reports `{ healthy, mode, engine: up|down|skipped }`
   - [x] Engine errors forwarded in the team shape; 502 `DATA_ENGINE_UNAVAILABLE` when the engine is down
-  - [ ] Frontend API helper (base URL from `src/constants/api.js`, path constants, `res.ok` check) and a
+  - [x] Frontend API helper (base URL from `src/constants/api.js`, path constants, `res.ok` check) and a
     backend / engine status indicator in the workspace
-  - [ ] Record backend test choice in `gendd/adr/` (`node:test` is in use with 110 tests and mocked SDK/engine)
+  - [x] Record backend test choice in `gendd/adr/` (`node:test`, see `0002-backend-tests-use-node-test.md`)
   - [x] `npm run lint` passes
 - Done when: the UI calls `GET /api/candidates` on port 3000 (mock or live) and shows whether the backend
   and engine are reachable.

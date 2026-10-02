@@ -1,9 +1,9 @@
 import { useRef, useState } from 'react';
 import Logo from './Logo';
-import { ACCEPTED_FILE_TYPES, APP_NAME, WELCOME_TEXT } from '../constants';
+import { ACCEPTED_FILE_TYPES, APP_NAME, FILE_UPLOAD_AVAILABLE, WELCOME_TEXT } from '../constants';
 import './WelcomeView.css';
 
-function WelcomeView({ isAnalyzing, onSubmitFiles }) {
+function WelcomeView({ isAnalyzing = false }) {
   const fileInputRef = useRef(null);
   const [fileNames, setFileNames] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -53,11 +53,10 @@ function WelcomeView({ isAnalyzing, onSubmitFiles }) {
 
   function handleSubmit(event) {
     event.preventDefault();
-    if (!hasFiles || isAnalyzing) {
+    // File upload is a later story. This screen must not start a mock analysis.
+    if (!FILE_UPLOAD_AVAILABLE || !hasFiles || isAnalyzing) {
       return;
     }
-    onSubmitFiles(fileNames);
-    setFileNames([]);
   }
 
   return (
@@ -129,6 +128,10 @@ function WelcomeView({ isAnalyzing, onSubmitFiles }) {
           </ul>
         )}
 
+        <p className="welcome__coming-soon" role="status" data-testid="upload-coming-soon">
+          {WELCOME_TEXT.UPLOAD_COMING_SOON}
+        </p>
+
         {isAnalyzing ? (
           <p className="welcome__analyzing" role="status" data-testid="analysis-loading">
             {WELCOME_TEXT.ANALYZING}
@@ -137,7 +140,7 @@ function WelcomeView({ isAnalyzing, onSubmitFiles }) {
           <button
             type="submit"
             className="welcome__submit-button"
-            disabled={!hasFiles}
+            disabled={!FILE_UPLOAD_AVAILABLE || !hasFiles}
             data-testid="upload-submit"
           >
             {WELCOME_TEXT.SUBMIT}

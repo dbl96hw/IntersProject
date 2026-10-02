@@ -1,23 +1,19 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
+import BackendStatus from '../components/BackendStatus';
 import ChatWidget from '../components/ChatWidget';
 import DashboardView from '../components/DashboardView';
 import LeafDecoration from '../components/LeafDecoration';
 import Sidebar from '../components/Sidebar';
 import WelcomeView from '../components/WelcomeView';
-import { MOCK_ANALYSIS_DELAY_MS } from '../constants';
-import { MOCK_USER, RECENT_DASHBOARDS, createMockDashboard } from '../mocks/dashboards';
+import { MOCK_USER, RECENT_DASHBOARDS } from '../mocks/dashboards';
 import './Workspace.css';
 
 function Workspace() {
   const [dashboards, setDashboards] = useState(RECENT_DASHBOARDS);
   // null means "New dashboard" is selected, which shows the welcome screen.
   const [activeDashboardId, setActiveDashboardId] = useState(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const analysisTimeout = useRef(null);
 
   const activeDashboard = dashboards.find((dashboard) => dashboard.id === activeDashboardId) ?? null;
-
-  useEffect(() => () => window.clearTimeout(analysisTimeout.current), []);
 
   function handleNewDashboard() {
     setActiveDashboardId(null);
@@ -25,18 +21,6 @@ function Workspace() {
 
   function handleSelectDashboard(dashboardId) {
     setActiveDashboardId(dashboardId);
-  }
-
-  // The upload is a mock: no file leaves the browser, the rows come from mocks/dashboards.js.
-  function handleSubmitFiles(fileNames) {
-    setIsAnalyzing(true);
-
-    analysisTimeout.current = window.setTimeout(() => {
-      const newDashboard = createMockDashboard(fileNames);
-      setDashboards((currentDashboards) => [newDashboard, ...currentDashboards]);
-      setActiveDashboardId(newDashboard.id);
-      setIsAnalyzing(false);
-    }, MOCK_ANALYSIS_DELAY_MS);
   }
 
   function handleUpdateCandidate(candidateId, changes) {
@@ -69,6 +53,7 @@ function Workspace() {
       />
 
       <main className="workspace__main">
+        <BackendStatus />
         <LeafDecoration position="top-right" />
         <LeafDecoration position="bottom-left" />
 
@@ -80,7 +65,7 @@ function Workspace() {
               onUpdateCandidate={handleUpdateCandidate}
             />
           ) : (
-            <WelcomeView isAnalyzing={isAnalyzing} onSubmitFiles={handleSubmitFiles} />
+            <WelcomeView />
           )}
         </div>
       </main>

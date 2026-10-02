@@ -55,6 +55,9 @@ export const OVERRIDE_REASONS = [
 export const ACCEPTED_FILE_TYPES =
   '.csv,.tsv,.xlsx,.json,.parquet,.pdf,.png,.jpg,.jpeg,.tiff,.docx,.pptx,.html,.txt';
 
+// Upload through the API is a later story. Until then Create dashboard stays disabled.
+export const FILE_UPLOAD_AVAILABLE = false;
+
 export const MOCK_ANALYSIS_DELAY_MS = 1500;
 
 export const MOCK_CHAT_DELAY_MS = 800;

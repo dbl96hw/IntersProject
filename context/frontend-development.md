@@ -26,7 +26,7 @@
       yield, justification, status, override reason, comment).
     - Chat: `ChatWidget` (floating widget; open, minimize, close, history, typing indicator).
   - `apps/intersfrontend/src/constants/` - re-exported from `index.js`:
-    - `api.js` - `API_BASE_URL` only (`HEALTH_PATH` was removed).
+    - `api.js` - `API_BASE_URL` (`VITE_API_URL`), `HEALTH_PATH`, `API_PATHS`, `CANDIDATES_PAGE_SIZE`.
     - `messages.js` - `APP_NAME` ("Git Push & Pray") and UI copy per area (`SIDEBAR_TEXT`,
       `WELCOME_TEXT`, `DASHBOARD_TEXT`, `FILTER_TEXT`, `EDIT_TEXT`, `CHAT_TEXT`).
     - `triage.js` - `TRIAGE_STATUS` (GREEN / AMBER / RED labelled Approved / Conditional / Not
@@ -43,11 +43,11 @@
 
 ### Current behaviour
 
-The whole UI runs on mock data. There is no `fetch` call anywhere in `src/`, and the previous
-landing-page health check is gone.
+Candidate rows and the chat still use mock data. `GET /health` is called from `BackendStatus`
+through `src/api/client.js` (`API_BASE_URL`, `res.ok`, errors as `code` / `message` / `field`).
 
-- "Create dashboard" waits `MOCK_ANALYSIS_DELAY_MS` and builds rows with `createMockDashboard`; no file
-  leaves the browser (`Workspace.jsx`, `handleSubmitFiles`).
+- "Create dashboard" does not start an analysis. The welcome screen shows that file upload is coming
+  soon (`data-testid="upload-coming-soon"`). Recent dashboards are still `RECENT_DASHBOARDS`.
 - Edits and overrides live only in React state (`Workspace.jsx`, `handleUpdateCandidate`); a reload
   loses them.
 - The chat answers from `mocks/chatReplies.js` by matching a candidate id in the message.
@@ -65,7 +65,7 @@ Source for the target: `services/data-engine/docs/INTEGRATION.md` section 6 and 
 | Override and correction modal | Built on mocks | `PATCH /api/candidates/:id` (501 until ticket 3), engine overrides; corrections F1.4 |
 | Chat | Built on mock replies | `POST /api/chats/:id/messages` text path + live agent (F2.1 / 9B) |
 | Upload | Built, files stay in the browser | `POST /api/chats/:id/messages` multipart (F4.2 / 9A) |
-| Backend status | Removed | `GET /health` → `mode`, `engine` (F1.1) |
+| Backend status | `GET /health` shows `mode` and `engine` | Live candidate list is still F1.2 |
 | Trust panel, comparison, disagreements | Not built | F4.1, F4.3, F4.4 |
 
 The backend implements `/api/*` per `docs/api-contract.md` and returns mock analysis in
@@ -94,8 +94,8 @@ The old `/api/breeder/*` example router in `services/data-engine/clients/node/` 
 
 ## Testing expectations
 
-- No test framework or `test` script in `apps/intersfrontend/package.json`. See
-  `context/quality-assurance.md`.
+- Vitest and Testing Library. `npm test -w apps/intersfrontend`. Fetch is replaced in the test.
+  Recorded in `gendd/adr/0001-frontend-tests-use-vitest.md`. See `context/quality-assurance.md`.
 - Minimum today: `npm run lint` passes, and the `data-testid` attributes stay stable so a future
   end-to-end suite can target them.
 
