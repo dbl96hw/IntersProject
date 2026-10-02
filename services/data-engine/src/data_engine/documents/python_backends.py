@@ -166,11 +166,13 @@ def html_extract(path: Path) -> tuple[list[str], list[dict]]:
     """Visible text + <table>s. The same parsing toolbox as web scraping, applied to local files."""
     raw = path.read_text(encoding="utf-8", errors="replace")
     tables = []
-    if HAS["lxml"]:
+    if HAS["lxml"] and "<table" in raw.lower():
         try:
-            tables = [{"page": 1, "frame": t, "source": "html"} for t in pd.read_html(StringIO(raw), header=None)]
-        except ValueError:
-            tables = []  # no <table> in the page
+            # flavor="lxml" only: otherwise pandas falls back to bs4 + html5lib, which may be missing.
+            tables = [{"page": 1, "frame": t, "source": "html"}
+                      for t in pd.read_html(StringIO(raw), header=None, flavor="lxml")]
+        except (ValueError, ImportError):
+            tables = []  # no parsable <table>: the bs4 path below still tries
     if HAS["bs4"]:
         from bs4 import BeautifulSoup
         soup = BeautifulSoup(raw, "lxml" if HAS["lxml"] else "html.parser")

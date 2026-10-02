@@ -27,6 +27,7 @@ The data engine is the only component that produces numbers. Everything downstre
 | POST | `/snapshot` | DuckDB + eigenbasis snapshot on disk |
 | GET / POST | `/overrides`, `/overrides/reasons` | human overrides (audit log) |
 | POST | `/ingest/records`, `/documents`, `/documents/base64`; GET `/documents` | new data |
+| POST / GET | `/relevance`, `/relevance/model` | is a file about breeding? (gate); the gate's model card |
 
 ## Input 1: files
 
@@ -51,7 +52,49 @@ Rules for the extraction service:
 2. One call per logical table. Do not mix sources in one list.
 3. Never invent values. Omit a field that could not be extracted; do not fill it with a guess.
 
-Response: `{"accepted": true, "detection": {...}, "rows": n}`, or `{"accepted": false, "detection": {...}, "message": ...}` when no source matches (the file then needs classification by a human or the LLM).
+Response when a source matches:
+
+```json
+{
+  "accepted": true, "detection": {"source": "genomics", "score": 1.0, "...": "..."},
+  "rows": 3, "rows_added": 1, "duplicates_ignored": 1, "conflicts": 1,
+  "conflict_examples": [{"source": "genomics", "key": "1FC9E916-...", "table": "lab-report.pdf#genomics@2", "kind": "records",
+                         "differences": {"GENOMIC_BREEDING_VALUE": {"export": 104.2, "uploaded": 140.0}}}],
+  "message": "1 row(s) contradict the export and were not applied (the export wins; see GET /quality)",
+  "build_seconds": 0.5
+}
+```
+
+Posted records are **uploads**, never a new system of record. They are reconciled with the exports by the source's key (`MATERIAL_GUID`, `TRIAL_GUID`, `OPERATION_GUID`, `OBSERVATION_UUID`; whole-row match for `lab_observations`):
+
+| Uploaded row | What happens | Counted in |
+|---|---|---|
+| key unknown | added once | `rows_added` |
+| key known, same values | ignored, so re-uploading an export is idempotent | `duplicates_ignored` |
+| key known, different values | **not applied**; the export wins and the difference is shown (`GET /quality` → `provenance.upload_conflicts_export`) | `conflicts`, `conflict_examples` (first 5) |
+
+`{"accepted": false, "detection": {...}, "message": ...}` when no source matches (the file then needs classification by a human or the LLM).
+
+## Input 3: relevance gate (`POST /relevance`)
+
+Call it before paying an LLM to extract records from a file. Send `text`, `columns`, or the file itself (`filename` + `content_base64`), or a mix.
+
+```json
+{
+  "decision": "IRRELEVANT",          // RELEVANT | UNCERTAIN | IRRELEVANT
+  "relevant": false, "needs_review": false, "probability": 0.0123,
+  "reasons": ["breeding vocabulary: 0 distinct term(s) (none)", "closer to off-topic examples (similarity 0.09 vs 0.21)"],
+  "signals": {"known_entities": [], "id_grammar_matches": [], "table_sources": [],
+              "lexicon": {"weighted_hits": 0, "words": 32, "distinct_terms": 0, "top_terms": []},
+              "similarity": {"in_domain": 0.09, "off_topic": 0.21, "nearest_in_domain": "...", "nearest_off_topic": "..."}},
+  "model": {"version": "3f2a...", "probability": 0.0123, "thresholds": {"relevant_at": 0.7, "irrelevant_at": 0.3}},
+  "file": {"filename": "invoice.pdf", "kind": "pdf", "pages": 1, "characters": 812, "ocr_pages": 0}
+}
+```
+
+Order of decision: (1) an id or GUID the engine holds, or an id with its learned format → RELEVANT; (2) a table with a known source layout → RELEVANT; (3) otherwise the model (lexicon + few-shot n-gram contrast, logistic) → RELEVANT / UNCERTAIN / IRRELEVANT. UNCERTAIN means a person decides; it is never silently dropped. Examples, terms and thresholds live in `config/relevance.yaml`; `GET /relevance/model` returns the fitted weights and the nested leave-one-out result.
+
+The document endpoints run the same gate. An IRRELEVANT document returns `{"accepted": false, "relevance": {...}, "message": ...}` and is not indexed; `force: true` (JSON) or `?force=true` (multipart) indexes it anyway. An UNCERTAIN document is indexed with `needs_review: true`. Off-topic files found in the data directory at start-up are skipped and listed in `GET /ingestion` → `documents_rejected_as_irrelevant`.
 
 ## Output: candidate row (`GET /candidates`)
 
@@ -64,6 +107,7 @@ Response: `{"accepted": true, "detection": {...}, "rows": n}`, or `{"accepted": 
   "override": null,
   "verdict": "FAIL",
   "reason": "fails in 3 of 5 trials",
+  "mean_yield_t_ha": 10.65,      // mean over the candidate's trials (null if none has a yield)
   "n_trials": 5, "n_fail": 3,
   "ambiguous_trials": ["SYN-TR-0025"],
   "atypical": false,

@@ -61,9 +61,11 @@ class DocumentIngestion:
     accepted_tables: list[RawTable] = field(default_factory=list)
     unclassified_tables: list[dict] = field(default_factory=list)
     facts: list[dict] = field(default_factory=list)
+    text: str = field(default="", repr=False)       # full text, used by the relevance gate
+    relevance: dict | None = None                   # set by the engine (relevance.py)
 
     def summary(self) -> dict:
-        return {**self.document,
+        return {**self.document, "relevance": self.relevance,
                 "tables_accepted": [{"table": t.name, "source": t.meta.get("source"), "rows": len(t.frame)}
                                     for t in self.accepted_tables],
                 "tables_unclassified": self.unclassified_tables,
@@ -73,7 +75,7 @@ class DocumentIngestion:
 
 
 def structure(doc: Document, id_patterns=None) -> DocumentIngestion:
-    out = DocumentIngestion(doc.summary())
+    out = DocumentIngestion(doc.summary(), text=doc.text)
     name = doc.path.replace("\\", "/").rsplit("/", 1)[-1]
     for i, t in enumerate(doc.tables):
         table = normalise_table(t["frame"])

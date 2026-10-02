@@ -135,3 +135,73 @@ def test_first_drop_schema_is_still_recognised(mock_dir):
         assert d.confident, (path.name, d)
         if path.name.startswith("observation"):
             assert d.source == "observations" and d.variant == 1
+
+
+def _fresh_engine(engine):
+    from data_engine import DataEngine
+    return DataEngine([t for t in engine.raw_tables if not t.meta.get("uploaded")],
+                      overrides_path=engine.overrides.path, save_runs=False)
+
+
+def test_reuploading_an_export_is_idempotent(engine, mock_dir):
+    """Re-sending operations as records must not duplicate rows or inflate quality issues."""
+    e = _fresh_engine(engine)
+    before = len(e.model.operations)
+    issues_before = {i.id: i.count for i in e.quality.issues}
+    records = pd.read_csv(mock_dir / "operations_synthetic.csv").to_dict("records")
+    res = e.add_records("operations_synthetic.csv", records)
+    assert res["accepted"] and res["rows_added"] == 0 and res["duplicates_ignored"] == len(records)
+    assert res["conflicts"] == 0
+    assert len(e.model.operations) == before
+    issues_after = {i.id: i.count for i in e.quality.issues}
+    assert issues_after["linkage.operation_material_not_in_trial"] == issues_before["linkage.operation_material_not_in_trial"]
+
+
+def test_uploaded_records_never_override_the_export(engine, mock_dir):
+    """A record that disagrees with the export is a conflict: shown, never applied."""
+    e = _fresh_engine(engine)
+    row = pd.read_csv(mock_dir / "genomics_synthetic.csv").iloc[[0]].copy()
+    guid = row["MATERIAL_GUID"].iloc[0]
+    original = e.model.genomics.set_index("MATERIAL_GUID").at[guid, "GENOMIC_BREEDING_VALUE"]
+    row["GENOMIC_BREEDING_VALUE"] = 140.0
+    res = e.add_records("llm-extracted.pdf#genomics", row.to_dict("records"))
+    assert res["accepted"] and res["conflicts"] == 1 and res["rows_added"] == 0
+    assert res["conflict_examples"][0]["differences"]["GENOMIC_BREEDING_VALUE"]["uploaded"] == 140.0
+    assert e.model.genomics.set_index("MATERIAL_GUID").at[guid, "GENOMIC_BREEDING_VALUE"] == original
+    assert any(i.id == "provenance.upload_conflicts_export" for i in e.quality.issues)
+
+
+def test_new_keys_from_uploads_are_added_once(engine, mock_dir):
+    e = _fresh_engine(engine)
+    row = pd.read_csv(mock_dir / "operations_synthetic.csv").iloc[[0]].copy()
+    row["OPERATION_GUID"] = "NEW-OP-0001"
+    first = e.add_records("field-app", row.to_dict("records"))
+    second = e.add_records("field-app", row.to_dict("records"))
+    assert first["rows_added"] == 1 and second["rows_added"] == 0 and second["duplicates_ignored"] == 1
+    assert (e.model.operations["OPERATION_GUID"] == "NEW-OP-0001").sum() == 1
+
+
+@pytest.mark.parametrize("name", ["operations_synthetic.csv", "lab_observations_synthetic.csv", "genomics_synthetic.csv"])
+def test_reupload_typed_like_express_is_still_idempotent(engine, mock_dir, name):
+    """Express (SheetJS) sends "TRUE" for booleans, dates as text, and omits empty cells.
+
+    Re-uploading an export that way must still be recognised as duplicates, with or without a
+    single-column key (lab_observations has none), and never as conflicts.
+    """
+    e = _fresh_engine(engine)
+    raw = pd.read_csv(mock_dir / name, dtype=str, keep_default_na=False)
+    records = [{k: v for k, v in r.items() if v != ""} for r in raw.to_dict("records")]
+    empty = [c for c in raw.columns if (raw[c] == "").all()]
+    records[0].update({c: None for c in empty})  # like Express: an all-empty column shows once, as null
+    res = e.add_records(name, records)
+    assert res["accepted"] and res["conflicts"] == 0
+    assert res["rows_added"] == 0 and res["duplicates_ignored"] == len(records)
+
+
+def test_canonical_values_unify_the_reader_paths():
+    from data_engine.engine import _canonical_value as c
+    assert c(True) == c("TRUE") == c("true")
+    assert c(1001) == c("1001") == c(1001.0)
+    assert c("2026-09-21 00:00:00.000") == c("2026-09-21") == c(pd.Timestamp("2026-09-21"))
+    assert c(float("nan")) is None and c("") is None and c(None) is None
+    assert c("SYN-MZ-00001") == "SYN-MZ-00001"
