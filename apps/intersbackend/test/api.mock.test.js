@@ -251,8 +251,12 @@ test('GET /api/engine/* returns sample JSON in mock mode', async () => {
 
   assert.equal(reasons.status, 200);
   assert.ok('OTHER' in reasons.body);
-  assert.equal(baseline.body.rule_version, 'UC4_MATERIAL_V0');
-  assert.ok(Array.isArray(quality.body.issues));
+  // The samples are real engine output on the UC4 mocks (weighted-severity rule, 72/72 parity).
+  assert.equal(baseline.body.sample, true);
+  assert.equal(baseline.body.parity.agree, 72);
+  assert.equal(baseline.body.mode, 'weighted_severity');
+  assert.ok(Array.isArray(quality.body.issues) && quality.body.issues.length > 0);
+  assert.ok(quality.body.issues.every((issue) => issue.id && issue.fix_status));
 });
 
 test('CORS lets the frontend dev origin preflight a multipart POST', async () => {

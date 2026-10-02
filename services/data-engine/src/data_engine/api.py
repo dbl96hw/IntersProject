@@ -13,9 +13,12 @@ team's API contract (.cursor/rules/70-api-contract.mdc):
 from __future__ import annotations
 
 import base64
+import hashlib
 import importlib.util
 import logging
+import re
 import tempfile
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any
 
@@ -102,6 +105,15 @@ class RecordsIn(BaseModel):
 class DocumentIn(BaseModel):
     filename: str
     content_base64: str
+    force: bool = False        # index even if the relevance gate says IRRELEVANT (human override)
+
+
+class RelevanceIn(BaseModel):
+    """Either plain text (what Express already extracted) or the file itself, or both."""
+    text: str | None = None
+    filename: str | None = None
+    content_base64: str | None = None
+    columns: list[str] | None = None      # header of a table, if the caller has one
 
 
 class SqlIn(BaseModel):
@@ -284,24 +296,120 @@ def ingest_records(body: RecordsIn = Body(...)):
     return engine().add_records(body.label, body.records)
 
 
-def _ingest_bytes(filename: str, data: bytes) -> dict:
-    suffix = Path(filename).suffix or ".bin"
+# Extractions are cached by content hash: Express calls /relevance and then /documents/base64 with
+# the same bytes, and OCR is the expensive step, so the second call must not repeat it.
+_EXTRACTIONS: "OrderedDict[str, Any]" = OrderedDict()
+_EXTRACTION_CACHE_SIZE = 8
+
+
+def _safe_name(filename: str) -> str:
+    """The real file name (facts and table labels cite it), stripped of any path or odd characters."""
+    name = re.sub(r"[^\w.\-]+", "_", Path(filename or "upload.bin").name).strip("._")
+    return name[:120] or "upload.bin"
+
+
+def _extract_bytes(filename: str, data: bytes):
+    from . import documents as docs
+    key = hashlib.sha256(data).hexdigest() + ":" + _safe_name(filename)
+    if key in _EXTRACTIONS:
+        _EXTRACTIONS.move_to_end(key)
+        return _EXTRACTIONS[key]
     with tempfile.TemporaryDirectory() as tmp:
-        path = Path(tmp) / f"upload{suffix}"
+        path = Path(tmp) / _safe_name(filename)
         path.write_bytes(data)
-        result = engine().add_document(path)
+        try:
+            doc = docs.extract(path)
+        except Exception as exc:  # a damaged or unsupported file is bad input, not a server error
+            log.warning("could not read %s: %s", _safe_name(filename), exc)
+            raise ApiError(400, "VALIDATION_ERROR",
+                           f"could not read {_safe_name(filename)} ({type(exc).__name__})", "content_base64")
+    doc.path = _safe_name(filename)
+    _EXTRACTIONS[key] = doc
+    while len(_EXTRACTIONS) > _EXTRACTION_CACHE_SIZE:
+        _EXTRACTIONS.popitem(last=False)
+    return doc
+
+
+def _decode(content_base64: str) -> bytes:
+    try:
+        return base64.b64decode(content_base64, validate=True)
+    except ValueError:
+        raise ApiError(400, "VALIDATION_ERROR", "content_base64 is not valid base64", "content_base64")
+
+
+def _ingest_bytes(filename: str, data: bytes, force: bool = False) -> dict:
+    doc = _extract_bytes(filename, data)
+    result = engine().add_document(doc.path, force=force, document=doc)
     result["path"] = filename
     return result
 
 
 @app.post("/documents/base64")
 def ingest_document_base64(body: DocumentIn):
-    """Upload any document (PDF, scan, image, DOCX, PPTX, HTML...) as base64 JSON."""
-    try:
-        data = base64.b64decode(body.content_base64, validate=True)
-    except ValueError:
-        raise ApiError(400, "VALIDATION_ERROR", "content_base64 is not valid base64", "content_base64")
-    return _ingest_bytes(body.filename, data)
+    """Upload any document (PDF, scan, image, DOCX, PPTX, HTML...) as base64 JSON.
+
+    Off-topic files are refused by the relevance gate (`accepted: false`, with reasons);
+    `force: true` indexes them anyway.
+    """
+    return _ingest_bytes(body.filename, _decode(body.content_base64), body.force)
+
+
+def _table_text(filename: str, data: bytes) -> tuple[str, list[list[str]]] | None:
+    """For spreadsheets / CSV: headers (for the signature rule) and a text sample (for the model)."""
+    from . import ingest
+    if Path(filename).suffix.lower() not in ingest.SUPPORTED:
+        return None
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / _safe_name(filename)
+        path.write_bytes(data)
+        try:
+            tables = ingest.read_file(path)
+        except Exception as exc:   # unreadable spreadsheet: let the caller report it
+            raise ApiError(400, "VALIDATION_ERROR", f"could not read the table: {exc}", "content_base64")
+    text = "\n".join(t.frame.head(30).to_csv(index=False) for t in tables)
+    return text, [list(t.frame.columns) for t in tables]
+
+
+@app.post("/relevance")
+def relevance(body: RelevanceIn):
+    """Is this file about breeding / trials? RELEVANT, UNCERTAIN (a person decides) or IRRELEVANT.
+
+    Cheap and deterministic: call it before paying an LLM to extract records from a file.
+    """
+    if not (body.text or body.content_base64 or body.columns):
+        raise ApiError(400, "VALIDATION_ERROR", "send text, columns or content_base64", "text")
+    text, tables, file_info = body.text or "", [body.columns] if body.columns else [], None
+    if body.content_base64:
+        filename = body.filename or "upload.bin"
+        data = _decode(body.content_base64)
+        as_table = _table_text(filename, data)
+        if as_table is not None:
+            extra, table_columns = as_table
+            tables += table_columns
+            file_info = {"filename": filename, "kind": "table", "tables": len(table_columns)}
+        else:
+            doc = _extract_bytes(filename, data)
+            extra = doc.text
+            from .documents.structure import normalise_table
+            for t in doc.tables:
+                frame = normalise_table(t["frame"])
+                if frame is not None and not frame.empty:
+                    tables.append(list(frame.columns))
+            file_info = {"filename": filename, "kind": doc.kind, "pages": len(doc.pages_text),
+                         "characters": len(extra), "ocr_pages": doc.page_method.count("ocr")}
+        text = f"{text}\n{extra}" if text else extra
+    return {**engine().assess_relevance(text, tables), "file": file_info}
+
+
+@app.get("/relevance/model")
+def relevance_model():
+    """The gate's model card: examples, thresholds, fitted weights and nested leave-one-out accuracy."""
+    from . import relevance as rel
+    m = rel.model()
+    return {"version": m.version, "examples": {"in_domain": int(m.labels.sum()),
+                                               "off_topic": int((m.labels == 0).sum())},
+            "thresholds": {"relevant_at": m.relevant_at, "irrelevant_at": m.irrelevant_at},
+            "lexicon_terms": len(m.lexicon.weight), "leave_one_out": m.loo_report()}
 
 
 @app.get("/documents")
@@ -313,6 +421,6 @@ if importlib.util.find_spec("multipart") is not None:  # python-multipart instal
     from fastapi import File, UploadFile
 
     @app.post("/documents")
-    async def ingest_document(file: UploadFile = File(...)):
-        """Upload any document as multipart/form-data (field name: file)."""
-        return _ingest_bytes(file.filename or "upload.bin", await file.read())
+    async def ingest_document(file: UploadFile = File(...), force: bool = Query(False)):
+        """Upload any document as multipart/form-data (field name: file); `?force=true` skips the gate."""
+        return _ingest_bytes(file.filename or "upload.bin", await file.read(), force)

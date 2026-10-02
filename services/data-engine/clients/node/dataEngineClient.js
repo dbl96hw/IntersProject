@@ -44,9 +44,20 @@ export function createDataEngineClient({ baseUrl = DATA_ENGINE_URL, timeoutMs = 
     baseline: () => request(DATA_ENGINE_PATHS.BASELINE),
     quality: () => request(DATA_ENGINE_PATHS.QUALITY),
     diagnostics: () => request(DATA_ENGINE_PATHS.DIAGNOSTICS),
-    uploadDocument: (filename, buffer) => request(DATA_ENGINE_PATHS.DOCUMENTS_BASE64, {
+    // `force: true` indexes a file even when the relevance gate calls it IRRELEVANT (human override).
+    uploadDocument: (filename, buffer, { force = false } = {}) => request(DATA_ENGINE_PATHS.DOCUMENTS_BASE64, {
       method: 'POST',
-      body: { filename, content_base64: Buffer.from(buffer).toString('base64') },
+      body: { filename, content_base64: Buffer.from(buffer).toString('base64'), force },
+    }),
+    // Is a file about breeding / trials? Call before paying an LLM to extract records from it.
+    // Pass the file (filename + buffer), text you already extracted, or both.
+    checkRelevance: ({ filename, buffer, text } = {}) => request(DATA_ENGINE_PATHS.RELEVANCE, {
+      method: 'POST',
+      body: {
+        filename,
+        text,
+        content_base64: buffer ? Buffer.from(buffer).toString('base64') : undefined,
+      },
     }),
     ingestRecords: (label, records) => request(DATA_ENGINE_PATHS.INGEST_RECORDS, { method: 'POST', body: { label, records } }),
   };

@@ -20,6 +20,10 @@ npm run dev:frontend # in another terminal — starts the frontend on http://loc
 
 The frontend reads the API's address from `VITE_API_URL` (see `apps/intersfrontend/.env.example`). It defaults to `http://localhost:3000` for local dev.
 
+The data engine (Python) runs next to the API on port 8001; see `services/data-engine/README.md`. Start it a minute before a demo: its first build also compiles the native back-ends.
+
+**If `npm install` fails on `xlsx`:** the backend takes SheetJS from `cdn.sheetjs.com` (the npm registry copy, 0.18.5, is outdated and has known security advisories, so do not switch to it). On a network that blocks that CDN, download `https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz` once on a machine that can reach it, save it as `apps/intersbackend/vendor/xlsx-0.20.3.tgz`, and point the dependency at `file:vendor/xlsx-0.20.3.tgz`.
+
 ## Linting
 
 ```bash

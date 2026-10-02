@@ -136,16 +136,23 @@ Show `engine_colour` next to `colour` when `overridden` is `true`. Show an "unve
 
 ### Ingestion item
 
-One per uploaded file (or per table inside a file). `accepted`, `rows` and `message` come from the engine's `POST /ingest/records` response. `source` is the engine's `detection.source`. When the engine does not return `rows` or `message`, the field is `null` (never guessed).
+One per uploaded file (or per table inside a file). `accepted`, `rows`, `rows_added`, `duplicates_ignored`, `conflicts` and `message` come from the engine's `POST /ingest/records` response (summed over chunks). `source` is the engine's `detection.source`. When the engine does not return a field, it is `null` (never guessed).
+
+The exports are the system of record: an uploaded row whose key is already in an export is never applied. `duplicates_ignored` counts identical rows (re-uploading a file is harmless); `conflicts` counts rows that disagree with the export. Conflicts also produce an `UPLOAD_CONFLICTS` warning; the details are in the engine's quality report.
 
 ```json
-{ "file": "trials-2024.xlsx", "kind": "table", "accepted": true, "source": "trial_recommendations", "rows": 72, "message": null }
+{ "file": "trials-2024.xlsx", "kind": "table", "accepted": true, "source": "trial_recommendations", "rows": 72,
+  "rows_added": 0, "duplicates_ignored": 71, "conflicts": 1,
+  "message": "1 row(s) contradict the export and were not applied (the export wins; see GET /quality)" }
 ```
 
 ```json
-{ "file": "notes.pdf", "kind": "document", "accepted": false, "source": "UNKNOWN", "rows": null,
-  "message": "no known source matches these fields: needs classification by a human or the LLM" }
+{ "file": "notes.pdf", "kind": "document", "accepted": false, "source": null, "rows": null,
+  "rows_added": null, "duplicates_ignored": null, "conflicts": null,
+  "message": "Not about breeding or trial data, so it was not read or added" }
 ```
+
+Documents pass the engine's relevance gate (`POST /relevance`) and, if they pass, go as bytes to `POST /documents/base64`. The gate is the engine's own check. It does not call Claude, and Claude does not extract the file. An off-topic file is not indexed: `accepted: false`, a message starting with "Not about breeding or trial data", and an `IRRELEVANT_FILE` warning. A file the gate cannot place is uploaded with a `RELEVANCE_UNCERTAIN` warning, so the breeder can check it. Tables skip the gate because the engine already rejects tables whose columns match no known source.
 
 ### Usage
 
@@ -294,7 +301,7 @@ Errors: 404 `NOT_FOUND`.
 | `text` | Yes if no files are sent | The question or a note about the files |
 | `files` | No | Repeat the field once per file (`formData.append('files', file)`). Up to `MAX_FILES` (10) files of `MAX_FILE_MB` (10 MB) each. Allowed: `.csv .xlsx .xls .pdf .docx .png .jpg .jpeg .webp`. UTF-8 file names (e.g. `análisis.csv`) are kept as sent. |
 
-With files, the backend runs an **analysis**: tables are sent to the engine, documents are extracted by Claude and sent to the engine, then each candidate is explained. Without files, it runs an **answer**: Claude answers through the engine's tools (max 6 rounds).
+With files, the backend runs an **analysis**: tables go to `POST /ingest/records`, documents that pass the relevance gate go to `POST /documents/base64`, then each candidate is explained. Claude does not extract documents. Without files, it runs an **answer**: Claude answers through the engine's tools (max 6 rounds). That answer path is not wired yet in live mode.
 
 > **Always check `assistant_message.status` before rendering.** The HTTP status is **201 even when the analysis failed**, so that the user message is saved and the frontend gets a `messageId` it can retry. When `status` is `"error"`, show `assistant_message.error.message` and a retry button; `analysis` and `answer` are both `null`.
 

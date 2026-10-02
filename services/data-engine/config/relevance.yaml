@@ -1,0 +1,90 @@
+# Relevance gate: is an uploaded file about UC4 (vegetable-seed R&D / plant breeding)?
+#
+# Used by data_engine.relevance before a document is indexed and, through
+# POST /relevance, by Express BEFORE paying Claude to extract records from it.
+# Everything here is editable without touching code.
+#
+# Decision ladder (deterministic first):
+#   1. the file mentions an entity the engine knows (candidate / trial id, GUID) -> RELEVANT
+#   2. a table matches a known source signature                                  -> RELEVANT
+#   3. otherwise a small model scores the text on two signals:
+#        - domain lexicon density (weighted terms below, English + Spanish)
+#        - contrastive similarity: char n-gram TF-IDF similarity to the in-domain
+#          examples minus similarity to the off-topic examples (few-shot,
+#          nearest-prototype; language-agnostic, robust to OCR noise)
+#      p >= relevant_at -> RELEVANT, p <= irrelevant_at -> IRRELEVANT,
+#      in between -> UNCERTAIN (the breeder / user decides: human in the loop).
+
+relevant_at: 0.70
+irrelevant_at: 0.30
+
+# Weighted domain terms (lower case; matched on word boundaries). Weight 3 = unmistakable.
+lexicon:
+  3: [germplasm, germoplasma, pedigree, pedigrí, genotyping, genotipado, breeding value, valor genómico,
+      breeder, mejorador, fitomejorador, plant breeding, fitomejoramiento, inbred line, línea endogámica,
+      advancement decision, trial entry, field trial, ensayo de campo, syngenta, candidate line, línea candidata,
+      hybrid seed, semilla híbrida, marker-assisted, marcador molecular, qtl, breeding program, programa de mejoramiento]
+  2: [trial, ensayo, yield, rendimiento, t/ha, genomic, genómico, genotype, genotipo, phenotype, fenotipo,
+      germination, germinación, seed, semilla, variety, variedad, cultivar, hybrid, híbrido, disease score,
+      resistance, resistencia, susceptible, tolerance, tolerancia, plot, parcela, replication, repetición,
+      flowering, floración, plant height, altura de planta, harvest, cosecha, planting, siembra, lab trait,
+      call rate, snp, marker, marcador, accession, accesión, progeny, progenie, cross, cruce, breeding, mejoramiento,
+      vigour, vigor, mildew, mildiu, phytophthora, fusarium, virus, lodging, acame, stand count, entry, entrada]
+  1: [crop, cultivo, field, campo, irrigation, riego, moisture, humedad, disease, enfermedad, maize, maíz,
+      tomato, tomate, pepper, chile, pimiento, melon, melón, watermelon, sandía, cucumber, pepino, lettuce,
+      lechuga, squash, calabaza, agronomy, agronomía, greenhouse, invernadero, location, localidad, season,
+      temporada, sample, muestra, quality control, control de calidad]
+
+# Few-shot examples for the contrastive similarity. Short, generic, no real data.
+in_domain:
+  - "Field trial summary: yield 9.4 t/ha, moisture 18 percent, disease score 3. The candidate line advances to the next stage."
+  - "Ensayo de campo en la localidad 2: rendimiento de 8,7 t/ha, humedad 19 %, severidad de enfermedad 4. La línea avanza."
+  - "Germplasm and pedigree record for the inbred line, female and male parents, generation code and breeding group."
+  - "Registro de germoplasma y pedigrí de la línea endogámica: progenitores, generación y grupo de mejoramiento."
+  - "Genotyping results with SNP markers for drought tolerance, disease resistance and yield potential; call rate above 95 percent."
+  - "Resultados de genotipado con marcadores SNP: tolerancia a sequía, resistencia a enfermedades y potencial de rendimiento."
+  - "Lab observations per material: trait values measured in three replications with quality control flags."
+  - "Planting, irrigation and harvest operations recorded per plot for each trial and material."
+  - "Siembra, riego y cosecha registrados por parcela para cada ensayo y material."
+  - "Advancement meeting notes: the breeder decided to keep the tomato hybrid despite lower yield because of its resistance."
+  - "Notas de la reunión de avance: el mejorador mantuvo el híbrido de tomate por su resistencia aunque rindió menos."
+  - "Vegetable seed R&D: candidate lines are triaged after multi-location trials, lab tests and genomic selection."
+  - "Plant height and days to flowering were recorded for every entry of the pepper trial."
+  - "Se registró la altura de planta y los días a floración de cada entrada del ensayo de chile."
+  - "Seed lot quality: germination rate, purity and moisture of the harvested hybrid seed."
+  - "Genomic breeding value of the line is 108, favourable marker for disease resistance, susceptible for drought."
+  - "TRIAL_ID, MATERIAL_ID, YIELD_T_HA, MOISTURE_PCT, DISEASE_SCORE, GENOMIC_BREEDING_VALUE, TRIAL_RECOMMENDATION"
+  - "WhatsApp from the station: melon plots in block B show mildew, replication 2 lodged after the storm."
+  - "Mensaje de la estación: las parcelas de melón del bloque B tienen mildiu y la repetición 2 se acamó con la tormenta."
+  - "Syngenta vegetable breeding pipeline: trial, lab, pedigree and operations data for each candidate."
+  - "Drought tolerance screening: candidate lines were scored for wilting and yield under reduced irrigation."
+  - "Evaluación de tolerancia a sequía: las líneas candidatas se calificaron por marchitez y rendimiento con riego reducido."
+
+off_topic:
+  - "Invoice number 4821: two laptops and one monitor, subtotal, tax and total due within 30 days."
+  - "Factura 4821: dos computadoras portátiles y un monitor, subtotal, impuesto y total a pagar en 30 días."
+  - "Release notes: fixed a crash in the login screen, upgraded the database driver and improved logging."
+  - "Notas de versión: se corrigió un error en la pantalla de inicio de sesión y se actualizó el controlador."
+  - "The home team won 2-1 after a late goal in the second half; the coach praised the defence."
+  - "El equipo local ganó 2 a 1 con un gol en el segundo tiempo; el entrenador elogió la defensa."
+  - "Recipe: mix flour, sugar and eggs, bake for 30 minutes at 180 degrees and let it cool."
+  - "Receta: mezcle harina, azúcar y huevos, hornee 30 minutos a 180 grados y deje enfriar."
+  - "Apartment for rent: two bedrooms, one bathroom, parking space, close to the city centre."
+  - "Travel itinerary: flight on Monday, hotel check-in at 3 pm, museum tour on Tuesday morning."
+  - "Itinerario de viaje: vuelo el lunes, registro en el hotel a las 3 pm y visita al museo el martes."
+  - "Employee handbook: vacation policy, remote work rules and expense reimbursement procedure."
+  - "Quarterly financial report: revenue grew 4 percent, operating margin and earnings per share."
+  - "Informe financiero trimestral: los ingresos crecieron 4 por ciento, margen operativo y utilidad por acción."
+  - "Lecture notes: Maxwell equations, gauge invariance and the wave equation in vacuum."
+  - "Car manual: check tyre pressure monthly, replace the oil filter every 10,000 km."
+  - "Weather forecast: sunny morning, scattered showers in the afternoon, wind from the north."
+  - "Meeting agenda: budget review, marketing campaign and hiring plan for the next quarter."
+  - "Dear customer, your password will expire soon; click the link to update your account."
+  - "Python tutorial: lists, dictionaries, loops and functions with simple examples."
+  # Hard negatives: agriculture or vegetables, but not breeding R&D (teach the contrast where it is thin).
+  - "Coffee futures rose as drought hit the harvest; traders expect lower exports this season."
+  - "Los precios del maíz subieron en la bolsa por la sequía; los exportadores esperan menos ventas."
+  - "Garden blog: water your tomato plants in the morning and add compost every two weeks."
+  - "Receta de ensalada: tomate, pepino, lechuga y cebolla con aceite de oliva y limón."
+  - "Tractor dealer invoice: one used tractor, delivery to the farm and two years of maintenance."
+  - "Supermarket weekly offers: melons, watermelons and peppers at half price until Sunday."

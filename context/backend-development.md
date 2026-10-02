@@ -57,7 +57,8 @@ Variable names (values only in `.env`, never committed): `PORT`, `CORS_ORIGIN`, 
 ### Architecture: who reads documents, who explains
 
 - The **data engine** decides colours, produces evidence, and **reads uploaded documents** (PDF, scans,
-  Office). Tables from spreadsheets go through `POST /ingest/records`.
+  Office). Documents pass the engine's relevance gate (`POST /relevance`, a local check, not Claude)
+  and then go to `POST /documents/base64`. Tables from spreadsheets go through `POST /ingest/records`.
 - **Claude** does **not** extract tabular data from documents in the product path. It only writes
   justifications (`submit_justifications`) and (when wired) answers chat via the engine's tools. It
   never decides or changes a colour.

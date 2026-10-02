@@ -83,11 +83,12 @@ Claude Desktop, in `claude_desktop_config.json`:
 
 | What arrives | Endpoint | What happens |
 |---|---|---|
-| A PDF / scan / photo / DOCX / PPTX / HTML | `POST /documents` (multipart, field `file`) or `POST /documents/base64` | text layer or OCR; tables matching a source are ingested; sentences become searchable evidence; exports always win on conflicts |
-| Structured records from the extraction service | `POST /ingest/records` `{"label", "records": [...]}` | routed by header signature; unknown shapes are rejected with the best guess |
+| Any file, before paying Claude to read it | `POST /relevance` (`text` and/or `filename` + `content_base64`) | RELEVANT / UNCERTAIN / IRRELEVANT with reasons; deterministic, about 1 ms on text (the extraction is cached, so a later `/documents/base64` of the same bytes does not OCR again) |
+| A PDF / scan / photo / DOCX / PPTX / HTML | `POST /documents` (multipart, field `file`) or `POST /documents/base64` | relevance gate (off-topic files are refused, `force` overrides); text layer or OCR; tables matching a source are ingested; sentences become searchable evidence; exports always win on conflicts |
+| Structured records from the extraction service | `POST /ingest/records` `{"label", "records": [...]}` | routed by header signature; unknown shapes are rejected with the best guess; rows already in the exports are ignored, and contradictions are reported as `conflicts` and never applied |
 | Nothing new, but you want proof it works | `GET /diagnostics` | timings, memory, numerical checks, integrity, drift, topology of the last build |
 
-Incremental rebuilds take ~1 s: the calibration is cached by a content hash.
+Incremental rebuilds take ~0.5 s on a laptop: the calibration and the per-table profiles are cached by a content hash. **For the demo:** start the engine a minute early (the first build also compiles the C++ back-ends once) and upload each file once; uploads are queued by Express, and each rebuilds the model.
 
 ## 6. Frontend (what to show)
 

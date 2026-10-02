@@ -1,25 +1,27 @@
 /**
  * Triage-related constants for the use case 4 dashboard.
  * Status keys match the data engine's `colour` values (GREEN / AMBER / RED).
+ * Labels are suggestions, never decisions: the UI must not say "approved" or "rejected"
+ * (docs/api-contract.md). The breeder decides; the colour only says where to look first.
  */
 
 export const TRIAGE_STATUS = {
   GREEN: {
     key: 'GREEN',
-    label: 'Approved',
-    description: 'Meet the established criteria',
+    label: 'Strong candidate',
+    description: 'Meets the advancement criteria in the data',
     modifier: 'green',
   },
   AMBER: {
     key: 'AMBER',
-    label: 'Conditional',
-    description: 'Partially meet the criteria',
+    label: 'Needs review',
+    description: 'Mixed or borderline evidence: worth a closer look',
     modifier: 'amber',
   },
   RED: {
     key: 'RED',
-    label: 'Not approved',
-    description: 'Do not meet the criteria',
+    label: 'Concerns',
+    description: 'Fails one or more criteria in the data',
     modifier: 'red',
   },
 };
