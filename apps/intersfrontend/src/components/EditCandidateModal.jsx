@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react';
-import { EDIT_TEXT, OVERRIDE_REASONS, TRIAGE_STATUS, TRIAGE_STATUS_ORDER } from '../constants';
+import {
+  CANDIDATE_SAVE_AVAILABLE,
+  EDIT_TEXT,
+  OVERRIDE_REASONS,
+  TRIAGE_STATUS,
+  TRIAGE_STATUS_ORDER,
+} from '../constants';
 import './EditCandidateModal.css';
 
 function validateForm({ crop, meanYield, justification, isStatusChanged, reasonCode }) {
@@ -22,9 +28,11 @@ function validateForm({ crop, meanYield, justification, isStatusChanged, reasonC
 }
 
 function EditCandidateModal({ candidate, onSave, onClose }) {
-  const [crop, setCrop] = useState(candidate.crop);
-  const [meanYield, setMeanYield] = useState(String(candidate.mean_yield_t_ha));
-  const [justification, setJustification] = useState(candidate.reason);
+  const [crop, setCrop] = useState(candidate.crop ?? '');
+  const [meanYield, setMeanYield] = useState(
+    candidate.mean_yield_t_ha == null ? '' : String(candidate.mean_yield_t_ha),
+  );
+  const [justification, setJustification] = useState(candidate.reason ?? '');
   const [colour, setColour] = useState(candidate.colour);
   const [reasonCode, setReasonCode] = useState('');
   const [comment, setComment] = useState('');
@@ -45,6 +53,9 @@ function EditCandidateModal({ candidate, onSave, onClose }) {
 
   function handleSubmit(event) {
     event.preventDefault();
+    if (!CANDIDATE_SAVE_AVAILABLE) {
+      return;
+    }
 
     const formErrors = validateForm({ crop, meanYield, justification, isStatusChanged, reasonCode });
     setErrors(formErrors);
@@ -171,6 +182,12 @@ function EditCandidateModal({ candidate, onSave, onClose }) {
           </>
         )}
 
+        {!CANDIDATE_SAVE_AVAILABLE && (
+          <p className="edit-modal__error" role="status" data-testid="edit-save-coming-soon">
+            {EDIT_TEXT.SAVE_COMING_SOON}
+          </p>
+        )}
+
         <div className="edit-modal__actions">
           <button type="button" className="edit-modal__button" onClick={onClose} data-testid="edit-cancel-button">
             {EDIT_TEXT.CANCEL}
@@ -178,6 +195,7 @@ function EditCandidateModal({ candidate, onSave, onClose }) {
           <button
             type="submit"
             className="edit-modal__button edit-modal__button--primary"
+            disabled={!CANDIDATE_SAVE_AVAILABLE}
             data-testid="edit-save-button"
           >
             {EDIT_TEXT.SAVE}

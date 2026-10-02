@@ -29,15 +29,14 @@ export const TRIAGE_STATUS = {
 // Filter value meaning "show every status"; kept separate from the real status keys.
 export const STATUS_FILTER_ALL = 'ALL';
 
-export const TRIAGE_STATUS_ORDER = [TRIAGE_STATUS.GREEN.key, TRIAGE_STATUS.AMBER.key, TRIAGE_STATUS.RED.key];
+// Red first: the engine sorts that way so the breeder looks at concerns before the rest.
+export const TRIAGE_STATUS_ORDER = [TRIAGE_STATUS.RED.key, TRIAGE_STATUS.AMBER.key, TRIAGE_STATUS.GREEN.key];
 
 // One shared config keeps the three tables' columns aligned (used with table-layout: fixed).
 export const TABLE_COLUMNS = [
-  { key: 'candidate_id', label: 'Candidate ID', width: '17%' },
-  { key: 'crop', label: 'Crop', width: '13%' },
-  { key: 'mean_yield_t_ha', label: 'Mean yield (t/ha)', width: '17%' },
-  { key: 'trials', label: 'Trials failed/total', width: '17%' },
-  { key: 'reason', label: 'Justification', width: '36%' },
+  { key: 'candidate_id', label: 'Candidate ID', width: '22%' },
+  { key: 'trials', label: 'Trials failed/total', width: '18%' },
+  { key: 'reason', label: 'Justification', width: '60%' },
 ];
 
 // Same codes as the data engine's override audit log (`GET /overrides/reasons`).
@@ -57,6 +56,9 @@ export const ACCEPTED_FILE_TYPES =
 
 // Upload through the API is a later story. Until then Create dashboard stays disabled.
 export const FILE_UPLOAD_AVAILABLE = false;
+
+// Colour changes and pass / no pass are the next story. Until then Save does not record anything.
+export const CANDIDATE_SAVE_AVAILABLE = false;
 
 export const MOCK_ANALYSIS_DELAY_MS = 1500;
 

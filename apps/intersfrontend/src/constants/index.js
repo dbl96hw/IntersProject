@@ -1,4 +1,12 @@
-export { API_BASE_URL, API_ERROR_CODES, API_PATHS, CANDIDATES_PAGE_SIZE, HEALTH_PATH } from './api.js';
+export {
+  API_BASE_URL,
+  API_ERROR_CODES,
+  API_PATHS,
+  CANDIDATES_PAGE_SIZE,
+  HEALTH_PATH,
+  MAX_CANDIDATE_PAGES,
+} from './api.js';
+export { RECENT_DASHBOARD_LIMIT } from './dashboards.js';
 export { LEAF_PATH } from './decorations.js';
 export {
   APP_NAME,
@@ -9,9 +17,11 @@ export {
   HEALTH_TEXT,
   SIDEBAR_TEXT,
   WELCOME_TEXT,
+  missingReasonText,
 } from './messages.js';
 export {
   ACCEPTED_FILE_TYPES,
+  CANDIDATE_SAVE_AVAILABLE,
   FILE_UPLOAD_AVAILABLE,
   MOCK_ANALYSIS_DELAY_MS,
   MOCK_CHAT_DELAY_MS,

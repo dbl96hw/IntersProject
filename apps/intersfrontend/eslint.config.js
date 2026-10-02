@@ -16,6 +16,8 @@ export default [
         window: 'readonly',
         document: 'readonly',
         fetch: 'readonly',
+        URL: 'readonly',
+        URLSearchParams: 'readonly',
       },
       parserOptions: {
         ecmaFeatures: { jsx: true },

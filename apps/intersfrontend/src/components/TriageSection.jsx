@@ -81,8 +81,6 @@ function TriageSection({ status, candidates, expandedIds, onToggleRow, onRowCont
                   data-testid={`candidate-row-${candidate.candidate_id}`}
                 >
                   <td title={isExpanded ? undefined : candidate.candidate_id}>{candidate.candidate_id}</td>
-                  <td title={isExpanded ? undefined : candidate.crop}>{candidate.crop}</td>
-                  <td>{candidate.mean_yield_t_ha}</td>
                   <td>
                     {candidate.n_fail}/{candidate.n_trials}
                   </td>
@@ -96,7 +94,44 @@ function TriageSection({ status, candidates, expandedIds, onToggleRow, onRowCont
                         {DASHBOARD_TEXT.OVERRIDDEN_BADGE}
                       </span>
                     )}
-                    {candidate.reason}
+                    {candidate.overridden && (
+                      <span
+                        className="triage-table__badge"
+                        data-testid={`engine-colour-${candidate.candidate_id}`}
+                      >
+                        {candidate.engine_colour}
+                      </span>
+                    )}
+                    {candidate.justification_source && (
+                      <span
+                        className="triage-table__badge"
+                        data-testid={`justification-source-${candidate.candidate_id}`}
+                      >
+                        {DASHBOARD_TEXT.SOURCE_LABEL} {candidate.justification_source}
+                      </span>
+                    )}
+                    {candidate.verified === false && (
+                      <span
+                        className="triage-table__badge"
+                        data-testid={`unverified-badge-${candidate.candidate_id}`}
+                      >
+                        {DASHBOARD_TEXT.UNVERIFIED_BADGE}
+                      </span>
+                    )}
+                    {Array.isArray(candidate.ambiguous_trials) && candidate.ambiguous_trials.length > 0 && (
+                      <span
+                        className="triage-table__badge"
+                        data-testid={`ambiguous-trials-${candidate.candidate_id}`}
+                      >
+                        {DASHBOARD_TEXT.AMBIGUOUS_TRIALS}
+                      </span>
+                    )}
+                    {candidate.atypical === true && (
+                      <span className="triage-table__badge" data-testid={`atypical-flag-${candidate.candidate_id}`}>
+                        {DASHBOARD_TEXT.ATYPICAL}
+                      </span>
+                    )}
+                    <span data-testid={`candidate-reason-${candidate.candidate_id}`}>{candidate.reason}</span>
                   </td>
                 </tr>
               );

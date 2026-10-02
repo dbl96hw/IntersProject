@@ -17,6 +17,13 @@
   background: var(--color-page-bg);
 }
 
+.workspace__status {
+  position: relative;
+  z-index: 1;
+  margin: 2rem;
+  color: var(--color-text-secondary);
+}
+
 .workspace__scroll {
   position: relative;
   z-index: 1;

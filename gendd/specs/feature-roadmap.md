@@ -209,12 +209,12 @@ Phase 4 feature, re-run the F3.1 checklist.
   candidate row").
 - Checklist:
   - [x] Colour-grouped tables, search, status chips, counts and empty states (F0.5)
-  - [ ] Replace `RECENT_DASHBOARDS` / `createMockDashboard` with `GET /api/candidates`, with visible loading and error states
-  - [ ] Align columns with the contract. The engine row now has `mean_yield_t_ha` (the mean of the candidate's trials). To show it, Express must add it to `ENGINE_CANDIDATE_FIELDS` and the `candidates` table needs the column (a migration). There is still no `crop`: the mock data has only `CROP_GUID`, so the UI should drop that column or show the GUID
-  - [ ] Show the `ambiguous_trials` and `atypical` flags on each row
-  - [ ] Decide the section order with the team (the UI shows green first; the engine sorts red first for "what to look at first")
-  - [ ] Decide how "Create dashboard" and "Recent dashboards" map to the engine, which holds one dataset (for example, one dashboard = the current engine dataset, or a saved filter)
-  - [ ] Choose a frontend test framework with a mentor, record it in `gendd/adr/`, and test loading, empty, error and populated states
+  - [x] Replace `RECENT_DASHBOARDS` / `createMockDashboard` with `GET /api/chats` (latest 8) and `GET /api/candidates?chat_id=`, with visible loading and error states
+  - [x] Align columns with the contract. Crop and mean yield are not on the Express candidate, so those columns are dropped. `mean_yield_t_ha` stays on the engine until Express exposes it
+  - [x] Show the `ambiguous_trials` and `atypical` flags on each row
+  - [x] Section order is red, then amber, then green (`TRIAGE_STATUS_ORDER`)
+  - [x] Recent dashboards are chats. Create dashboard stays the welcome screen until file upload
+  - [x] Frontend tests use Vitest (`gendd/adr/0001-frontend-tests-use-vitest.md`), including loading, empty, error and populated states
 - Done when: the breeder sees the engine's 150 candidates grouped by colour with their reasons, and can
   filter to the red ones.
 

@@ -43,13 +43,15 @@
 
 ### Current behaviour
 
-Candidate rows and the chat still use mock data. `GET /health` is called from `BackendStatus`
-through `src/api/client.js` (`API_BASE_URL`, `res.ok`, errors as `code` / `message` / `field`).
+`GET /health` is called from `BackendStatus`. Recent dashboards are the first
+`RECENT_DASHBOARD_LIMIT` chats from `GET /api/chats`. Opening one loads every page of
+`GET /api/candidates?chat_id=` (`page_size` 100, cap `MAX_CANDIDATE_PAGES`). The chat widget still
+uses mock replies.
 
 - "Create dashboard" does not start an analysis. The welcome screen shows that file upload is coming
-  soon (`data-testid="upload-coming-soon"`). Recent dashboards are still `RECENT_DASHBOARDS`.
-- Edits and overrides live only in React state (`Workspace.jsx`, `handleUpdateCandidate`); a reload
-  loses them.
+  soon (`data-testid="upload-coming-soon"`).
+- The edit modal does not record a change yet (`data-testid="edit-save-coming-soon"`). Saving a colour
+  is the next story.
 - The chat answers from `mocks/chatReplies.js` by matching a candidate id in the message.
 - Mock rows follow the engine's candidate row, plus two fields the engine does not return: `crop` and
   `mean_yield_t_ha` (`mocks/dashboards.js`).
@@ -60,7 +62,7 @@ Source for the target: `services/data-engine/docs/INTEGRATION.md` section 6 and 
 
 | Screen | UI today | Pending (roadmap feature) |
 |---|---|---|
-| Triage tables | Built on mocks | `GET /api/candidates` (mock works today), `ambiguous_trials` / `atypical` when live (F1.2) |
+| Triage tables | `GET /api/chats` and `GET /api/candidates` for the open chat | Evidence card (F1.3); save is still disabled |
 | Evidence card | Row only expands the text | `GET /api/candidates/:id` → `engine_detail` (F1.3) |
 | Override and correction modal | Built on mocks | `PATCH /api/candidates/:id` (501 until ticket 3), engine overrides; corrections F1.4 |
 | Chat | Built on mock replies | `POST /api/chats/:id/messages` text path + live agent (F2.1 / 9B) |

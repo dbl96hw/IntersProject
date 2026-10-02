@@ -1,5 +1,12 @@
-import { API_BASE_URL, API_ERROR_CODES, HEALTH_PATH } from '../constants/api';
-import { HEALTH_TEXT } from '../constants/messages';
+import {
+  API_BASE_URL,
+  API_ERROR_CODES,
+  API_PATHS,
+  CANDIDATES_PAGE_SIZE,
+  HEALTH_PATH,
+  MAX_CANDIDATE_PAGES,
+} from '../constants/api';
+import { DASHBOARD_TEXT, HEALTH_TEXT, SIDEBAR_TEXT } from '../constants/messages';
 
 export class ApiError extends Error {
   constructor({ code, message, field }) {
@@ -60,4 +67,64 @@ export async function requestJson(path, options = {}) {
 
 export function getHealth() {
   return requestJson(HEALTH_PATH);
+}
+
+export async function listChats() {
+  const body = await requestJson(API_PATHS.CHATS);
+  if (!Array.isArray(body.chats)) {
+    throw new ApiError({
+      code: API_ERROR_CODES.UNEXPECTED,
+      message: SIDEBAR_TEXT.LOAD_FAILED,
+      field: null,
+    });
+  }
+  return body.chats;
+}
+
+export function getChat(chatId) {
+  return requestJson(`${API_PATHS.CHATS}/${chatId}`);
+}
+
+function incompleteListError() {
+  return new ApiError({
+    code: API_ERROR_CODES.UNEXPECTED,
+    message: DASHBOARD_TEXT.LIST_INCOMPLETE,
+    field: null,
+  });
+}
+
+// Pages of 100 until `total` is reached. An empty page or the page cap is an error,
+// so the screen never shows a partial dashboard.
+export async function listChatCandidates(chatId) {
+  const collected = [];
+  let total = 0;
+
+  for (let page = 1; page <= MAX_CANDIDATE_PAGES; page += 1) {
+    const params = new URLSearchParams({
+      chat_id: chatId,
+      page: String(page),
+      page_size: String(CANDIDATES_PAGE_SIZE),
+    });
+    const body = await requestJson(`${API_PATHS.CANDIDATES}?${params}`);
+    const batch = Array.isArray(body.candidates) ? body.candidates : null;
+    total = body.total;
+    if (batch === null || !Number.isInteger(total) || total < 0) {
+      throw incompleteListError();
+    }
+    if (batch.length === 0) {
+      if (collected.length === total) {
+        return { candidates: collected, total };
+      }
+      throw incompleteListError();
+    }
+    collected.push(...batch);
+    if (collected.length >= total) {
+      if (collected.length !== total) {
+        throw incompleteListError();
+      }
+      return { candidates: collected, total };
+    }
+  }
+
+  throw incompleteListError();
 }

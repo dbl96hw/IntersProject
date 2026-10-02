@@ -9,33 +9,44 @@ import {
   STATUS_FILTER_ALL,
   TRIAGE_STATUS,
   TRIAGE_STATUS_ORDER,
+  missingReasonText,
 } from '../constants';
 import './DashboardView.css';
+
+function hasReason(candidate) {
+  return typeof candidate.reason === 'string' && candidate.reason.trim() !== '';
+}
 
 function matchesSearch(candidate, searchText) {
   const query = searchText.trim().toLowerCase();
   if (!query) {
     return true;
   }
-  return [candidate.candidate_id, candidate.crop, candidate.reason].join(' ').toLowerCase().includes(query);
+  return [candidate.candidate_id, candidate.reason, candidate.justification]
+    .filter((value) => typeof value === 'string')
+    .join(' ')
+    .toLowerCase()
+    .includes(query);
 }
 
-function DashboardView({ dashboard, onUpdateCandidate }) {
+function DashboardView({ title, candidates, warnings = [] }) {
   const [expandedIds, setExpandedIds] = useState(() => new Set());
   const [contextMenu, setContextMenu] = useState(null);
   const [editingCandidate, setEditingCandidate] = useState(null);
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState(STATUS_FILTER_ALL);
 
-  const candidateCount = dashboard.candidates.length;
-  const searchedCandidates = dashboard.candidates.filter((candidate) => matchesSearch(candidate, searchText));
-  // Chip counts follow the search, so they always match what clicking the chip would show.
+  const missingReasonCount = candidates.filter((candidate) => !hasReason(candidate)).length;
+  const searchedWithReason = candidates.filter(
+    (candidate) => hasReason(candidate) && matchesSearch(candidate, searchText),
+  );
+  // Chip counts follow the search and only rows that have a reason, so they match the tables.
   const statusCounts = {
-    [STATUS_FILTER_ALL]: searchedCandidates.length,
+    [STATUS_FILTER_ALL]: searchedWithReason.length,
     ...Object.fromEntries(
       TRIAGE_STATUS_ORDER.map((statusKey) => [
         statusKey,
-        searchedCandidates.filter((candidate) => candidate.colour === statusKey).length,
+        searchedWithReason.filter((candidate) => candidate.colour === statusKey).length,
       ]),
     ),
   };
@@ -73,11 +84,6 @@ function DashboardView({ dashboard, onUpdateCandidate }) {
     setEditingCandidate(null);
   }, []);
 
-  function handleSaveCandidate(changes) {
-    onUpdateCandidate(editingCandidate.candidate_id, changes);
-    setEditingCandidate(null);
-  }
-
   return (
     <section className="dashboard" data-testid="dashboard-view" aria-labelledby="dashboard-title">
       <header className="dashboard__header">
@@ -89,14 +95,10 @@ function DashboardView({ dashboard, onUpdateCandidate }) {
           <p className="dashboard__hint">{DASHBOARD_TEXT.ROW_HINT}</p>
         </div>
 
-        <div
-          className="dashboard__summary"
-          title={dashboard.fileNames.join(', ')}
-          data-testid="dashboard-summary"
-        >
-          <span className="dashboard__summary-title">{DASHBOARD_TEXT.FILES_ANALYZED}</span>
+        <div className="dashboard__summary" data-testid="dashboard-summary">
+          <span className="dashboard__summary-title">{title}</span>
           <span className="dashboard__summary-detail">
-            {candidateCount} {DASHBOARD_TEXT.CANDIDATES_EVALUATED}
+            {candidates.length} {DASHBOARD_TEXT.CANDIDATES_EVALUATED}
           </span>
         </div>
       </header>
@@ -109,24 +111,40 @@ function DashboardView({ dashboard, onUpdateCandidate }) {
         statusCounts={statusCounts}
       />
 
-      {visibleCount === 0 ? (
+      {warnings.length > 0 && (
+        <ul className="dashboard__warnings" data-testid="analysis-warnings">
+          {warnings.map((warning, index) => (
+            <li key={`${warning.code}-${index}`} data-testid={`analysis-warning-${warning.code}`}>
+              {warning.code}: {warning.message}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {missingReasonCount > 0 && (
+        <p className="dashboard__empty" role="status" data-testid="candidates-without-reason">
+          {missingReasonText(missingReasonCount)}
+        </p>
+      )}
+
+      {visibleCount === 0 && (searchText.trim() || statusFilter !== STATUS_FILTER_ALL) ? (
         <p className="dashboard__empty" role="status" data-testid="filter-empty">
           {FILTER_TEXT.NO_RESULTS}
         </p>
-      ) : (
+      ) : visibleCount > 0 ? (
         <div className="dashboard__sections">
           {visibleStatusKeys.map((statusKey) => (
             <TriageSection
               key={statusKey}
               status={TRIAGE_STATUS[statusKey]}
-              candidates={searchedCandidates.filter((candidate) => candidate.colour === statusKey)}
+              candidates={searchedWithReason.filter((candidate) => candidate.colour === statusKey)}
               expandedIds={expandedIds}
               onToggleRow={handleToggleRow}
               onRowContextMenu={handleRowContextMenu}
             />
           ))}
         </div>
-      )}
+      ) : null}
 
       {contextMenu && (
         <RowContextMenu
@@ -138,11 +156,7 @@ function DashboardView({ dashboard, onUpdateCandidate }) {
       )}
 
       {editingCandidate && (
-        <EditCandidateModal
-          candidate={editingCandidate}
-          onSave={handleSaveCandidate}
-          onClose={handleCloseModal}
-        />
+        <EditCandidateModal candidate={editingCandidate} onSave={() => {}} onClose={handleCloseModal} />
       )}
     </section>
   );

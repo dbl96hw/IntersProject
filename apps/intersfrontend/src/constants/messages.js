@@ -4,6 +4,9 @@ export const SIDEBAR_TEXT = {
   NEW_DASHBOARD: 'New dashboard',
   RECENT_DASHBOARDS: 'Recent dashboards',
   NO_DASHBOARDS: 'No dashboards yet',
+  LOADING: 'Loading dashboards.',
+  LOAD_FAILED: 'The dashboard list could not be loaded.',
+  HIDDEN_DASHBOARDS: 'more dashboards are not shown',
 };
 
 export const WELCOME_TEXT = {
@@ -39,11 +42,18 @@ export const DASHBOARD_TEXT = {
   EMPTY_SECTION: 'No candidates in this group',
   OVERRIDDEN_BADGE: 'Overridden',
   ROW_HINT: 'Click a row to expand it. Right-click a row to edit it.',
+  LOADING: 'Loading candidates.',
+  EMPTY: 'This dashboard has no candidates.',
+  LIST_INCOMPLETE: 'The candidate list stopped before every row arrived. Nothing is shown.',
+  UNVERIFIED_BADGE: 'Unverified',
+  AMBIGUOUS_TRIALS: 'Ambiguous trials',
+  ATYPICAL: 'Atypical',
+  SOURCE_LABEL: 'Source',
 };
 
 export const FILTER_TEXT = {
   SEARCH_LABEL: 'Search candidates',
-  SEARCH_PLACEHOLDER: 'Search by ID, crop, or justification',
+  SEARCH_PLACEHOLDER: 'Search by ID or justification',
   STATUS_GROUP_LABEL: 'Filter by status',
   STATUS_ALL: 'All',
   NO_RESULTS: 'No candidates match your filters.',
@@ -65,7 +75,15 @@ export const EDIT_TEXT = {
   JUSTIFICATION_REQUIRED: 'Enter a justification.',
   CANCEL: 'Cancel',
   SAVE: 'Save changes',
+  SAVE_COMING_SOON: 'Saving a colour or a decision is coming soon. This change is not recorded.',
 };
+
+export function missingReasonText(count) {
+  if (count === 1) {
+    return '1 candidate has no reason and is not shown';
+  }
+  return `${count} candidates have no reason and are not shown`;
+}
 
 export const CHAT_TEXT = {
   TITLE: 'Chat with Git Push & Pray',
