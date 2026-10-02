@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "test": "node --test",
     "db:smoke": "node --env-file-if-exists=.env scripts/db-smoke.js",
-    "ingest:smoke": "node --env-file-if-exists=.env scripts/ingest-smoke.js"
+    "ingest:smoke": "node --env-file-if-exists=.env scripts/ingest-smoke.js",
+    "claude:smoke": "node --env-file-if-exists=.env scripts/claude-smoke.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.130.0",
