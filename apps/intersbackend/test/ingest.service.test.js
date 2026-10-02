@@ -47,6 +47,11 @@ function fakeEngine({
       return track('sql', () => {
         if (query.startsWith('SELECT * FROM trial_material')) return { columns: trialMaterialColumns, rows: [] };
         const ids = idsIn(query);
+        if (query.includes('OR MATERIAL_GUID IN')) {
+          const byId = Object.fromEntries(Object.entries(MATERIALS).map(([guid, id]) => [id, guid]));
+          const found = ids.flatMap((id) => (byId[id] ? [id] : MATERIALS[id] ? [MATERIALS[id]] : []));
+          return { columns: ['candidate_id'], rows: [...new Set(found)].map((id) => ({ candidate_id: id })) };
+        }
         if (query.includes('FROM materials WHERE candidate_id IN')) {
           const byId = Object.fromEntries(Object.entries(MATERIALS).map(([guid, id]) => [id, guid]));
           return { columns: ['id', 'guid'], rows: ids.filter((id) => byId[id]).map((id) => ({ id, guid: byId[id] })) };
@@ -330,4 +335,37 @@ test('re-uploaded and contradicting rows are counted, and conflicts become a war
   assert.deepEqual(result.warnings.map((entry) => entry.code), ['UPLOAD_CONFLICTS']);
   // The file still covers these candidates, even though nothing new was added.
   assert.deepEqual(result.touchedCandidateIds, ['SYN-MZ-00001', 'SYN-MZ-00002']);
+});
+
+test('a document touches the candidates it mentions, checked against the engine', async () => {
+  const engine = fakeEngine();
+  engine.uploadDocument = async (filename) => {
+    engine.calls.upload.push(filename);
+    return {
+      accepted: true,
+      tables_accepted: [{ table: 'note.pdf#table1(p1)', source: 'genomics', rows: 2 }],
+      entities_mentioned: ['SYN-MZ-00001', 'SYN-TR-0001', 'SYN-MZ-09999'],
+      entities_in_tables: [GUID_B],
+    };
+  };
+
+  const result = await createIngestService({ dataEngine: engine })
+    .ingestFiles([{ name: 'note.pdf', buffer: Buffer.from('%PDF-1.4 fake') }]);
+
+  // SYN-MZ-00001 named in the text, SYN-MZ-00002 through its GUID in a table, SYN-MZ-00003/4 through
+  // trial SYN-TR-0001; SYN-MZ-09999 is not in the engine and is ignored.
+  assert.deepEqual(result.touchedCandidateIds, ['SYN-MZ-00001', 'SYN-MZ-00002', 'SYN-MZ-00003', 'SYN-MZ-00004']);
+  assert.deepEqual([result.ingestion[0].accepted, result.ingestion[0].source, result.ingestion[0].rows], [true, 'genomics', 2]);
+});
+
+test('a document the engine itself refuses is reported as not accepted', async () => {
+  const engine = fakeEngine();
+  engine.uploadDocument = async () => ({ accepted: false, message: 'this file does not look like breeding / trial data', entities_mentioned: ['SYN-MZ-00001'] });
+
+  const result = await createIngestService({ dataEngine: engine })
+    .ingestFiles([{ name: 'invoice.pdf', buffer: Buffer.from('%PDF-1.4 fake') }]);
+
+  assert.equal(result.ingestion[0].accepted, false);
+  assert.match(result.ingestion[0].message, /breeding/);
+  assert.deepEqual(result.touchedCandidateIds, []);
 });
