@@ -1,64 +1,162 @@
 import { useEffect, useRef, useState } from 'react';
+import { postChatMessage } from '../api/client';
+import { ANSWER_WARNING_CODES, API_ERROR_CODES, CHAT_TEXT } from '../constants';
 import Logo from './Logo';
-import { CHAT_TEXT, MOCK_CHAT_DELAY_MS } from '../constants';
-import { CHAT_WELCOME_MESSAGE, getMockChatReply } from '../mocks/chatReplies';
 import './ChatWidget.css';
 
 const SENDER = { BOT: 'bot', USER: 'user' };
+const EMPTY_MESSAGES = [];
 
 function formatTime(date) {
   return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
-function ChatWidget({ candidates }) {
+function hasUnverifiedNumbers(warnings) {
+  return Array.isArray(warnings)
+    && warnings.some((warning) => warning?.code === ANSWER_WARNING_CODES.UNVERIFIED_NUMBERS);
+}
+
+function bubbleFromStored(message) {
+  if (message?.role === 'user' && message.text) {
+    return { id: message.id, sender: SENDER.USER, text: message.text };
+  }
+  if (message?.kind !== 'answer') {
+    return null;
+  }
+  if (message.status === 'error') {
+    return {
+      id: message.id,
+      sender: SENDER.BOT,
+      errorCode: message.error?.code || 'UNKNOWN',
+      errorMessage: message.error?.message || CHAT_TEXT.ERROR_FALLBACK,
+    };
+  }
+  if (message.status === 'ok' && message.answer?.text) {
+    return {
+      id: message.id,
+      sender: SENDER.BOT,
+      text: message.answer.text,
+      warnings: message.answer.warnings ?? [],
+    };
+  }
+  return null;
+}
+
+function bubblesFromStored(storedMessages) {
+  if (!Array.isArray(storedMessages)) {
+    return [];
+  }
+  return storedMessages.map(bubbleFromStored).filter(Boolean);
+}
+
+function failureBubble(id, error) {
+  if (!error?.code || error.code === API_ERROR_CODES.NETWORK) {
+    return {
+      id,
+      sender: SENDER.BOT,
+      errorCode: 'network',
+      errorMessage: CHAT_TEXT.NETWORK,
+    };
+  }
+  return {
+    id,
+    sender: SENDER.BOT,
+    errorCode: error.code,
+    errorMessage: error.message || CHAT_TEXT.ERROR_FALLBACK,
+  };
+}
+
+function ChatWidget({ chatId = null, storedMessages = EMPTY_MESSAGES }) {
   const [isOpen, setIsOpen] = useState(true);
-  const [isMinimized, setIsMinimized] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(true);
   const [draft, setDraft] = useState('');
-  const [isBotTyping, setIsBotTyping] = useState(false);
-  const [messages, setMessages] = useState(() => [
-    { id: 0, sender: SENDER.BOT, text: CHAT_WELCOME_MESSAGE, time: formatTime(new Date()) },
-  ]);
+  const [isSending, setIsSending] = useState(false);
+  const [messages, setMessages] = useState(() => bubblesFromStored(storedMessages));
 
   const nextMessageId = useRef(1);
-  const replyCount = useRef(0);
-  const replyTimeout = useRef(null);
+  const generation = useRef(0);
+  const hasLocalTurn = useRef(false);
   const messageListRef = useRef(null);
 
-  useEffect(() => () => window.clearTimeout(replyTimeout.current), []);
+  useEffect(() => {
+    generation.current += 1;
+    hasLocalTurn.current = false;
+    setIsSending(false);
+  }, [chatId]);
+
+  useEffect(() => {
+    if (hasLocalTurn.current) {
+      return;
+    }
+    setMessages(bubblesFromStored(storedMessages));
+  }, [storedMessages, chatId]);
 
   useEffect(() => {
     const messageList = messageListRef.current;
     if (messageList) {
       messageList.scrollTop = messageList.scrollHeight;
     }
-  }, [messages, isBotTyping, isOpen, isMinimized]);
+  }, [messages, isSending, isOpen, isMinimized]);
 
-  function addMessage(sender, text) {
-    const message = { id: nextMessageId.current, sender, text, time: formatTime(new Date()) };
+  function takeId() {
+    const id = `local-${nextMessageId.current}`;
     nextMessageId.current += 1;
-    setMessages((currentMessages) => [...currentMessages, message]);
+    return id;
   }
 
-  function handleSend(event) {
+  async function handleSend(event) {
     event.preventDefault();
-
     const text = draft.trim();
-    if (!text || isBotTyping) {
+    if (!text || isSending || !chatId) {
       return;
     }
 
-    // Built now so the reply quotes the rows as they were when the user asked.
-    const replyText = getMockChatReply(text, candidates, replyCount.current);
-    replyCount.current += 1;
-
-    addMessage(SENDER.USER, text);
+    const generationAtSend = generation.current;
+    const chatAtSend = chatId;
+    hasLocalTurn.current = true;
+    setMessages((current) => [
+      ...current,
+      { id: takeId(), sender: SENDER.USER, text, time: formatTime(new Date()) },
+    ]);
     setDraft('');
-    setIsBotTyping(true);
+    setIsSending(true);
 
-    replyTimeout.current = window.setTimeout(() => {
-      addMessage(SENDER.BOT, replyText);
-      setIsBotTyping(false);
-    }, MOCK_CHAT_DELAY_MS);
+    try {
+      const body = await postChatMessage(chatAtSend, text);
+      if (generation.current !== generationAtSend) {
+        return;
+      }
+      const assistant = body?.assistant_message;
+      if (assistant?.status === 'error') {
+        setMessages((current) => [...current, {
+          id: assistant.id || takeId(),
+          sender: SENDER.BOT,
+          errorCode: assistant.error?.code || 'UNKNOWN',
+          errorMessage: assistant.error?.message || CHAT_TEXT.ERROR_FALLBACK,
+          time: formatTime(new Date()),
+        }]);
+      } else {
+        setMessages((current) => [...current, {
+          id: assistant?.id || takeId(),
+          sender: SENDER.BOT,
+          text: assistant?.answer?.text ?? '',
+          warnings: assistant?.answer?.warnings ?? [],
+          time: formatTime(new Date()),
+        }]);
+      }
+    } catch (error) {
+      if (generation.current !== generationAtSend) {
+        return;
+      }
+      setMessages((current) => [...current, {
+        ...failureBubble(takeId(), error),
+        time: formatTime(new Date()),
+      }]);
+    } finally {
+      if (generation.current === generationAtSend) {
+        setIsSending(false);
+      }
+    }
   }
 
   function handleToggleMinimize() {
@@ -119,18 +217,35 @@ function ChatWidget({ candidates }) {
 
       {!isMinimized && (
         <>
+          <p className="chat-widget__notice" data-testid="chat-readonly-notice">{CHAT_TEXT.READONLY}</p>
           <ul className="chat-widget__messages" ref={messageListRef} data-testid="chat-messages">
+            {!chatId && (
+              <li className="chat-message chat-message--bot" data-testid="chat-no-chat">
+                <p className="chat-message__text">{CHAT_TEXT.NO_CHAT}</p>
+              </li>
+            )}
             {messages.map((message) => (
               <li
                 key={message.id}
                 className={`chat-message chat-message--${message.sender}`}
                 data-testid={`chat-message-${message.sender}`}
               >
-                <p className="chat-message__text">{message.text}</p>
-                <span className="chat-message__time">{message.time}</span>
+                {message.errorCode ? (
+                  <p className="chat-message__text" data-testid={`chat-error-${message.errorCode}`}>
+                    {message.errorMessage}
+                  </p>
+                ) : (
+                  <p className="chat-message__text" style={{ whiteSpace: 'pre-wrap' }}>{message.text}</p>
+                )}
+                {hasUnverifiedNumbers(message.warnings) && (
+                  <p className="chat-message__warning" data-testid="chat-number-warning">
+                    {CHAT_TEXT.NUMBER_WARNING}
+                  </p>
+                )}
+                {message.time && <span className="chat-message__time">{message.time}</span>}
               </li>
             ))}
-            {isBotTyping && (
+            {isSending && (
               <li className="chat-message chat-message--bot" role="status" data-testid="chat-typing">
                 <p className="chat-message__text">{CHAT_TEXT.TYPING}</p>
               </li>
@@ -145,12 +260,13 @@ function ChatWidget({ candidates }) {
               onChange={(event) => setDraft(event.target.value)}
               placeholder={CHAT_TEXT.INPUT_PLACEHOLDER}
               aria-label={CHAT_TEXT.INPUT_PLACEHOLDER}
+              disabled={!chatId || isSending}
               data-testid="chat-input"
             />
             <button
               type="submit"
               className="chat-widget__send-button"
-              disabled={!draft.trim() || isBotTyping}
+              disabled={!chatId || !draft.trim() || isSending}
               aria-label={CHAT_TEXT.SEND}
               data-testid="chat-send-button"
             >

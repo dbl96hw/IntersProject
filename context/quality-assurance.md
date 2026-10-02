@@ -8,7 +8,7 @@
 ## Signals
 
 - `services/data-engine/tests/` with pytest (`services/data-engine/pyproject.toml`).
-- `apps/intersbackend/test/` — `node --test`, 110 tests; Anthropic SDK and engine mocked.
+- `apps/intersbackend/test/` — `node --test`, 148 tests; Anthropic SDK and engine mocked. Frontend Vitest: 42 tests.
 - `.github/workflows/lint.yml` — lint only on pull requests.
 - `.cursor/rules/80-testability-lite.mdc`.
 

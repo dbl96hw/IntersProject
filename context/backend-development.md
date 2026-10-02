@@ -85,7 +85,17 @@ Variable names (values only in `.env`, never committed): `PORT`, `CORS_ORIGIN`, 
 - Live upload is wired. A message with files ingests tables and documents, then `explainAll` (at most
   `EXPLAIN_MAX_SYNC` new explanations, RED then AMBER then GREEN). The summary counts engine colours.
   `usage` and `versions` are saved. Unchanged `evidence_hash` reuses a verified Claude justification.
-- A live message with **no files** still returns `LLM_UNAVAILABLE`. That is Step 9B.
+  Analysis `versions` stay `getPromptVersions` (`explanation_prompt`, `rule_version`, `model`).
+- A live message with **no files** calls `agent.service.ask`. History is the chat's saved user and answer
+  messages (`kind: "analysis"` is ignored). The loop uses `GET /tools` and `POST /tools/:name` with
+  `tool_choice: auto`, at most `MAX_TOOL_ROUNDS` (6) and `CHAT_QUESTION_DEADLINE_MS` (90s,
+  `ANSWER_TIMEOUT`). Answer `versions` add `chat_prompt: "engine"`. Numbers missing from this question's
+  tool JSON add `ANSWER_UNVERIFIED_NUMBERS`; the text is still returned. Mock mode still returns the canned answer.
+  A live check raised that warning on 2 of 3 answers. `query_candidates` is a bare list with default
+  limit 20 and no total, so an answer can count the page (20) instead of the full set (`apply_scoring`
+  reported rule-colour RED 54; the same filter with limit 200 returned 50 effective reds). Small numbers
+  pass too easily: 1, 3, 4 and 5 already occur in `n_trials`, `n_fail`, `reason`, trial strings, or the
+  digit inside `UC4_MATERIAL_V0`.
 - Live `PATCH /api/candidates/:id` forwards a colour change to engine `POST /overrides` and stores a `candidate_reviews` row. Live `POST /api/candidates/:id/decision` stores pass / no pass and does not change colour. Mock mode still validates, then returns **501**.
 
 ### What the frontend expects
@@ -130,7 +140,7 @@ Unchanged ownership: FastAPI on port 8001, contracts in `services/data-engine/do
 ## Unknowns
 
 - Unknown: exact `EXPLAIN_MAX_SYNC` UX when some candidates get `EXPLANATION_DEFERRED`.
-- Unknown: chat message shape for multi-turn agent history in 9B.
+- History for 9B is the saved user and answer messages on that chat, capped by `MAX_CHAT_HISTORY_MESSAGES`. The browser does not send it.
 - Unknown: whether breeder corrections should feed rules (SME); engine corrections log not built (F1.4).
 - Unknown: crop display name source (`CROP_GUID` only in data).
 - Unknown: Python lint/format for `services/data-engine`.

@@ -60,7 +60,13 @@ function toAssistantMessageResponse(message, candidates) {
     ? { ...message.analysis, candidates: candidates.map(toCandidateResponse), usage: message.usage, versions: message.versions }
     : null;
   const answer = isOk && !isAnalysis
-    ? { text: message.text, tool_calls: message.tool_calls ?? [], usage: message.usage }
+    ? {
+      text: message.text,
+      tool_calls: message.tool_calls ?? [],
+      usage: message.usage,
+      warnings: message.analysis?.warnings ?? [],
+      versions: message.versions ?? null,
+    }
     : null;
   return {
     id: message.id,

@@ -17,6 +17,7 @@ import { emptyUsage } from '../llm/claude.client.js';
 import { engineFallback } from '../llm/evidence.check.js';
 import { loadSample } from '../mocks/index.js';
 import { getPromptVersions } from '../prompts/index.js';
+import { ask } from './agent.service.js';
 import { DataEngineError } from './dataEngineClient.js';
 import { fileKindOf } from './responses.js';
 
@@ -88,17 +89,6 @@ function buildSummary(candidates) {
     if (counts[candidate.colour] !== undefined) counts[candidate.colour] += 1;
   });
   return `${candidates.length} candidates analysed: ${counts[COLOURS.GREEN]} green, ${counts[COLOURS.AMBER]} amber, ${counts[COLOURS.RED]} red.`;
-}
-
-function notImplementedAnswer() {
-  return {
-    message: {
-      kind: MESSAGE_KINDS.ANSWER,
-      status: MESSAGE_STATUS.ERROR,
-      error: { code: ERROR_CODES.LLM_UNAVAILABLE, message: 'Live analysis is not implemented yet' },
-    },
-    candidates: [],
-  };
 }
 
 function engineDown(err) {
@@ -248,10 +238,19 @@ async function liveAnalysis({ text, files, ingest, claude, dataEngine, db, model
 export function createAnalysisService({ config, ingest, claude, dataEngine, db }) {
   return {
     // files: [{ name, mime_type, size_bytes, buffer }]
-    async handleMessage({ text, files }) {
+    async handleMessage({ text, files, history = [] }) {
       const hasFiles = files.length > 0;
       if (config.analysisMode === ANALYSIS_MODES.LIVE) {
-        if (!hasFiles) return notImplementedAnswer();
+        if (!hasFiles) {
+          return ask({
+            text,
+            history,
+            claude,
+            dataEngine,
+            model: config.anthropicModel,
+            apiKey: config.anthropicApiKey,
+          });
+        }
         return liveAnalysis({
           text,
           files,

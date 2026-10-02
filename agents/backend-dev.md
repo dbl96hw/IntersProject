@@ -14,7 +14,7 @@ Day-to-day commands (from repo root unless noted):
 
 - `npm run dev:backend` — http://localhost:3000.
 - `cd services/data-engine && uvicorn data_engine.api:app --port 8001`.
-- `npm test -w apps/intersbackend` — 110 unit tests (mocked SDK/engine).
+- `npm test -w apps/intersbackend` — 148 unit tests (mocked SDK/engine). Unset `ANALYSIS_MODE` first if the shell already has it.
 - `npm run lint`.
 - Live smokes (engine + `.env` with `ANALYSIS_MODE=live`): `npm run db:smoke -w apps/intersbackend`,
   `npm run ingest:smoke -w apps/intersbackend -- path/to/file.csv`, `npm run claude:smoke -w apps/intersbackend`
@@ -22,13 +22,12 @@ Day-to-day commands (from repo root unless noted):
 
 ## Role-Specific Context
 
-- Express is a **real gateway** in mock mode (full `/api` shape) with **partial live** wiring: engine
-  passthrough, candidate detail refresh, chats/messages storage — but live **analysis** and **chat agent**
-  are not implemented yet (`analysis.service.js` returns not implemented in live).
+- Express is a **real gateway** in mock mode (full `/api` shape) with live upload, live override and
+  decision, and a live text-only chat agent (`agent.service.ask`). Mock mode still returns the canned answer.
 - The data engine is the only producer of numbers and colours; it also **reads documents**. Claude
-  **only explains** (and will answer chat via engine tools in 9B). See roadmap **Backend next steps**.
+  explains file rows with a forced tool, and answers chat with `tool_choice: auto` (`gendd/adr/0003-chat-tool-choice-auto.md`).
 - Current Claude model in use for smokes: `claude-haiku-4-5-20251001`. Forced single-tool calls work on
-  Haiku 4.5; Sonnet 5.5+ may need `tool_choice: auto` + strict schemas (not done).
+  Haiku 4.5. Chat already uses `tool_choice: auto`.
 
 ## Key Areas
 
@@ -42,7 +41,7 @@ Day-to-day commands (from repo root unless noted):
 - Wire live `analysis.service.handleMessage`: `ingest.service` + `createClaudeClient().explainAll`, persist
   candidates/messages with `usage` and `getPromptVersions`.
 - Implement ticket 3 routes (stop returning 501) with engine `POST /overrides` for colour.
-- Add `agent.service.ask` for text-only chat messages with engine tools.
+- `agent.service.ask` is wired for text-only chat messages. Do not point it at the file-upload path.
 - Extend tests with mocked ingest + explain paths before touching production keys.
 
 ## Danger Zones

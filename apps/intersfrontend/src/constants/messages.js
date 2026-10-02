@@ -98,4 +98,9 @@ export const CHAT_TEXT = {
   CLOSE: 'Close chat',
   OPEN: 'Open chat',
   TYPING: 'Typing...',
+  NO_CHAT: 'Open a dashboard before asking a question.',
+  READONLY: 'This chat cannot change a colour. Decide on the table.',
+  NUMBER_WARNING: 'Some numbers in this answer could not be checked against the engine data. Review them before relying on them.',
+  ERROR_FALLBACK: 'The assistant could not answer. Try again.',
+  NETWORK: 'The server did not answer. Check that the backend is running.',
 };

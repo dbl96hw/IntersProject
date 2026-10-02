@@ -33,3 +33,8 @@ export const API_ERROR_CODES = {
 };
 
 export const OTHER_REASON_CODE = 'OTHER';
+
+// Lives on answer.warnings. Missing this warning does not mean the numbers were checked.
+export const ANSWER_WARNING_CODES = {
+  UNVERIFIED_NUMBERS: 'ANSWER_UNVERIFIED_NUMBERS',
+};

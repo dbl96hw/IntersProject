@@ -5,7 +5,7 @@ Phased, priority-ordered list of the features that cover the hackathon use case
 readiness: conversational channels (WhatsApp, voice), authentication hardening, deployment beyond `stg`
 and Cropwise packaging are out of this roadmap.
 
-Last synced with `dev` on 2026-10-02, after PR #13 (`feature/backend-prompts`, merge `86c829b`).
+Last synced with the working tree on 2026-10-02, after the F2.1 chat widget on `feature/chatbot` (not merged).
 Merged on `dev` so far for the backend gateway and Claude layer: PR #9 (API contract and paths), PR #10
 and #11 (`feature/backend-core`: Supabase schema, mock/live routes, ingest service, data engine client),
 PR #12 (Claude client, evidence check, live `claude:smoke`), PR #13 (Step 8 explanation prompt). PR #7
@@ -61,7 +61,7 @@ flowchart LR
 |---|---|---|
 | 0. Foundations | F0.1 - F0.5 | done |
 | 1. Demo critical path | F1.1 - F1.5 | in progress (Express gateway in mock + partial live; UI on mocks; F1.4 deferred after the freeze) |
-| 2. Natural-language assistant | F2.1 | in progress (Claude justification layer; chat agent pending) |
+| 2. Natural-language assistant | F2.1 | in progress (widget posts the live answer; known issues below) |
 | 3. Demo readiness gate | F3.1 | not started |
 | 4. Trust and data enrichment | F4.1 - F4.4 | in progress (F4.2 has mock upload UI) |
 
@@ -157,7 +157,7 @@ Phase 4 feature, re-run the F3.1 checklist.
 - Evidence / pointers: PR #7 (`ced1454`); `apps/intersfrontend/src/pages/Workspace.jsx`;
   `src/components/` (`Sidebar`, `WelcomeView`, `DashboardView`, `DashboardFilters`, `TriageSection`,
   `RowContextMenu`, `EditCandidateModal`, `ChatWidget`, `Logo`, `LeafDecoration`, `PlantDecoration`);
-  `src/constants/triage.js`, `messages.js`; `src/mocks/dashboards.js`, `chatReplies.js`;
+  `src/constants/triage.js`, `messages.js`; `src/mocks/dashboards.js`;
   `src/styles/theme.css`.
 - Checklist:
   - [x] Workspace shell: sidebar with "New dashboard", recent dashboards and user badge
@@ -283,12 +283,12 @@ Phase 4 feature, re-run the F3.1 checklist.
 ## Phase 2 - Natural-language assistant
 
 ### F2.1 Breeder assistant chat
-- Status: in progress (chat widget on mocks; Claude justification layer done; chat agent pending)
+- Status: in progress (widget posts `{ text }` to the live answer; known issues below)
 - Priority: 1 of 1 in Phase 2
 - Depends on: F1.1 (F1.3 recommended, so answers can link to the evidence card)
 - Goal: The breeder asks questions in their own language ("which lines should I look at first?") and
   gets answers that cite the engine's values and remind them that they decide.
-- Evidence / pointers: `apps/intersfrontend/src/components/ChatWidget.jsx`, `src/mocks/chatReplies.js`,
+- Evidence / pointers: `apps/intersfrontend/src/components/ChatWidget.jsx`,
   `apps/intersbackend/src/llm/`, `apps/intersbackend/src/prompts/explanation.v1.md`,
   `services/data-engine/docs/INTEGRATION.md` section 3, `services/data-engine/src/data_engine/agent_tools.py`
   (`SYSTEM_PROMPT`), `docs/api-contract.md` (messages on chats).
@@ -296,12 +296,19 @@ Phase 4 feature, re-run the F3.1 checklist.
   - [x] Chat widget with open / minimize / close, conversation history, typing state and `data-testid`s (F0.5)
   - [x] `@anthropic-ai/sdk` in `apps/intersbackend`; `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL` in `.env.example` (no values)
   - [x] Claude client, tool schemas, evidence check and explanation prompt (`submit_justifications` only; documents ingested by the engine)
-  - [ ] Wire chat agent (`agent.service.ask`) through engine tools on `POST /api/chats/:id/messages` (text-only path); cap rounds with `MAX_TOOL_ROUNDS`
-  - [ ] Replace `getMockChatReply` with the live answer path, sending conversation history
-  - [ ] Answers render the colour, the one-line reason and the cited evidence, plus the "you decide" reminder from the system prompt
-  - [ ] Clear message in the widget when the API key is missing or the engine is unreachable, instead of a crash
-  - [ ] No override or colour-changing path through the chat (overrides stay in F1.5)
-  - [ ] Tests for the route with a mocked Claude client and a mocked engine
+  - [x] Wire chat agent (`agent.service.ask`) through engine tools on `POST /api/chats/:id/messages` (text-only path); cap rounds with `MAX_TOOL_ROUNDS` and the question with `CHAT_QUESTION_DEADLINE_MS`
+  - [x] Replace `getMockChatReply` with the live answer path. The widget posts `{ text }` only; the backend reads saved messages and does not trust a history from the browser
+  - [ ] Answers render the colour, the one-line reason and the cited evidence as their own fields, plus the "you decide" reminder from the system prompt. Today the widget shows the answer text as plain text, including any markdown marks the model wrote
+  - [x] Clear message in the widget when the API key is missing, the engine is unreachable, the question times out, or the network fails, instead of a crash
+  - [x] No override or colour-changing path through the chat (overrides stay in F1.5)
+  - [x] Tests for the route with a mocked Claude client and a mocked engine, and for the widget with a fake `fetch`
+- Known issues:
+  - `query_candidates` returns at most 20 rows, with no total and no truncated flag. A live answer said "20 red lines" when the rule colour count is 54.
+  - `apply_scoring` counts rule colour (RED 54). `query_candidates` filters effective colour after overrides (50 on that check). With overrides, the chat can report two different numbers. On the widget check the chat said 54 / 71 / 25 while the open board showed 53 / 72 / 25.
+  - `ANSWER_UNVERIFIED_NUMBERS` is a partial net. It fired on 3 of 4 answers in the first live chat, several times for a correct count written as a word (`dos`). Digits 1, 3, 4 and 5 can match another field and pass. No warning does not mean the answer was verified. The widget never shows a verified mark.
+  - The chat answers with the engine's effective colour, which is global. The board shows the colour saved on that chat. They can differ after an override in another chat.
+  - Ingested documents can appear in `search` results. The chat is read-only, so the risk is misleading text, not a write.
+  - Widget check on chat `f0ac38c2-0931-4baf-90d3-29bddd8bee0f`: the colour-count question took 12.0 s and did not warn; the question about SYN-MZ-00001 took 13.9 s and warned. After reload the warning was still next to that answer, because `GET /api/chats/:id` returns it on `answer.warnings`. The welcome screen shows `chat-no-chat` and does not call the server. The panel starts minimized.
 - Done when: the breeder asks "which lines are red and why?" and receives a cited answer.
 
 ---
@@ -323,6 +330,7 @@ Phase 4 feature, re-run the F3.1 checklist.
   - [ ] No screen in the demo path still imports from `src/mocks/`
   - [ ] `npm audit` findings at Medium or above triaged (fixed or recorded with a reason)
   - [ ] Root `README.md` explains how to run all three processes (engine, backend, frontend), the required `.env` values, and how to reset the override and correction logs (`DATA_ENGINE_STATE_DIR`)
+  - [ ] Clean demo data the day before, from a read-only inventory: overrides in `services/data-engine/.state/overrides.jsonl`, `candidate_reviews` rows, test chats and messages in Supabase, and the engine's in-memory state. An engine override is global, so a test override changes what new chats show
   - [ ] Promotion `dev` -> `stg` through a pull request with the demo script passing
 - Done when: the demo script passes end to end on a fresh clone and on `stg`.
 
@@ -425,8 +433,8 @@ Step 8 is merged. 9A is done. See `context/backend-development.md` and `agents/b
 
 ### 9B — Chat agent with engine tools
 
-- `agent.service.ask`: Claude loop using engine `GET /tools` and `POST /tools/:name`, max 6 rounds.
-- Answer verification warning `ANSWER_UNVERIFIED_NUMBERS` when numbers are not backed by tool results.
+- [x] `agent.service.ask`: Claude loop using engine `GET /tools` and `POST /tools/:name`, max 6 rounds, plus a 90 second deadline (`ANSWER_TIMEOUT`). History is loaded from saved messages; `kind: "analysis"` is skipped.
+- [x] Answer verification warning `ANSWER_UNVERIFIED_NUMBERS` when numbers are not backed by this question's tool results. The text is still returned. Ids are not numbers. Live check: the warning fired on 3 of 4 answers. `query_candidates` has no total, so a reply can count the default page of 20 instead of the full set. Digits 1, 3, 4 and 5 can match another field (including the `4` in `UC4_MATERIAL_V0`) and pass. No warning does not mean the numbers were verified.
 
 ### Ticket 3 — Candidate decisions
 
@@ -436,10 +444,13 @@ Step 8 is merged. 9A is done. See `context/backend-development.md` and `agents/b
 ### Step 10 — Demo ops
 
 - `baseline.js`, `warmup.js`, Render deploy, root `README.md` runbook.
+- Clean demo data the day before, from a read-only inventory: `services/data-engine/.state/overrides.jsonl`, `candidate_reviews`, test chats and messages in Supabase, and the engine process memory. An engine override is global, so a test override changes what new chats show.
 
 ### Engine owner backlog (Sebastián)
 
-- Trial status counts in llm-context evidence (reduces `number_word` false rejects when Claude writes "tres ensayos en HOLD").
+- `query_candidates`: return the total and a truncated flag, and say in the tool description that the default limit is 20.
+- Engine system prompt: use `apply_scoring` for colour counts, and do not treat the page length as the total. Spell out rule colour versus effective colour after overrides.
+- Trial status counts in llm-context evidence (reduces warnings when the model writes a count as a word, such as "dos" or "tres ensayos en HOLD").
 - Dedupe in `POST /ingest/records`.
 - In-memory engine state lost on restarts.
 - Docker deploy with Tesseract / Poppler for OCR.

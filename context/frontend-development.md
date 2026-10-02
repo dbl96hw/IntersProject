@@ -34,7 +34,7 @@
       `ACCEPTED_FILE_TYPES`, mock delays.
     - `decorations.js` - `LEAF_PATH`.
   - `apps/intersfrontend/src/mocks/` - `dashboards.js` (`MOCK_USER`, `RECENT_DASHBOARDS`,
-    `createMockDashboard`), `chatReplies.js` (`getMockChatReply`).
+    `createMockDashboard`). Chat replies are not mocked.
   - `apps/intersfrontend/src/styles/theme.css` - theme variables, imported in `main.jsx` before `index.css`.
 - Entry points:
   - `apps/intersfrontend/index.html` -> `src/main.jsx` -> `src/App.jsx` -> `src/pages/Workspace.jsx`.
@@ -46,14 +46,16 @@
 
 `GET /health` is called from `BackendStatus`. Recent dashboards are the first
 `RECENT_DASHBOARD_LIMIT` chats from `GET /api/chats`. Opening one loads every page of
-`GET /api/candidates?chat_id=` (`page_size` 100, cap `MAX_CANDIDATE_PAGES`). The chat widget still
-uses mock replies.
+`GET /api/candidates?chat_id=` (`page_size` 100, cap `MAX_CANDIDATE_PAGES`). The chat widget posts
+`{ text }` to `POST /api/chats/:id/messages` and shows `answer.text`. It starts minimized. With no
+chat open it shows `chat-no-chat` and does not call the server.
 
 - "Create dashboard" does not start an analysis. The welcome screen shows that file upload is coming
   soon (`data-testid="upload-coming-soon"`).
 - A colour change sends `PATCH /api/candidates/:id`. Pass / no pass sends `POST /api/candidates/:id/decision`.
   The row becomes the `candidate` in the response. The screen does not move the colour itself.
-- The chat answers from `mocks/chatReplies.js` by matching a candidate id in the message.
+- The chat shows the server answer as plain text (`white-space: pre-wrap`). A warning
+  `ANSWER_UNVERIFIED_NUMBERS` on `answer.warnings` is a calm notice. There is no verified mark.
 - Mock rows follow the engine's candidate row, plus two fields the engine does not return: `crop` and
   `mean_yield_t_ha` (`mocks/dashboards.js`).
 
@@ -66,7 +68,7 @@ Source for the target: `services/data-engine/docs/INTEGRATION.md` section 6 and 
 | Triage tables | `GET /api/chats` and `GET /api/candidates` for the open chat | Evidence card (F1.3) |
 | Evidence card | Row only expands the text | `GET /api/candidates/:id` → `engine_detail` (F1.3) |
 | Override and decision modal | `PATCH /api/candidates/:id` and `POST /api/candidates/:id/decision`. Reasons from `GET /api/engine/override-reasons` | Crop and yield corrections (F1.4) |
-| Chat | Built on mock replies | `POST /api/chats/:id/messages` text path + live agent (F2.1 / 9B) |
+| Chat | `POST /api/chats/:id/messages` with `{ text }` only. History stays on the server | Structured colour and evidence fields in the bubble (F2.1 remainder) |
 | Upload | Built, files stay in the browser | `POST /api/chats/:id/messages` multipart (F4.2 / 9A) |
 | Backend status | `GET /health` shows `mode` and `engine` | Live candidate list is still F1.2 |
 | Trust panel, comparison, disagreements | Not built | F4.1, F4.3, F4.4 |

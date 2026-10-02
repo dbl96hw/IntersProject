@@ -85,6 +85,11 @@ export function getChat(chatId) {
   return requestJson(`${API_PATHS.CHATS}/${chatId}`);
 }
 
+// Text only. The backend loads history from saved messages.
+export function postChatMessage(chatId, text) {
+  return sendJson(`${API_PATHS.CHATS}/${chatId}/messages`, 'POST', { text });
+}
+
 function sendJson(path, method, body) {
   return requestJson(path, {
     method,

@@ -32,3 +32,11 @@ export const RELEVANCE_DECISIONS = { RELEVANT: 'RELEVANT', UNCERTAIN: 'UNCERTAIN
 
 // The agent loop stops after this many tool rounds so a confused model cannot loop forever.
 export const MAX_TOOL_ROUNDS = 6;
+// Whole question, including every tool round. Separate from the per-call LLM timeout.
+export const CHAT_QUESTION_DEADLINE_MS = 90000;
+// Prior user and answer bubbles loaded from the chat. Analysis messages are not part of this.
+export const MAX_CHAT_HISTORY_MESSAGES = 6;
+// messages.versions.chat_prompt when the system prompt came from the engine's GET /tools.
+export const CHAT_PROMPT_SOURCE = 'engine';
+// The chat agent never calls a tool whose name looks like a write, even if a model asks for it.
+export const BLOCKED_CHAT_TOOL_PATTERN = /override|ingest|upload|delete|insert|update|patch/i;

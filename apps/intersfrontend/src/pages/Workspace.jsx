@@ -66,6 +66,7 @@ function Workspace() {
             candidates: list.candidates,
             total: list.total,
             warnings: latestAnalysisWarnings(chat.messages),
+            messages: chat.messages ?? [],
           });
         }
       })
@@ -155,7 +156,11 @@ function Workspace() {
         </div>
       </main>
 
-      {dashboardReady && <ChatWidget key={activeChat.id} candidates={dashboardState.candidates} />}
+      <ChatWidget
+        key={activeChatId ?? 'welcome'}
+        chatId={activeChatId}
+        storedMessages={dashboardState.messages}
+      />
     </div>
   );
 }
