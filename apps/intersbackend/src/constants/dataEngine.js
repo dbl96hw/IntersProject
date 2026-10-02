@@ -24,7 +24,11 @@ export const DATA_ENGINE_PATHS = {
   DIAGNOSTICS: '/diagnostics',
   DOCUMENTS_BASE64: '/documents/base64',
   INGEST_RECORDS: '/ingest/records',
+  RELEVANCE: '/relevance',
 };
+
+// Decisions of the engine's relevance gate (POST /relevance): is a file about breeding / trials?
+export const RELEVANCE_DECISIONS = { RELEVANT: 'RELEVANT', UNCERTAIN: 'UNCERTAIN', IRRELEVANT: 'IRRELEVANT' };
 
 // The agent loop stops after this many tool rounds so a confused model cannot loop forever.
 export const MAX_TOOL_ROUNDS = 6;

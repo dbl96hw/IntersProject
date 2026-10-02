@@ -65,6 +65,7 @@ OCR needs the Tesseract binary. On Windows use the UB Mannheim installer and add
 | `system` | Probes usable CPUs (affinity, cgroup quota), physical cores and RAM (cgroup limit) | Every resource decision derives from one hardware profile |
 | `parallel` | Picks inline / threads / processes from an Amdahl + memory model | Parallelises only when the model predicts ≥ 20 % gain and RAM allows it |
 | `ingest`, `documents` | Tables and documents. PDF text layer first, OCR only on pages without text; C++ / Julia / Python back-ends | Exact text is never degraded by OCR; backend choice is recorded |
+| `relevance` | Gate for uploads: known ids / table signatures first, then a lexicon + char n-gram contrast model (logistic, nested-LOO reported) | Off-topic files never reach the LLM or the evidence; doubtful ones go to a person |
 | `detect`, `profile` | Header signatures; Shannon entropy per column | Deterministic routing; lossless removal of zero-information columns |
 | `patterns` | Character → integer encoding, ID grammar, combinatorics, counter gaps, fact extraction | Finds IDs in free text, validates formats, detects missing records |
 | `canonical`, `quality` | Key aliases → star schema. Issues with root cause, fix status and provenance | Never overwrites the system of record; every fix is reversible |
@@ -97,7 +98,8 @@ The mathematical justification is in [`docs/DESIGN.md`](docs/DESIGN.md), the JSO
 - The trial rule is a **reconstruction** (`SYNTH_V1_RECON`) pending SME confirmation. The weights are fitted, and the margin to the cut is thin (4e-5), so one trial sits on the boundary. The candidate rule (`UC4_MATERIAL_V0`) is **our proposal**.
 - In the mocks every candidate was tested in a single location-year, so stability across environments cannot be assessed. The engine reports this instead of hiding it.
 - The mock features are nearly uncorrelated, so spectral compression is modest (16 → 13 components at 95 %). Real, correlated trait data compresses more. The canonical tables are always kept, so compression never loses data.
-- Some parts could not be run in the build environment and fall back automatically: the Julia back-ends (Julia download blocked there), Apache Tika (needs its server jar) and textract. The Python and C++ paths are tested (54 tests).
+- Some parts could not be run in the build environment and fall back automatically: the Julia back-ends (Julia download blocked there), Apache Tika (needs its server jar) and textract. The Python and C++ paths are tested (80+ tests).
+- The relevance gate is trained on 48 short examples. It is meant to stop obviously off-topic files and to send borderline ones to a person, not to judge scientific relevance. Add examples to `config/relevance.yaml` when it errs.
 - The document text extractor reads values that are written next to known field names (English/Spanish). It does not interpret prose, and document facts never change a colour.
 
 ## Attribution

@@ -16,8 +16,17 @@ const csvFile = (name, text) => ({ name, buffer: Buffer.from(text, 'utf8') });
 const idsIn = (query) => [...query.matchAll(/'([^']+)'/g)].map((match) => match[1]);
 
 // Fake engine: records every call and answers SQL from the small tables above by matching the query text.
-function fakeEngine({ reject = () => false, trialMaterialColumns = ['TRIAL_GUID', 'MATERIAL_GUID', 'n_observations'], delayMs = 0, log } = {}) {
-  const calls = { ingest: [], sql: [], upload: [] };
+// `relevance` (optional) is the gate's answer; without it the fake has no checkRelevance, like an older engine.
+// `counts` (optional) adds the engine's reconciliation counts to every accepted ingest.
+function fakeEngine({
+  reject = () => false,
+  trialMaterialColumns = ['TRIAL_GUID', 'MATERIAL_GUID', 'n_observations'],
+  delayMs = 0,
+  log,
+  relevance,
+  counts,
+} = {}) {
+  const calls = { ingest: [], sql: [], upload: [], relevance: [] };
   const pause = () => new Promise((resolve) => setTimeout(resolve, delayMs));
   const track = async (entry, work) => {
     log?.push(`start ${entry}`);
@@ -25,13 +34,13 @@ function fakeEngine({ reject = () => false, trialMaterialColumns = ['TRIAL_GUID'
     log?.push(`end ${entry}`);
     return work();
   };
-  return {
+  const engine = {
     calls,
     async ingestRecords(label, records) {
       calls.ingest.push({ label, records });
       return track(label, () => (reject(label)
         ? { accepted: false, detection: { source: 'UNKNOWN' }, message: 'no known source matches these fields' }
-        : { accepted: true, detection: { source: 'germplasm' }, rows: records.length }));
+        : { accepted: true, detection: { source: 'germplasm' }, rows: records.length, ...counts }));
     },
     async sql(query) {
       calls.sql.push(query);
@@ -62,6 +71,14 @@ function fakeEngine({ reject = () => false, trialMaterialColumns = ['TRIAL_GUID'
       return track(`upload ${filename}`, () => ({ path: filename }));
     },
   };
+  if (relevance) {
+    engine.checkRelevance = async ({ filename }) => {
+      calls.relevance.push(filename);
+      if (relevance instanceof Error) throw relevance;
+      return relevance;
+    };
+  }
+  return engine;
 }
 
 test('a corrupt spreadsheet gives only a warning', async () => {
@@ -96,7 +113,15 @@ test('a table rejected by the engine gives accepted false with the engine messag
     .ingestFiles([csvFile('mystery.csv', 'FOO,BAR,BAZ\n1,2,3\n')]);
 
   assert.deepEqual(result.ingestion, [{
-    file: 'mystery.csv', kind: 'table', accepted: false, source: 'UNKNOWN', rows: null, message: 'no known source matches these fields',
+    file: 'mystery.csv',
+    kind: 'table',
+    accepted: false,
+    source: 'UNKNOWN',
+    rows: null,
+    rows_added: null,
+    duplicates_ignored: null,
+    conflicts: null,
+    message: 'no known source matches these fields',
   }]);
   assert.deepEqual(result.touchedCandidateIds, []);
 });
@@ -227,4 +252,74 @@ test('two concurrent ingestFiles calls never interleave their engine calls', asy
   assert.ok(log.indexOf('start second.csv#Sheet1') > log.indexOf('end sql'));
   assert.deepEqual(firstResult.touchedCandidateIds, ['SYN-MZ-00001']);
   assert.deepEqual(secondResult.touchedCandidateIds, ['SYN-MZ-00002']);
+});
+
+test('an off-topic document stops at the relevance gate: no Claude call, no upload', async () => {
+  const engine = fakeEngine({
+    relevance: { decision: 'IRRELEVANT', reasons: ['breeding vocabulary: 0 distinct term(s) (none)'] },
+  });
+  let claudeCalls = 0;
+  const claudeExtract = async () => { claudeCalls += 1; return []; };
+
+  const result = await createIngestService({ dataEngine: engine, claudeExtract })
+    .ingestFiles([{ name: 'invoice.pdf', buffer: Buffer.from('%PDF-1.4 fake') }]);
+
+  assert.equal(claudeCalls, 0);
+  assert.deepEqual(engine.calls.upload, []);
+  assert.deepEqual(engine.calls.relevance, ['invoice.pdf']);
+  assert.equal(result.ingestion[0].accepted, false);
+  assert.match(result.ingestion[0].message, /Not about breeding or trial data/);
+  assert.deepEqual(result.warnings.map((item) => item.code), ['IRRELEVANT_FILE']);
+});
+
+test('an uncertain document is processed with a warning so a person can check it', async () => {
+  const engine = fakeEngine({ relevance: { decision: 'UNCERTAIN', reasons: [] } });
+
+  const result = await createIngestService({ dataEngine: engine, claudeExtract: async () => [] })
+    .ingestFiles([{ name: 'field-photo.png', buffer: Buffer.from('fake png') }]);
+
+  assert.deepEqual(engine.calls.upload, ['field-photo.png']);
+  assert.deepEqual(result.warnings.map((item) => item.code), ['RELEVANCE_UNCERTAIN', 'NO_RECORDS_EXTRACTED']);
+});
+
+test('a relevance check that fails (not an outage) lets the document through as before', async () => {
+  const engine = fakeEngine({ relevance: new DataEngineError(404, { code: 'NOT_FOUND', message: 'Not Found' }) });
+
+  const result = await createIngestService({ dataEngine: engine, claudeExtract: async () => [] })
+    .ingestFiles([{ name: 'photo.png', buffer: Buffer.from('fake png') }]);
+
+  assert.deepEqual(engine.calls.upload, ['photo.png']);
+  assert.deepEqual(result.warnings.map((item) => item.code), ['NO_RECORDS_EXTRACTED']);
+});
+
+test('tables do not go through the relevance gate (the engine rejects unknown layouts itself)', async () => {
+  const engine = fakeEngine({ relevance: { decision: 'IRRELEVANT', reasons: [] } });
+
+  await createIngestService({ dataEngine: engine })
+    .ingestFiles([csvFile('genomics.csv', `GENOMIC_SAMPLE_GUID,MATERIAL_GUID,QC_CALL_RATE_PCT\nGS-1,${GUID_A},97.1\n`)]);
+
+  assert.deepEqual(engine.calls.relevance, []);
+  assert.equal(engine.calls.ingest.length, 1);
+});
+
+test('re-uploaded and contradicting rows are counted, and conflicts become a warning', async () => {
+  const engine = fakeEngine({
+    counts: {
+      rows_added: 0,
+      duplicates_ignored: 1,
+      conflicts: 1,
+      message: '1 row(s) contradict the export and were not applied (the export wins; see GET /quality)',
+    },
+  });
+  const rows = `GS-1,${GUID_A},97.1\nGS-2,${GUID_B},96\n`;
+
+  const result = await createIngestService({ dataEngine: engine })
+    .ingestFiles([csvFile('genomics.csv', `GENOMIC_SAMPLE_GUID,MATERIAL_GUID,QC_CALL_RATE_PCT\n${rows}`)]);
+  const [item] = result.ingestion;
+
+  assert.deepEqual([item.rows, item.rows_added, item.duplicates_ignored, item.conflicts], [2, 0, 1, 1]);
+  assert.match(item.message, /the export wins/);
+  assert.deepEqual(result.warnings.map((entry) => entry.code), ['UPLOAD_CONFLICTS']);
+  // The file still covers these candidates, even though nothing new was added.
+  assert.deepEqual(result.touchedCandidateIds, ['SYN-MZ-00001', 'SYN-MZ-00002']);
 });

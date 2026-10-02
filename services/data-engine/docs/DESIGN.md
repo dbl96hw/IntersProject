@@ -50,7 +50,17 @@ Statistics are used only where the data is genuinely uncertain, and there they q
 - OCR pages run in parallel. Tesseract runs out of process, so threads work, with `OMP_THREAD_LIMIT=1` to avoid oversubscribing cores.
 - The C++ back-end calls Poppler and the Tesseract API in-process, with one Tesseract instance per thread. Tests check that C++ and Python produce the same text.
 - Document tables go through the same header detection and source signatures as the CSVs.
-- **Exports always win.** A document row whose key exists in an export is never merged; if its values differ, the difference is stored as a conflict (evidence). This is tested.
+- **Exports always win.** This holds for every upload, document tables and records posted to `/ingest/records` alike. An uploaded row whose key exists in an export is never merged: identical values are ignored (re-uploading is idempotent), different values are stored as a conflict (evidence), and new keys are added once. This is tested.
+
+## 2b. Relevance gate: is this file about breeding at all? (`relevance`)
+
+Before a document is indexed, and before Express pays Claude to extract from it, the file is classified RELEVANT / UNCERTAIN / IRRELEVANT.
+
+- **Rules first.** A mention of an id or GUID the engine holds, an id with the learned id grammar (`SYN-MZ-\d{5}`), or a table whose header matches a source signature makes the file RELEVANT with probability 1. These are exact facts, not estimates.
+- **Then a small, auditable model** on two features. (i) Lexicon density: weighted English/Spanish breeding terms per 100 words, `log(1 + d)`. (ii) A few-shot contrast `delta = s_in - s_off`: `s_*` is the mean of the top-3 cosine similarities between the file's character n-gram TF-IDF vector (n = 3..5, accents folded, digits mapped to 0) and the labelled in-domain / off-topic examples. Character n-grams handle two languages, OCR errors and inflection without a tokenizer. The subtraction cancels the language component that every text shares, so `delta` measures topic. The query is projected onto the examples' vocabulary, so long files are not penalised for words the examples never used.
+- **Fit.** Logistic regression with an L2 penalty, solved by Newton/IRLS (strictly convex, so the minimiser is unique and there is no random start). Training features are leave-one-out: an example is never compared with itself.
+- **Honest error.** Nested leave-one-out holds each example out of both the reference corpus and the fit (`GET /relevance/model`). On the shipped 48 examples (22 in-domain, 26 off-topic) it makes no wrong decision; the hard cases fall into UNCERTAIN. The tests add 14 texts the model never saw.
+- **UNCERTAIN is a feature.** The file is indexed and flagged `needs_review`, so a person decides. Only IRRELEVANT is refused, and `force` overrides it.
 
 ## 3. Renormalization: remove zero-information degrees of freedom (`profile`)
 

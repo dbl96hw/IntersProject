@@ -100,8 +100,11 @@ def from_json_payload(payload: Any, label: str, origin: str) -> list[RawTable]:
 
 
 def from_records(records: list[dict[str, Any]], label: str) -> RawTable:
-    """Entry point for structured records produced by the upstream Claude extraction API."""
-    return RawTable(label, _normalise_headers(pd.DataFrame(records)), f"records:{label}")
+    """Entry point for structured records (Express uploads, the Claude extraction service).
+
+    Marked as an upload: such rows never override the exports (see DataEngine._merge_sources).
+    """
+    return RawTable(label, _normalise_headers(pd.DataFrame(records)), f"records:{label}", meta={"uploaded": True})
 
 
 def discover(directory: str | Path, recursive: bool = False) -> list[Path]:

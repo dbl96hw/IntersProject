@@ -74,6 +74,13 @@ export function createDataEngineClient({
       body: { filename, content_base64: Buffer.from(buffer).toString('base64') },
       timeoutMs: ingestTimeoutMs,
     }),
+    // Is a file about breeding / trials? Deterministic and cheap; called before paying Claude to read it.
+    // Uses the ingest timeout: for a scanned PDF the engine runs OCR (cached for the later upload).
+    checkRelevance: ({ filename, buffer, text } = {}) => request(DATA_ENGINE_PATHS.RELEVANCE, {
+      method: 'POST',
+      body: { filename, text, content_base64: buffer ? Buffer.from(buffer).toString('base64') : undefined },
+      timeoutMs: ingestTimeoutMs,
+    }),
     ingestRecords: (label, records) => request(DATA_ENGINE_PATHS.INGEST_RECORDS, {
       method: 'POST',
       body: { label, records },

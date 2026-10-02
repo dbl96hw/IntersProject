@@ -7,17 +7,17 @@
   --color-sidebar-main: #303816;
   --color-sidebar-secondary: #4D5724;
 
-  /* Approved (green) */
+  /* Strong candidate (green) */
   --color-approved-accent: #1FA63A;
   --color-approved-bg: #E2F1D5;
   --color-approved-text: #12651F;
 
-  /* Conditional (amber) */
+  /* Needs review (amber) */
   --color-conditional-accent: #F5B719;
   --color-conditional-bg: #FFF0BF;
   --color-conditional-text: #70520A;
 
-  /* Not approved (red) */
+  /* Concerns (red) */
   --color-rejected-accent: #DF2528;
   --color-rejected-bg: #FAD2C9;
   --color-rejected-text: #8D1717;

@@ -1,6 +1,9 @@
 // Sends uploaded files to the data engine. Tables go as-is; documents go through Claude's extraction
 // (injected) and then as records. This layer never computes colours or joins sources: it only maps
 // readable ids to the engine's GUIDs (and back) through the engine's own read-only SQL.
+// Documents first pass the engine's relevance gate, so an off-topic file (an invoice, a holiday photo)
+// never reaches Claude or the evidence index. Tables need no gate: the engine already rejects any
+// table whose columns match no known source.
 
 import path from 'node:path';
 import {
@@ -12,6 +15,7 @@ import {
   MAX_IDS_PER_SQL,
   MAX_RECORDS_PER_INGEST,
   MAX_SQL_ROWS,
+  RELEVANCE_DECISIONS,
   WARNING_CODES,
 } from '../constants/index.js';
 import { extractDocxText } from '../extractors/docx.js';
@@ -25,6 +29,8 @@ const TRIAL_LINK_COLUMNS = ['TRIAL_GUID', 'MATERIAL_GUID'];
 const warning = (code, message, file = null) => ({ code, message, file });
 const isSafeId = (id) => ID_VALUE_PATTERN.test(id);
 const isEngineUnavailable = (err) => err instanceof DataEngineError && err.status === HTTP_STATUS.BAD_GATEWAY;
+// Engine counts summed over chunks; null when the engine did not report them (never guessed).
+const addCount = (total, value) => (typeof value === 'number' ? (total ?? 0) + value : total);
 
 function chunk(items, size) {
   const chunks = [];
@@ -99,7 +105,17 @@ export function createIngestService({ dataEngine, claudeExtract }) {
   }
 
   async function sendRecords(file, kind, label, records, state) {
-    const item = { file: file.name, kind, accepted: false, source: null, rows: null, message: null };
+    const item = {
+      file: file.name,
+      kind,
+      accepted: false,
+      source: null,
+      rows: null,
+      rows_added: null,
+      duplicates_ignored: null,
+      conflicts: null,
+      message: null,
+    };
     const allColumns = [...new Set(records.flatMap((record) => Object.keys(record)))];
     for (const [index, recordsChunk] of chunk(records, MAX_RECORDS_PER_INGEST).entries()) {
       const result = await ingestChunk(label, withAllColumns(recordsChunk, allColumns));
@@ -111,8 +127,20 @@ export function createIngestService({ dataEngine, claudeExtract }) {
         item.message = result.message ?? null;
         break;
       }
-      if (typeof result.rows === 'number') item.rows = (item.rows ?? 0) + result.rows;
+      item.rows = addCount(item.rows, result.rows);
+      item.rows_added = addCount(item.rows_added, result.rows_added);
+      item.duplicates_ignored = addCount(item.duplicates_ignored, result.duplicates_ignored);
+      item.conflicts = addCount(item.conflicts, result.conflicts);
+      if (result.message) item.message = result.message;
       state.acceptedRecords.push(...recordsChunk);
+    }
+    // The export is the system of record: the engine keeps it and reports the disagreement instead.
+    if (item.conflicts > 0) {
+      state.warnings.push(warning(
+        WARNING_CODES.UPLOAD_CONFLICTS,
+        `${item.conflicts} row(s) in "${file.name}" contradict the system-of-record export and were not applied; the export values are kept`,
+        file.name,
+      ));
     }
     state.ingestion.push(item);
   }
@@ -211,7 +239,53 @@ export function createIngestService({ dataEngine, claudeExtract }) {
     }
   }
 
+  // A gate failure that is not an outage (e.g. an engine without /relevance) lets the file through as before.
+  async function relevanceOf(file) {
+    if (typeof dataEngine.checkRelevance !== 'function') return null;
+    try {
+      return await dataEngine.checkRelevance({ filename: file.name, buffer: file.buffer });
+    } catch (err) {
+      if (!(err instanceof DataEngineError) || isEngineUnavailable(err)) throw err;
+      logFailure(file.name, 'relevance', err);
+      return null;
+    }
+  }
+
+  // Returns false when the file must stop here (off-topic), true otherwise.
+  async function passesRelevanceGate(file, state) {
+    const relevance = await relevanceOf(file);
+    if (relevance?.decision === RELEVANCE_DECISIONS.IRRELEVANT) {
+      const reasons = (relevance.reasons ?? []).join('; ');
+      state.ingestion.push({
+        file: file.name,
+        kind: FILE_KINDS.DOCUMENT,
+        accepted: false,
+        source: null,
+        rows: null,
+        rows_added: null,
+        duplicates_ignored: null,
+        conflicts: null,
+        message: `Not about breeding or trial data, so it was not read or added${reasons ? ` (${reasons})` : ''}`,
+      });
+      state.warnings.push(warning(
+        WARNING_CODES.IRRELEVANT_FILE,
+        `"${file.name}" does not look like breeding or trial data; it was skipped`,
+        file.name,
+      ));
+      return false;
+    }
+    if (relevance?.decision === RELEVANCE_DECISIONS.UNCERTAIN) {
+      state.warnings.push(warning(
+        WARNING_CODES.RELEVANCE_UNCERTAIN,
+        `It is unclear whether "${file.name}" is about breeding; it was processed, please check the result`,
+        file.name,
+      ));
+    }
+    return true;
+  }
+
   async function ingestDocumentFile(file, state) {
+    if (!(await passesRelevanceGate(file, state))) return;
     if (!claudeExtract) {
       state.warnings.push(warning(WARNING_CODES.NO_RECORDS_EXTRACTED, `Record extraction from documents is not available yet; "${file.name}" was only added as searchable evidence`, file.name));
     } else {

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -28,6 +29,7 @@ from . import diagnostics as diag
 from . import ingest
 from . import profile as prof
 from . import quality as qual
+from . import relevance as rel
 from .audit import REASON_CODES, OverrideLog
 from .encode import CANDIDATE_SPECS, encode_frame
 from .rules import CandidateRules, Decision, TrialRules
@@ -56,15 +58,88 @@ def _frame_hash(df: pd.DataFrame) -> str:
     return hashlib.sha256(pd.util.hash_pandas_object(df, index=False).values.tobytes()).hexdigest()
 
 
+_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)?$")
+
+
+def _canonical_value(v: Any) -> Any:
+    """One representation per value, whatever path it took (pandas CSV reader, Express/SheetJS, JSON).
+
+    The same export row arrives as True or "TRUE", 1001 or "1001", "2026-09-21 00:00:00.000" or
+    "2026-09-21", and a missing cell as NaN, None or "". Without this, re-uploading an export would
+    be reported as hundreds of conflicts. Numbers -> float, booleans -> "bool:true|false",
+    ISO dates -> "ts:<isoformat>", empty -> None, anything else -> stripped text.
+    """
+    if v is None or (isinstance(v, float) and np.isnan(v)):
+        return None
+    if isinstance(v, (bool, np.bool_)):
+        return f"bool:{bool(v)}".lower()
+    if isinstance(v, pd.Timestamp):
+        return "ts:" + v.isoformat()
+    if isinstance(v, (int, float, np.integer, np.floating)):
+        return float(v)
+    s = str(v).strip()
+    if s == "" or s.lower() in ("nan", "none", "null", "nat"):
+        return None
+    if s.lower() in ("true", "false"):
+        return f"bool:{s.lower()}"
+    try:
+        return float(s)
+    except ValueError:
+        pass
+    if _ISO_DATE.match(s):
+        try:
+            return "ts:" + pd.Timestamp(s).isoformat()
+        except ValueError:
+            pass
+    return s
+
+
+def _signature_value(v: Any) -> str:
+    c = _canonical_value(v)
+    return f"{c:.9g}" if isinstance(c, float) else str(c)
+
+
+_PROFILE_CACHE: dict[str, tuple] = {}
+_PROFILE_CACHE_SIZE = 256
+
+
+def _profiled(frame: pd.DataFrame) -> tuple:
+    """Detection + entropy profile + token counts of a table, cached by content.
+
+    These depend only on the table itself, and every ingest rebuilds the engine
+    from all raw tables: without the cache, one uploaded row re-profiles every
+    export. The key is a content hash (values and column names), so a changed
+    table can never reuse a stale profile.
+    """
+    key = _frame_hash(frame) + "|" + "|".join(map(str, frame.columns))
+    if key in _PROFILE_CACHE:
+        return (*_PROFILE_CACHE[key], 1)
+    d = det.detect(list(frame.columns))
+    p = prof.profile_table(frame)
+    entry = (d, p, prof.token_estimate(frame), prof.token_estimate(prof.renormalize(frame, p)))
+    if len(_PROFILE_CACHE) >= _PROFILE_CACHE_SIZE:
+        _PROFILE_CACHE.pop(next(iter(_PROFILE_CACHE)))
+    _PROFILE_CACHE[key] = entry
+    return (*entry, 0)
+
+
+def _rejection(ing) -> dict:
+    """What is kept about a file that failed the relevance gate: enough to explain, nothing indexed."""
+    d = ing.document
+    return {"path": d.get("path"), "kind": d.get("kind"), "sha256": d.get("sha256"), "pages": d.get("pages"),
+            "relevance": ing.relevance}
+
+
 class DataEngine:
     def __init__(self, raw_tables: list[ingest.RawTable], parallel_plan: dict | None = None,
                  overrides_path: str | Path | None = None, telemetry: Telemetry | None = None,
                  document_ingestions: list | None = None, export_date: str | None = None,
-                 save_runs: bool = True):
+                 save_runs: bool = True, rejected_documents: list | None = None):
         self.rules_cfg = load_yaml("rules")
         self.parallel_plan = parallel_plan
         self.raw_tables = list(raw_tables)
         self.documents = list(document_ingestions or [])
+        self.rejected_documents = list(rejected_documents or [])   # failed the relevance gate; never indexed
         self.export_date = export_date
         self.save_runs = save_runs
         self.overrides = OverrideLog(overrides_path or state_dir() / "overrides.jsonl")
@@ -90,61 +165,106 @@ class DataEngine:
             st.rows_out = sum(len(t.frame) for t in tables)
             st.metrics = {"files": len(files), "bytes": sum(p.stat().st_size for p in files),
                           "plan": plan.reason if plan else None}
-        ingestions = []
+        ingestions, rejected = [], []
         if doc_files:
+            from .patterns import ID_PATTERNS
+            known = rel.identifiers(t.frame for t in tables)
             with tel.stage("read_documents") as st:
                 for path in doc_files:
                     ing = structure(docs.extract(path))
+                    ing.relevance = rel.model().assess(ing.text, [list(t.frame.columns) for t in ing.accepted_tables],
+                                                       known, ID_PATTERNS).as_dict()
+                    if ing.relevance["decision"] == rel.IRRELEVANT:
+                        rejected.append(_rejection(ing))    # same gate as uploads: off-topic files are not indexed
+                        continue
                     ingestions.append(ing)
                     tables.extend(ing.accepted_tables)
-                st.metrics = {"documents": len(doc_files),
+                st.metrics = {"documents": len(doc_files), "rejected_as_irrelevant": len(rejected),
                               "tables_accepted": sum(len(i.accepted_tables) for i in ingestions),
                               "facts": sum(len(i.facts) for i in ingestions)}
         return cls(tables, parallel_plan=plan.as_dict() if plan else None, telemetry=tel,
-                   document_ingestions=ingestions, **kw)
+                   document_ingestions=ingestions, rejected_documents=rejected, **kw)
 
     def add_records(self, label: str, records: list[dict[str, Any]]) -> dict:
         """Add structured records (e.g. from the Claude extraction service) and rebuild."""
         table = ingest.from_records(records, label)
+        # Unique name per upload so the response reports this call's counts only.
+        table.name = f"{label}@{sum(1 for t in self.raw_tables if t.meta.get('uploaded')) + 1}"
         detection = det.detect(list(table.frame.columns))
         if not detection.confident:
             return {"accepted": False, "detection": detection.as_dict(),
                     "message": "no known source matches these fields: needs classification by a human or the LLM"}
         self.raw_tables.append(table)
         self._build()
-        return {"accepted": True, "detection": detection.as_dict(), "rows": len(table.frame),
-                "build_seconds": self.run_report["summary"]["total_wall_s"]}
+        stats = self.merge_stats.get(table.name, {})
+        conflicts = [c for c in self.document_conflicts if c["table"] == table.name]
+        return jsonable({"accepted": True, "detection": detection.as_dict(), "rows": len(table.frame),
+                         "rows_added": stats.get("added", len(table.frame)),
+                         "duplicates_ignored": stats.get("duplicates_ignored", 0),
+                         "conflicts": len(conflicts), "conflict_examples": conflicts[:5],
+                         "message": (f"{len(conflicts)} row(s) contradict the export and were not applied "
+                                     f"(the export wins; see GET /quality)") if conflicts else None,
+                         "build_seconds": self.run_report["summary"]["total_wall_s"]})
 
-    def add_document(self, path: str | Path) -> dict:
-        """OCR / parse a document, add the tables that match a source, keep its facts, rebuild."""
+    def add_document(self, path: str | Path, force: bool = False, document=None) -> dict:
+        """OCR / parse a document, check it is about breeding, add its matching tables and facts, rebuild.
+
+        The relevance gate (relevance.py) runs before anything is indexed: an IRRELEVANT file is
+        returned with `accepted: false` and its reasons, and the model is not rebuilt. `force=True`
+        is the human override ("I know, index it anyway"). An UNCERTAIN file is indexed and flagged
+        with `needs_review: true`. `document` lets a caller pass an extraction it already has.
+        """
         from . import documents as docs
         from .documents.structure import structure
 
         tel = Telemetry()
         with tel.stage("read_document") as st:
-            ing = structure(docs.extract(path), id_patterns=self.id_patterns())
+            ing = structure(document or docs.extract(path), id_patterns=self.id_patterns())
             st.metrics = ing.summary()["backends"] if "backends" in ing.summary() else {}
+        with tel.stage("relevance") as st:
+            ing.relevance = self.assess_relevance(ing.text, [list(t.frame.columns) for t in ing.accepted_tables])
+            st.metrics = {"decision": ing.relevance["decision"], "probability": ing.relevance["probability"]}
+        if ing.relevance["decision"] == rel.IRRELEVANT and not force:
+            self.rejected_documents.append(_rejection(ing))
+            return jsonable({**ing.summary(), "accepted": False, "needs_review": False,
+                             "message": "this file does not look like breeding / trial data, so it was not indexed: "
+                                        + "; ".join(ing.relevance["reasons"])})
         self.documents.append(ing)
         self.raw_tables.extend(ing.accepted_tables)
         self._build(tel)
-        return jsonable(ing.summary())
+        uncertain = ing.relevance["decision"] == rel.UNCERTAIN
+        return jsonable({**ing.summary(), "accepted": True, "needs_review": uncertain,
+                         "message": ("indexed, but it is unclear whether this file is about breeding: please confirm"
+                                     if uncertain else None)})
+
+    def assess_relevance(self, text: str = "", tables: list[list[str]] | None = None) -> dict:
+        """Relevance of a file (text + table headers) to UC4; see relevance.py for the decision ladder."""
+        if self._relevance_context is None:
+            ids = rel.identifiers(t.frame for t in self.raw_tables if not self._is_upload(t))
+            ids |= {str(c).upper() for c in self.candidate_decisions}
+            self._relevance_context = (ids, self.id_patterns())
+        ids, patterns = self._relevance_context
+        return rel.model().assess(text, tables or [], ids, patterns).as_dict()
 
     def _build(self, telemetry: Telemetry | None = None) -> None:
         tel = telemetry or Telemetry()
+        self._relevance_context = None     # known ids change with the data
         with tel.stage("detect_and_renormalize", rows_in=sum(len(t.frame) for t in self.raw_tables)) as st:
             self.tables: list[IngestedTable] = []
             by_source: dict[str, list] = {}
+            hits = 0
             for t in self.raw_tables:
-                d = det.detect(list(t.frame.columns))
-                p = prof.profile_table(t.frame)
-                ren = prof.renormalize(t.frame, p)
-                self.tables.append(IngestedTable(t.name, t.origin, d, p, prof.token_estimate(t.frame),
-                                                 prof.token_estimate(ren), t.frame))
+                d, p, tok_raw, tok_ren, hit = _profiled(t.frame)
+                hits += hit
+                self.tables.append(IngestedTable(t.name, t.origin, d, p, tok_raw, tok_ren, t.frame))
                 if d.confident:
                     by_source.setdefault(d.source, []).append((t, t.frame))
             merged = self._merge_sources(by_source)
             st.metrics = {"tables": len(self.tables), "sources": sorted(merged),
-                          "document_conflicts": len(self.document_conflicts),
+                          "upload_conflicts": len(self.document_conflicts),
+                          "upload_duplicates_ignored": sum(v.get("duplicates_ignored", 0)
+                                                           for v in self.merge_stats.values()),
+                          "profile_cache_hits": hits,
                           "columns": sum(len(t.profile.columns) for t in self.tables),
                           "informative_columns": sum(len(t.profile.kept) for t in self.tables)}
 
@@ -157,14 +277,25 @@ class DataEngine:
             self.quality = qual.assess(self.model, export_date=self.export_date)
             if self.document_conflicts:
                 self.quality.issues.append(qual.Issue(
-                    id="provenance.document_conflicts_export", category="provenance", severity="warning",
-                    title="Document rows contradict the system-of-record export",
+                    id="provenance.upload_conflicts_export", category="provenance", severity="warning",
+                    title="Uploaded rows contradict the system-of-record export",
                     count=len(self.document_conflicts),
                     affected=[f"{c['source']}:{c['key']}" for c in self.document_conflicts][:12],
-                    root_cause="the same key appears in an export and in a document table with different values",
+                    root_cause=("the same key arrives from an upload (document table or posted records) with "
+                                "values different from the export"),
                     evidence={"conflicts": self.document_conflicts[:20]}, fix_status="applied",
-                    fix="the export wins; the document value is kept as evidence and shown to the breeder",
-                    impact="no silent overwrite of exported data by scanned or pasted tables"))
+                    fix="the export wins; the uploaded value is kept as evidence and shown to the breeder",
+                    impact="no silent overwrite of exported data by uploads, scans or LLM-extracted records"))
+            dupes = sum(s.get("duplicates_ignored", 0) for s in self.merge_stats.values())
+            if dupes:
+                self.quality.issues.append(qual.Issue(
+                    id="provenance.duplicate_uploads_ignored", category="provenance", severity="info",
+                    title="Uploaded rows already present were ignored", count=dupes,
+                    affected=[name for name, s in self.merge_stats.items() if s.get("duplicates_ignored")][:12],
+                    root_cause="the same rows were uploaded again (re-upload of an export or of a previous upload)",
+                    evidence={"per_table": self.merge_stats}, fix_status="applied",
+                    fix="exact duplicates are not added, so re-uploading is idempotent",
+                    impact="counts, quality issues and drift are not inflated by repeated uploads"))
             st.metrics = self.quality.summary()
 
         with tel.stage("rules_trial", rows_in=len(self.model.trials)) as st:
@@ -214,51 +345,82 @@ class DataEngine:
         self.run_path = tel.save(runs_dir, {"diagnostics": self.diagnostics,
                                             "quality": self.quality.summary()}) if self.save_runs else None
 
-    # Primary key per source, used to reconcile document tables with exports.
+    # Primary key per source, used to reconcile uploaded tables with exports.
+    # lab_observations has no single-column key (several rows per material): exact duplicates are
+    # removed instead.
     _SOURCE_KEYS = {"genomics": "MATERIAL_GUID", "germplasm": "MATERIAL_GUID", "trial": "TRIAL_GUID",
                     "trial_recommendations": "TRIAL_GUID", "operations": "OPERATION_GUID",
                     "observations": "OBSERVATION_UUID"}
 
-    def _merge_sources(self, by_source: dict[str, list]) -> dict[str, pd.DataFrame]:
-        """Concatenate tables per source; exports (system of record) win over document tables.
+    @staticmethod
+    def _is_upload(table: ingest.RawTable) -> bool:
+        """Anything that did not come from the export directory: document tables and posted records."""
+        return bool(table.meta.get("from_document") or table.meta.get("uploaded"))
 
-        A document row whose key already exists in an export is not merged: if its
-        values differ, the difference is recorded as a conflict (evidence), never
-        applied. Document rows with new keys are added (that is new information).
+    @staticmethod
+    def _same(a: Any, b: Any) -> bool:
+        """Equality of two cells after canonicalisation (see _canonical_value)."""
+        ca, cb = _canonical_value(a), _canonical_value(b)
+        if isinstance(ca, float) and isinstance(cb, float):
+            return bool(np.isclose(ca, cb))
+        return ca == cb
+
+    def _merge_sources(self, by_source: dict[str, list]) -> dict[str, pd.DataFrame]:
+        """Concatenate tables per source with the system of record always winning.
+
+        Exports (files in the data directory) are authoritative. Uploaded rows (document tables
+        and POST /ingest/records) are reconciled against everything already accepted, in arrival
+        order, so the result does not depend on how often a file is uploaded:
+
+          * key already present, same values  -> exact duplicate, ignored (idempotent re-upload)
+          * key already present, other values -> conflict: recorded and shown, never applied
+          * new key                           -> added (that is new information)
+
+        For sources without a single-column key, exact duplicate rows are dropped.
+        Per-table counts are kept in self.merge_stats for the ingest response.
         """
         self.document_conflicts: list[dict] = []
+        self.merge_stats: dict[str, dict[str, int]] = {}
         merged: dict[str, pd.DataFrame] = {}
         for source, items in by_source.items():
-            exports = [f for t, f in items if not t.meta.get("from_document")]
-            docs = [(t, f) for t, f in items if t.meta.get("from_document")]
+            exports = [f for t, f in items if not self._is_upload(t)]
             base = pd.concat(exports, ignore_index=True) if exports else pd.DataFrame()
             key = self._SOURCE_KEYS.get(source)
-            extra = []
-            for t, f in docs:
-                if key is None or key not in f.columns or base.empty or key not in base.columns:
-                    extra.append(f)
-                    continue
-                known = f[key].isin(set(base[key]))
-                for _, row in f[known].iterrows():
-                    ref = base.loc[base[key] == row[key]].iloc[0]
-                    diffs = {}
-                    for c in f.columns:
-                        if c == key or c not in base.columns or pd.isna(row[c]):
-                            continue
-                        a, b = ref[c], row[c]
-                        try:
-                            same = np.isclose(float(a), float(b))
-                        except (TypeError, ValueError):
-                            same = str(a) == str(b)
-                        if not same:
-                            diffs[c] = {"export": a, "document": b}
-                    if diffs:
-                        self.document_conflicts.append({"source": source, "key": row[key], "document": t.name,
-                                                        "differences": jsonable(diffs)})
-                extra.append(f[~known])
-            frames = ([base] if not base.empty else []) + [f for f in extra if not f.empty]
-            if frames:
-                merged[source] = pd.concat(frames, ignore_index=True)
+            for t, f in [(t, f) for t, f in items if self._is_upload(t)]:
+                stats = {"received": len(f), "added": 0, "duplicates_ignored": 0, "conflicts": 0}
+                if base.empty:
+                    accepted = f.drop_duplicates()
+                    stats["duplicates_ignored"] = len(f) - len(accepted)
+                elif key and key in f.columns and key in base.columns:
+                    index = base.drop_duplicates(key, keep="first").set_index(key)
+                    known = f[key].isin(index.index)
+                    for _, row in f[known].iterrows():
+                        ref = index.loc[row[key]]
+                        diffs = {c: {"export": ref[c], "uploaded": row[c]} for c in f.columns
+                                 if c != key and c in index.columns and pd.notna(row[c]) and not self._same(ref[c], row[c])}
+                        if diffs:
+                            stats["conflicts"] += 1
+                            self.document_conflicts.append({
+                                "source": source, "key": row[key], "table": t.name,
+                                "kind": "document" if t.meta.get("from_document") else "records",
+                                "differences": jsonable(diffs)})
+                        else:
+                            stats["duplicates_ignored"] += 1
+                    accepted = f[~known]
+                else:
+                    # No usable key: drop rows identical (on the shared columns) to rows already accepted.
+                    shared = [c for c in f.columns if c in base.columns]
+                    signature = lambda df: df[shared].apply(lambda col: col.map(_signature_value)).agg("\x1f".join, axis=1)
+                    seen = set(signature(base)) if shared else set()
+                    mask = ~signature(f).isin(seen) if shared else pd.Series(True, index=f.index)
+                    accepted = f[mask].drop_duplicates()
+                    stats["duplicates_ignored"] = len(f) - len(accepted)
+                stats["added"] = len(accepted)
+                self.merge_stats[t.name] = stats
+                if not accepted.empty:
+                    base = pd.concat([base, accepted], ignore_index=True) if not base.empty else accepted.reset_index(drop=True)
+            if not base.empty:
+                merged[source] = base
         return merged
 
     def _build_features(self) -> None:
@@ -375,7 +537,15 @@ class DataEngine:
         reason = d.reason
         if atyp and atyp["atypical"]:
             reason += f"; atypical profile (driven by {atyp['drivers'][0]['feature']})"
+        # Mean yield over the candidate's trials (the UI table shows it). Read from the feature table,
+        # i.e. computed once by the engine; None when the candidate has no trial with a yield.
+        mean_yield = None
+        i = self._index.get(cid)
+        if i is not None and "MEAN_YIELD_T_HA" in self.features.columns:
+            v = self.features.at[i, "MEAN_YIELD_T_HA"]
+            mean_yield = None if pd.isna(v) else round(float(v), 2)
         return {"candidate_id": cid, **eff, "verdict": d.verdict, "reason": reason,
+                "mean_yield_t_ha": mean_yield,
                 "n_trials": d.extras.get("n_trials"), "n_fail": d.extras.get("n_fail"),
                 "ambiguous_trials": ambiguous, "atypical": bool(atyp and atyp["atypical"]),
                 "rule_version": d.rule_version}
@@ -616,6 +786,7 @@ class DataEngine:
         cols = sum(len(t.profile.columns) for t in self.tables)
         kept = sum(len(t.profile.kept) for t in self.tables)
         return jsonable({"tables": tables, "parallel_plan": self.parallel_plan,
+                         "documents_rejected_as_irrelevant": self.rejected_documents,
                          "totals": {"columns": cols, "informative_columns": kept,
                                     "tokens_raw": raw, "tokens_renormalized": ren,
                                     "token_reduction": round(1 - ren / raw, 4) if raw else None},

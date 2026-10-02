@@ -15,6 +15,9 @@ function mockIngestion(files) {
     accepted: true,
     source: MOCK_SOURCE,
     rows: null,
+    rows_added: null,
+    duplicates_ignored: null,
+    conflicts: null,
     message: MOCK_INGESTION_MESSAGE,
   }));
 }
