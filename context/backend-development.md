@@ -81,8 +81,10 @@ Variable names (values only in `.env`, never committed): `PORT`, `CORS_ORIGIN`, 
 
 ### Live vs mock gaps (Step 9)
 
-- `analysis.service.js` in **live** mode still returns `LLM_UNAVAILABLE` ("Live analysis is not
-  implemented yet"). Ingest + `explainAll` are implemented but not wired to `POST /api/chats/:id/messages`.
+- Live upload is wired. A message with files ingests tables and documents, then `explainAll` (at most
+  `EXPLAIN_MAX_SYNC` new explanations, RED then AMBER then GREEN). The summary counts engine colours.
+  `usage` and `versions` are saved. Unchanged `evidence_hash` reuses a verified Claude justification.
+- A live message with **no files** still returns `LLM_UNAVAILABLE`. That is Step 9B.
 - `PATCH /api/candidates/:id` and `POST /api/candidates/:id/decision` validate input then **501** (ticket 3).
 
 ### What the frontend expects
@@ -108,6 +110,10 @@ Unchanged ownership: FastAPI on port 8001, contracts in `services/data-engine/do
 ## Testing expectations
 
 - `npm test -w apps/intersbackend` — `node:test`, mock Anthropic and engine, no network.
+- Manual smokes (not in CI). Engine on port 8001 and `ANALYSIS_MODE=live` in `apps/intersbackend/.env`.
+  Neither command prints the API key, the prompt, or the file contents.
+  - `npm run ingest:smoke -w apps/intersbackend -- path/to/file.csv` prints accepted, source, rows and ids.
+  - `npm run claude:smoke -w apps/intersbackend` runs `explainAll`. Optional: `SMOKE_BREEDER_TEXT`.
 - Fixture `test/fixtures/lab-report.pdf` for manual document checks with the engine (not read by automated tests).
 - Data engine: `pytest -q` in `services/data-engine` (see `context/quality-assurance.md`).
 

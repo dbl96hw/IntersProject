@@ -11,10 +11,12 @@ import { createChatsRouter } from './routes/chats.routes.js';
 import { createEngineRouter } from './routes/engine.routes.js';
 import { createHealthRouter } from './routes/health.js';
 import { createRootRouter } from './routes/root.js';
+import { createClaudeClient } from './llm/claude.client.js';
 import { createAnalysisService } from './services/analysis.service.js';
 import { createCandidatesService } from './services/candidates.service.js';
 import { createChatsService } from './services/chats.service.js';
 import { createDataEngineClient } from './services/dataEngineClient.js';
+import { createIngestService } from './services/ingest.service.js';
 import { createEngineService } from './services/engine.service.js';
 import { createMemoryFileStorage, createSupabaseFileStorage } from './services/fileStorage.js';
 
@@ -24,14 +26,30 @@ function createDefaultFileStorage(config) {
     : createMemoryFileStorage();
 }
 
-export function createApp({ config = defaultConfig, dataEngineClient, db = defaultDb, fileStorage } = {}) {
+export function createApp({
+  config = defaultConfig, dataEngineClient, claude, db = defaultDb, fileStorage,
+} = {}) {
   const engineClient = dataEngineClient ?? createDataEngineClient({
     baseUrl: config.dataEngineUrl,
     timeoutMs: config.dataEngineTimeoutMs,
     ingestTimeoutMs: config.dataEngineIngestTimeoutMs,
   });
+  const claudeClient = claude !== undefined
+    ? claude
+    : (config.analysisMode === ANALYSIS_MODES.LIVE ? createClaudeClient({
+      apiKey: config.anthropicApiKey,
+      model: config.anthropicModel,
+      batchSize: config.batchSize,
+      maxParallelBatches: config.maxParallelBatches,
+    }) : null);
 
-  const analysisService = createAnalysisService({ config });
+  const analysisService = createAnalysisService({
+    config,
+    ingest: createIngestService({ dataEngine: engineClient }),
+    claude: claudeClient,
+    dataEngine: engineClient,
+    db,
+  });
   const chatsService = createChatsService({
     db,
     fileStorage: fileStorage ?? createDefaultFileStorage(config),

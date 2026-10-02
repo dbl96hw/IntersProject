@@ -137,5 +137,5 @@ These come from the use case's non-negotiable constraints and are enforced in co
   single dataset from its data directory plus uploaded documents.
 - Unknown: whether breeder corrections should feed the rules (and so change `engine_colour`) or stay as
   annotations; needs the SME.
-- Unknown: a component inventory at `gendd/architecture/components.md` (referenced by the Definition
-  of Ready) does not exist yet; `/gendd:gendd-brownfield` is expected to produce it.
+- A short component note lives at `gendd/architecture/components.md` (Express gateway). The rest of
+  the inventory is still for `/gendd:gendd-brownfield`.

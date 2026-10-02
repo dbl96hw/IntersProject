@@ -64,13 +64,14 @@ function fakeEngine({ reject = () => false, trialMaterialColumns = ['TRIAL_GUID'
   };
 }
 
-test('a corrupt spreadsheet gives only a warning', async () => {
+test('a corrupt spreadsheet warns and is not accepted', async () => {
   const engine = fakeEngine();
   const corrupt = { name: 'broken.xlsx', buffer: Buffer.concat([Buffer.from('PK\u0003\u0004'), Buffer.alloc(64, 7)]) };
 
   const result = await createIngestService({ dataEngine: engine }).ingestFiles([corrupt]);
 
-  assert.deepEqual(result.ingestion, []);
+  assert.equal(result.ingestion[0].accepted, false);
+  assert.equal(result.ingestion[0].file, 'broken.xlsx');
   assert.deepEqual(result.warnings.map((item) => item.code), ['EXTRACTION_FAILED']);
   assert.equal(result.warnings[0].file, 'broken.xlsx');
   assert.equal(engine.calls.ingest.length, 0);
@@ -173,41 +174,40 @@ test('without the trial_material link columns no join runs and a warning explain
   assert.ok(engine.calls.sql.every((query) => !query.includes('JOIN')));
 });
 
-test('document records get their GUIDs from the engine and unresolved records are omitted', async () => {
+test('a PDF is sent only as a document and never as extracted records', async () => {
   const engine = fakeEngine();
-  const claudeExtract = async () => [{
-    source: 'genomics',
-    records: [
-      { MATERIAL_ID: 'SYN-MZ-00001', GENOMIC_BREEDING_VALUE: 104.2 },
-      { MATERIAL_ID: 'SYN-MZ-07777', GENOMIC_BREEDING_VALUE: 99.1 },
-      { MATERIAL_ID: "x'; DROP", GENOMIC_BREEDING_VALUE: 98 },
-    ],
-  }];
   const pdf = { name: 'lab-report.pdf', buffer: Buffer.from('%PDF-1.4 fake') };
 
-  const result = await createIngestService({ dataEngine: engine, claudeExtract }).ingestFiles([pdf]);
-  const unresolved = result.warnings.find((item) => item.code === 'UNRESOLVED_IDS');
+  const result = await createIngestService({ dataEngine: engine }).ingestFiles([pdf]);
 
-  assert.equal(engine.calls.ingest.length, 1);
-  assert.equal(engine.calls.ingest[0].label, 'lab-report.pdf#genomics');
-  assert.deepEqual(engine.calls.ingest[0].records, [{ MATERIAL_ID: 'SYN-MZ-00001', GENOMIC_BREEDING_VALUE: 104.2, MATERIAL_GUID: GUID_A }]);
-  assert.ok(engine.calls.sql.every((query) => !query.includes('DROP')));
-  assert.match(unresolved.message, /2 record\(s\) from "lab-report.pdf" were omitted/);
-  assert.match(unresolved.message, /SYN-MZ-07777/);
   assert.deepEqual(engine.calls.upload, ['lab-report.pdf']);
-  assert.equal(result.ingestion[0].kind, 'document');
-  assert.deepEqual(result.touchedCandidateIds, ['SYN-MZ-00001']);
+  assert.equal(engine.calls.ingest.length, 0);
+  assert.equal(engine.calls.sql.length, 0);
+  assert.deepEqual(result.ingestion, [{
+    file: 'lab-report.pdf', kind: 'document', accepted: true, source: null, rows: null, message: null,
+  }]);
+  assert.deepEqual(result.touchedCandidateIds, []);
+  assert.deepEqual(result.warnings, []);
 });
 
-test('when Claude finds no records a warning is added and nothing is sent as records', async () => {
+test('a document the engine rejects is a warning and does not fail the other file', async () => {
   const engine = fakeEngine();
+  engine.uploadDocument = async (filename) => {
+    engine.calls.upload.push(filename);
+    throw new DataEngineError(400, { code: 'VALIDATION_ERROR', message: 'content_base64 is not valid base64' });
+  };
 
-  const result = await createIngestService({ dataEngine: engine, claudeExtract: async () => [] })
-    .ingestFiles([{ name: 'photo.png', buffer: Buffer.from('fake png') }]);
+  const result = await createIngestService({ dataEngine: engine }).ingestFiles([
+    { name: 'photo.png', buffer: Buffer.from('fake png') },
+    csvFile('germplasm.csv', `MATERIAL_GUID,MATERIAL_ID,PEDIGREE\n${GUID_A},SYN-MZ-00001,A/B\n`),
+  ]);
 
-  assert.deepEqual(result.warnings.map((item) => item.code), ['NO_RECORDS_EXTRACTED']);
-  assert.equal(engine.calls.ingest.length, 0);
-  assert.deepEqual(engine.calls.upload, ['photo.png']);
+  assert.equal(result.ingestion[0].accepted, false);
+  assert.equal(result.ingestion[0].file, 'photo.png');
+  assert.equal(result.warnings[0].code, 'DOCUMENT_UPLOAD_FAILED');
+  assert.equal(result.warnings[0].file, 'photo.png');
+  assert.equal(result.ingestion[1].accepted, true);
+  assert.deepEqual(result.touchedCandidateIds, ['SYN-MZ-00001']);
 });
 
 test('two concurrent ingestFiles calls never interleave their engine calls', async () => {

@@ -173,6 +173,8 @@ Totals for every Claude call made for this message. All zeros in mock mode.
 
 `file` is the file name when the warning is about one file, otherwise `null`.
 
+`EXPLANATION_DEFERRED` (`file` null) means more than 30 candidates needed a new explanation. The rest keep the engine `reason` as `justification`, with `justification_source` `"engine"`, `verified` false and `confidence` null. A reused explanation does not use one of those 30 slots.
+
 ### Tool call
 
 One per engine tool Claude used to answer a question. `name` is the engine's tool name (`query_candidates`, `get_candidate_context`, ...).
@@ -219,6 +221,8 @@ Assistant message:
   "versions": { /* Versions */ }
 }
 ```
+
+`summary` is built by the backend from the engine colour counts (`N candidates analysed: X green, Y amber, Z red.`). Claude's summary is not copied into this field.
 
 `answer`:
 
