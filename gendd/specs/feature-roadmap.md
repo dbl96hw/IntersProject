@@ -60,7 +60,7 @@ flowchart LR
 | Phase | Features | Status |
 |---|---|---|
 | 0. Foundations | F0.1 - F0.5 | done |
-| 1. Demo critical path | F1.1 - F1.5 | in progress (Express gateway in mock + partial live; UI on mocks) |
+| 1. Demo critical path | F1.1 - F1.5 | in progress (Express gateway in mock + partial live; UI on mocks; F1.4 deferred after the freeze) |
 | 2. Natural-language assistant | F2.1 | in progress (Claude justification layer; chat agent pending) |
 | 3. Demo readiness gate | F3.1 | not started |
 | 4. Trust and data enrichment | F4.1 - F4.4 | in progress (F4.2 has mock upload UI) |
@@ -162,7 +162,7 @@ Phase 4 feature, re-run the F3.1 checklist.
 - Checklist:
   - [x] Workspace shell: sidebar with "New dashboard", recent dashboards and user badge
   - [x] Welcome screen with drag-and-drop / browse upload, accepted file types and file chips (no file leaves the browser)
-  - [x] Dashboard with one table per colour (Approved / Conditional / Not approved), counts and empty states
+  - [x] Dashboard with one table per colour (Strong candidate / Needs review / Concerns: suggestions, never "approved" or "rejected"), counts and empty states
   - [x] Client-side search (id, crop, justification) and status filter chips with live counts
   - [x] Expandable rows, right-click context menu and an edit modal with status change, override reason and comment
   - [x] Floating chat widget (open, minimize, close, history, typing indicator) with mock replies
@@ -210,7 +210,7 @@ Phase 4 feature, re-run the F3.1 checklist.
 - Checklist:
   - [x] Colour-grouped tables, search, status chips, counts and empty states (F0.5)
   - [ ] Replace `RECENT_DASHBOARDS` / `createMockDashboard` with `GET /api/candidates`, with visible loading and error states
-  - [ ] Align columns with the contract: the engine row has no `crop` or `mean_yield_t_ha`. Either the engine exposes `mean_yield_t_ha` (from its `MEAN_YIELD_T_HA` feature) and a crop label, or the UI drops those columns. The mock data has only `CROP_GUID`, no crop name
+  - [ ] Align columns with the contract. The engine row now has `mean_yield_t_ha` (the mean of the candidate's trials). To show it, Express must add it to `ENGINE_CANDIDATE_FIELDS` and the `candidates` table needs the column (a migration). There is still no `crop`: the mock data has only `CROP_GUID`, so the UI should drop that column or show the GUID
   - [ ] Show the `ambiguous_trials` and `atypical` flags on each row
   - [ ] Decide the section order with the team (the UI shows green first; the engine sorts red first for "what to look at first")
   - [ ] Decide how "Create dashboard" and "Recent dashboards" map to the engine, which holds one dataset (for example, one dashboard = the current engine dataset, or a saved filter)
@@ -238,7 +238,7 @@ Phase 4 feature, re-run the F3.1 checklist.
 - Done when: for a flagged candidate, the breeder can read a one-line explanation and the evidence behind it.
 
 ### F1.4 Breeder data corrections (engine and Express)
-- Status: not started
+- Status: deferred (out of scope after the code freeze of 2026-10-01; overrides with a reason and comment cover the demo)
 - Priority: 4 of 5 in Phase 1
 - Depends on: F1.1
 - Goal: When the breeder knows a value is wrong (crop, mean yield, justification text), they can correct
@@ -358,6 +358,8 @@ Phase 4 feature, re-run the F3.1 checklist.
   `/documents/base64` — not wired to live analysis yet), engine `POST /ingest/records`, `GET /search`.
 - Checklist:
   - [x] Drag-and-drop / browse upload with accepted types matching the engine's formats and removable file chips (F0.5)
+  - [x] Relevance gate: off-topic documents are refused before Claude reads them (engine `POST /relevance`, used by the Express ingest service), with an `IRRELEVANT_FILE` warning
+  - [x] Uploads never overwrite the exports: identical rows are ignored, contradicting rows are counted as `conflicts` and shown (`UPLOAD_CONFLICTS` warning, engine quality report)
   - [ ] Send each file through `POST /api/chats/:id/messages` (multipart) with a size limit shown to the user
   - [ ] Show the ingestion result per file: accepted source and rows, or rejected with the best-guess detection
   - [ ] Triage and evidence card refresh after an accepted upload; document evidence appears on the card
