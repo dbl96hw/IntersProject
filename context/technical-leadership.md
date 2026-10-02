@@ -63,16 +63,16 @@ conventions, documented in `services/data-engine/README.md` and `services/data-e
 
 ## Testing expectations
 
-- See `context/quality-assurance.md`. Summary: only the Python data engine has tests (pytest); the
-  JavaScript apps have none; continuous integration runs lint only.
+- See `context/quality-assurance.md`. Summary: pytest (engine) and `node:test` (backend, 110 tests);
+  frontend still has no tests; **CI runs lint only**.
 
 ## Danger zones
 
 - The lint check is the only automated gate, so a pull request can break the data engine's tests
   without failing continuous integration. Reviewers must run `pytest -q` in `services/data-engine`
   for any change under `services/`.
-- Large AI-generated pull requests: commit `5cad388` added about 10,700 lines in one change. Review
-  them against the contracts and invariants in `context/architecture.md`, not line by line.
+- Large AI-generated pull requests: review backend PRs #10–#12 and Step 8 against `docs/api-contract.md`,
+  `services/data-engine/docs/CONTRACTS.md`, and rule `65-breeders-desk-backend.mdc`, not line by line.
 - Scope creep versus the guardrails: the data engine already includes optional C++, Julia, OCR, MCP
   and DuckDB back-ends. Adding more technology conflicts with `.cursor/rules/30-learning-and-safety.mdc`
   unless a mentor agrees.

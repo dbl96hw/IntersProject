@@ -7,65 +7,44 @@
 
 ## Signals
 
-- Secrets handling rules: `.cursor/rules/30-learning-and-safety.mdc`, `.cursor/rules/60-express-api.mdc`.
-- CORS configuration in `apps/intersbackend/src/index.js` and
-  `services/data-engine/src/data_engine/api.py`.
-- File upload and SQL endpoints in `services/data-engine/src/data_engine/api.py`.
-- Planned third-party API key (`ANTHROPIC_API_KEY`) in `services/data-engine/clients/node/agentLoop.example.js`.
-- No authentication, authorisation, or security scanning exists; confidence is LOW.
+- `apps/intersbackend/src/config/env.js` — validates env; live mode requires API and Supabase keys.
+- `apps/intersbackend/.env.example` — documents variable names only.
+- `supabase/migrations/001_init.sql` — RLS enabled on tables with **no policies** (service role only).
+- `apps/intersbackend/src/middleware/upload.js` — `MAX_FILE_MB`, `MAX_FILES`.
+- `apps/intersbackend/src/llm/claude.client.js` — API error logging redacts key substring; no prompt/body logs.
+- No authentication on Express or engine; confidence remains LOW.
 
 ## What lives here
 
-- Directories: no dedicated security code; concerns are spread across the files below.
-- Entry points:
-  - `apps/intersbackend/src/index.js` - CORS restricted to `CORS_ORIGIN` (default
-    `http://localhost:5173`).
-  - `services/data-engine/src/data_engine/api.py`:
-    - `CORSMiddleware(allow_origins=["*"])` - any origin can call the engine.
-    - `POST /sql` - read-only by string check (one statement starting with `SELECT` / `WITH`),
-      executed on an in-memory DuckDB connection (`engine.py` `sql`).
-    - `POST /documents`, `POST /documents/base64` - untrusted files written to a temporary directory
-      and parsed (PDF, Office, HTML, images).
-    - `POST /overrides` - records `user` from the request body (default `"breeder"`); no identity check.
-    - Unexpected errors return `INTERNAL_ERROR` without a stack trace; the trace is logged server-side.
-  - `services/data-engine/src/data_engine/audit.py` - append-only JSON-Lines override log.
+- **Express:** CORS to `CORS_ORIGIN`; JSON limit 25mb; multer upload limits. No auth middleware.
+  Breeder `user` on reviews/overrides is client-supplied text.
+- **Secrets:** `ANTHROPIC_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY` server-side only. Never in frontend
+  (`VITE_*` is public). **Rotate keys before the demo** if they were used in shared environments.
+- **Supabase:** Service role bypasses RLS; only backend uses it. Storage bucket for uploads.
+- **Data engine:** Open CORS locally; unauthenticated overrides; document parsing on untrusted uploads;
+  read-only SQL on in-memory DuckDB. Must stay behind Express in deployment.
+- **Logging:** Do not log secrets, prompts, or file contents. Claude logs model/tool/tokens/cost only.
 
 ## Conventions in force
 
-- Never commit `.env` files, passwords, tokens or API keys: `.cursor/rules/30-learning-and-safety.mdc`;
-  `.env` and `.env.local` are gitignored (root `.gitignore`).
-- Never log passwords or tokens; config from `process.env`: `.cursor/rules/60-express-api.mdc`.
-- No stack traces in API responses: `.cursor/rules/70-api-contract.mdc`,
-  `services/data-engine/docs/CONTRACTS.md` ("Errors").
-- Security findings at Medium or above block the Definition of Done (`gendd/config.md`).
-- Mock data only: every row is synthetic (`data/synthetic/uc4/README.md`); no live research system
-  may be connected (`gendd/specs/uc4-use-case.md`).
+- Never commit `.env`: `.cursor/rules/30-learning-and-safety.mdc`.
+- Team error shape without stack traces in responses.
+- DoD security bar Medium (`gendd/config.md`).
 
 ## Testing expectations
 
-- No security tests or scanners. See `context/quality-assurance.md`.
+- No dedicated security test suite. See `context/quality-assurance.md`.
 
 ## Danger zones
 
-- The data engine is unauthenticated and accepts any origin. Expose it only to the Express backend,
-  never directly to the internet.
-- Override records trust the `user` field sent by the client, so the audit log cannot prove who
-  overrode a colour.
-- Document parsing runs third-party parsers on untrusted input (PDF, DOCX, PPTX, HTML). The data
-  engine sets no upload size limit; the only bound is the `express.json({ limit: '25mb' })` that
-  `services/data-engine/docs/INTEGRATION.md` recommends for Express.
-- `POST /sql` must stay on an in-memory connection; pointing it at a persistent database would turn the
-  prefix check into the only barrier.
-- `ANTHROPIC_API_KEY` must live in `.env` / the hosting secret store only, never in frontend code
-  (anything under `VITE_*` is shipped to the browser).
-- `npm ci` reported 4 known vulnerabilities (3 moderate, 1 high) in dependencies on 2026-09-29; with a
-  Medium severity bar these block the Definition of Done until triaged (`npm audit`).
+- Exposing port 8001 (engine) or Supabase service role to the browser.
+- Trusting `user` on override/review payloads for audit proof.
+- Document bombs / oversized uploads — limits exist but are not pen-tested.
+- `npm audit` triage still open for demo gate (F3.1).
 
 ## Unknowns
 
-- Unknown: whether breeder authentication is required for the demo, and how `user` on overrides will
-  be identified.
-- Unknown: the allowed origins for the data engine outside local development.
-- Unknown: which security scanning (for example `npm audit`, `pip-audit`, GitHub Dependabot) the team
-  will run, and where.
-- Unknown: data-handling requirements from Syngenta beyond "mock data only".
+- Unknown: breeder authentication for demo vs post-hackathon.
+- Unknown: allowed origins for engine in staging/production.
+- Unknown: Syngenta data-handling requirements beyond mock-only data.
+- Unknown: automated dependency scanning in CI.

@@ -7,10 +7,11 @@
 
 ## Signals
 
-- `apps/intersbackend/package.json` depends on `express` 4; entry `apps/intersbackend/src/index.js`.
-- `services/data-engine/pyproject.toml` (FastAPI, uvicorn, pandas, NumPy) and
-  `services/data-engine/src/data_engine/api.py` (REST endpoints).
-- `.cursor/rules/60-express-api.mdc` and `70-api-contract.mdc` target `apps/intersbackend/**`.
+- `apps/intersbackend/package.json`: Express 4, `@anthropic-ai/sdk`, `@supabase/supabase-js`, `multer`,
+  `xlsx`, `mammoth`, `zod`; entry `src/index.js` → `createApp()` in `src/app.js`.
+- `docs/api-contract.md` — frontend API; paths in `apps/intersbackend/src/constants/paths.js`.
+- `services/data-engine/docs/CONTRACTS.md` — engine payloads (numbers and colours).
+- `.cursor/rules/65-breeders-desk-backend.mdc` — product and architecture guardrails for this app.
 
 ## What lives here
 
@@ -18,110 +19,111 @@ Two back-end components with different languages and owners.
 
 ### Express API (`apps/intersbackend`)
 
-- Directories: `apps/intersbackend/src/` (`index.js`), `apps/intersbackend/src/constants/`
-  (`paths.js` with `HEALTH_PATH`, re-exported from `index.js`).
-- Entry points: `apps/intersbackend/src/index.js`. Run `npm run dev:backend` from the root
-  (http://localhost:3000, `node --watch`).
-- Current routes: `GET /` (`{status, service, env}`), `GET /health` (`{healthy: true}`).
-- CORS is hand-written middleware allowing `CORS_ORIGIN` (default `http://localhost:5173`).
-- Configuration: `PORT` (`apps/intersbackend/.env.example`), `CORS_ORIGIN`, `NODE_ENV`.
-- Planned (drop-in examples, not wired yet) from `services/data-engine/clients/node/`:
-  - `constants.js` -> `apps/intersbackend/src/constants/` (`DATA_ENGINE_URL`, `DATA_ENGINE_PATHS`,
-    `MAX_TOOL_ROUNDS = 6`, `DATA_ENGINE_TIMEOUT_MS = 30000`).
-  - `dataEngineClient.js` -> `apps/intersbackend/src/services/`.
-  - `breederRoutes.example.js` -> `apps/intersbackend/src/routes/`, mounted at `/api/breeder` with
-    `express.json({ limit: '25mb' })`.
-  - `agentLoop.example.js` - Claude tool-use loop with `@anthropic-ai/sdk` (not a dependency yet);
-    needs `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `DATA_ENGINE_URL`.
-  - Step-by-step: `services/data-engine/docs/INTEGRATION.md` section 2.
+- **Layout:** `src/app.js` wires routes, services, db and middleware. `src/config/env.js` validates
+  environment variables with zod. `src/routes/` — chats, candidates, engine, health, root. `src/services/` —
+  `dataEngineClient`, `analysis`, `chats`, `candidates`, `engine`, `ingest`, `fileStorage`, `responses`.
+  `src/db/` — Supabase repositories plus in-memory store (chosen by `ANALYSIS_MODE`). Schema:
+  `supabase/migrations/001_init.sql`. `src/middleware/` — cors, upload (multer), errorHandler, notFound.
+  `src/constants/`, `src/mocks/`, `src/extractors/` (tables, docx, media for ingest). `src/llm/` —
+  Claude client, tools, evidence check. `src/prompts/` — `explanation.v1.md`, `loadPrompt`,
+  `getPromptVersions`.
+- **Run:** `npm run dev:backend` from the repo root (http://localhost:3000, `node --watch`).
+- **API surface:** Documented in `docs/api-contract.md` (`/api/chats`, `/api/candidates`,
+  `/api/engine/*`, multipart messages, `GET /health` with `mode` and `engine` status). Not the old
+  `/api/breeder/*` example router.
 
-### What the frontend now expects (from the mock UI in PR #7)
+### Modes and environment
 
-The workspace UI in `apps/intersfrontend` is built on mock rows (`src/mocks/dashboards.js`) and expects
-more than the engine returns today:
+| Mode | Behaviour |
+|---|---|
+| `ANALYSIS_MODE=mock` (default) | In-memory db, canned analysis/answer samples, no Claude, Supabase or engine required. |
+| `ANALYSIS_MODE=live` | Requires `DATA_ENGINE_URL`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`. Real engine, Claude and Postgres/Storage. |
 
-- Candidate row fields `crop` and `mean_yield_t_ha`. The engine's row has neither; `MEAN_YIELD_T_HA`
-  exists only as an engine feature, and the data has `CROP_GUID` but no crop name
-  (`gendd/specs/feature-roadmap.md`, F1.2).
-- Breeder corrections: the edit modal changes crop, mean yield and justification. This is an accepted
-  product decision and needs a new engine capability (roadmap F1.4). It is planned, not implemented:
-  - An append-only corrections log following the `audit.py` pattern.
-  - `POST /corrections` and `GET /corrections` in `api.py`.
-  - A `corrected` flag, plus original and corrected values, on the candidate row and profile.
-  - Express forwarding under `/api/breeder/corrections`.
-  - Corrections do not change `engine_colour`.
+Variable names (values only in `.env`, never committed): `PORT`, `CORS_ORIGIN`, `ANALYSIS_MODE`,
+`DATA_ENGINE_URL`, `DATA_ENGINE_TIMEOUT_MS`, `DATA_ENGINE_INGEST_TIMEOUT_MS`, `ANTHROPIC_API_KEY`,
+`ANTHROPIC_MODEL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_BUCKET`, `MAX_FILE_MB`,
+`MAX_FILES`, `BATCH_SIZE`, `MAX_PARALLEL_BATCHES`. See `apps/intersbackend/.env.example`.
+
+### npm scripts (backend workspace)
+
+| Script | Purpose |
+|---|---|
+| `test` | `node --test` — 110 tests; Anthropic SDK and engine mocked. |
+| `lint` | ESLint. |
+| `db:smoke` | Live Supabase round-trip (ids only in output). |
+| `ingest:smoke` | Extract a CSV/XLSX and send records to the engine. |
+| `claude:smoke` | Live: colour-mixed sample, `explainAll`, warnings and REJECTED section (no API key or payloads). Optional `SMOKE_BREEDER_TEXT`. |
+
+### Architecture: who reads documents, who explains
+
+- The **data engine** decides colours, produces evidence, and **reads uploaded documents** (PDF, scans,
+  Office). Tables from spreadsheets go through `POST /ingest/records`.
+- **Claude** does **not** extract tabular data from documents in the product path. It only writes
+  justifications (`submit_justifications`) and (when wired) answers chat via the engine's tools. It
+  never decides or changes a colour.
+- Optional unused code: `extraction.v1.md`, `submit_records`, `extractRecords` in `src/llm/`.
+
+### Claude layer (`src/llm/`)
+
+- **`tools.js`:** Zod schemas generate JSON tool definitions; `submit_justifications` is used for analysis.
+- **`claude.client.js`:** Forced tool calls, ephemeral system prompt cache, `LLM_MAX_TOKENS` and
+  `LLM_TIMEOUT_MS` in `src/constants/llm.js`. One corrective retry on invalid tool output; one retry on
+  429, 529 and 5xx. Errors: `CLAUDE_OUTPUT_INVALID`, `LLM_UNAVAILABLE` (502). Usage:
+  `input_tokens`, `output_tokens`, `cache_read_tokens`, `cache_write_tokens`, `cost_usd` from
+  `src/constants/pricing.js` (`cost_usd` null for unknown models). Engine fallback when a batch fails
+  (`EXPLANATION_FAILED`) or evidence check fails.
+- **`evidence.check.js`:** Guards (order): `id`, `number`, `number_word`, `cited_value`, `colour`.
+  Corpus: `reason`, `verdict`, `evidence`, `trials`, `similar`, `data_gaps`, `document_mentions`.
+  Warnings: `JUSTIFICATION_UNVERIFIED`, `EXPLANATION_FAILED`, `CLAUDE_NOTE`. Internal `rejected` list
+  for smoke/debug (not in API contract).
+- **`prompts/`:** `explanation.v1.md`; `getPromptVersions({ ruleVersion, model })` →
+  `{ explanation_prompt, rule_version, model }` for `messages.versions`.
+
+### Live vs mock gaps (Step 9)
+
+- `analysis.service.js` in **live** mode still returns `LLM_UNAVAILABLE` ("Live analysis is not
+  implemented yet"). Ingest + `explainAll` are implemented but not wired to `POST /api/chats/:id/messages`.
+- `PATCH /api/candidates/:id` and `POST /api/candidates/:id/decision` validate input then **501** (ticket 3).
+
+### What the frontend expects
+
+The workspace UI (`apps/intersfrontend`) is still on mocks. Target wiring is `docs/api-contract.md`.
+Mock rows add `crop` and `mean_yield_t_ha`, which the engine row does not provide (roadmap F1.2, F1.4).
 
 ### Data engine (`services/data-engine`)
 
-- Directories:
-  - `src/data_engine/` - the package (layers listed in `services/data-engine/README.md`, "Layers").
-  - `src/data_engine/documents/` - document ingestion (native PDF, OCR, Office, HTML; Python, C++,
-    Julia back-ends).
-  - `src/data_engine/accel/` - optional C++ / Julia kNN and document tools (`build.py`).
-  - `config/rules.yaml` (rule versions `SYNTH_V1_RECON_2026-09-30`, `UC4_MATERIAL_V0`, thresholds,
-    weights), `config/sources.yaml` (header signatures per source).
-  - `clients/node/` - Node client and Express examples for the Express owners.
-  - `docs/` - `DESIGN.md`, `CONTRACTS.md`, `INTEGRATION.md`, `FINDINGS.md`.
-  - `.state/` (gitignored) - override log, `runs/*.json`, snapshot, compiled back-ends.
-- Entry points:
-  - REST: `uvicorn data_engine.api:app --port 8001` (interactive docs at `/docs`).
-  - MCP (stdio): `python -m data_engine.mcp_server` (script `data-engine-mcp`).
-  - Evaluation: `python -m data_engine.evaluate` (script `data-engine-eval`).
-  - Library: `DataEngine.from_directory()` in `src/data_engine/engine.py`; agent tools
-    `TOOLS`, `SYSTEM_PROMPT`, `call_tool` in `src/data_engine/agent_tools.py`.
-- Setup: `cd services/data-engine && pip install -r requirements.txt && pip install -e .`
-  (`services/data-engine/README.md`, "Quick start"). Environment variables are listed in the same
-  README ("Environment variables"); paths are resolved in `src/data_engine/settings.py`.
-- Endpoint list and payload shapes: `services/data-engine/docs/CONTRACTS.md`.
+Unchanged ownership: FastAPI on port 8001, contracts in `services/data-engine/docs/CONTRACTS.md`.
+`GET /candidates/{id}/llm-context` builds a compact payload without raw `TRIAL_RECOMMENDATION` columns
+(trials are summarized strings).
 
 ## Conventions in force
 
-- Express: thin routes (validate -> work -> JSON), `express.json()` for bodies, config from
-  `process.env`, keep `/health` working, never log secrets: `.cursor/rules/60-express-api.mdc`.
-- Status codes and error shape `{"error": {"code", "message", "field"}}`, no stack traces in
-  responses: `.cursor/rules/70-api-contract.mdc`. The data engine implements the same contract in
-  `api.py` (`ApiError`, exception handlers) and documents codes in `services/data-engine/docs/CONTRACTS.md`.
-- Constants per app in `apps/intersbackend/src/constants/`: `.cursor/rules/95-shared-constants.mdc`.
+- Express: thin routes, team error shape, constants in `src/constants/`, never log secrets or file
+  contents: `.cursor/rules/60-express-api.mdc`, `70-api-contract.mdc`, `95-shared-constants.mdc`,
+  `65-breeders-desk-backend.mdc`.
+- Engine field names verbatim in API responses; backend only adds fields like `justification`,
+  `justification_source`, `verified`.
 - Lint: `apps/intersbackend/eslint.config.js`.
-- Data engine: rules and thresholds live in `config/*.yaml`, never hard-coded
-  (`src/data_engine/settings.py` docstring); the engine is the only producer of numbers
-  (`services/data-engine/docs/CONTRACTS.md`); the override log is append-only
-  (`src/data_engine/audit.py`).
-- Python style: Unknown: no Python linter or formatter is configured (`pyproject.toml` has none).
 
 ## Testing expectations
 
-- Express: no tests. Data engine: pytest in `services/data-engine/tests/`, including a FastAPI
-  `TestClient` test in `test_engine.py`. See `context/quality-assurance.md`.
+- `npm test -w apps/intersbackend` — `node:test`, mock Anthropic and engine, no network.
+- Fixture `test/fixtures/lab-report.pdf` for manual document checks with the engine (not read by automated tests).
+- Data engine: `pytest -q` in `services/data-engine` (see `context/quality-assurance.md`).
 
 ## Danger zones
 
-- `services/data-engine/config/rules.yaml`: changes every breeder-facing colour; re-run
-  `python -m data_engine.evaluate` and `pytest -q`, and record the new rule version.
-- `services/data-engine/docs/CONTRACTS.md` shapes and `/api/breeder/*` route names: consumed by the UI
-  and agent loop; renaming fields is a breaking change.
-- `src/data_engine/audit.py` and `POST /overrides`: the audit log must stay append-only and must
-  never change `engine_colour`. Do not add an override path to the agent tools (deliberately absent,
-  `services/data-engine/docs/INTEGRATION.md` section 3).
-- Corrections (planned, roadmap F1.4) must stay separate from overrides: overrides change the effective
-  colour, while corrections change displayed values. Both are append-only and never modify the source
-  tables or `engine_colour`. Agent tools must label corrected values as breeder corrections.
-- `src/data_engine/agent_tools.py` `SYSTEM_PROMPT`: rules such as "never change, compute or re-derive
-  a colour" enforce the human-in-the-loop constraint.
-- `POST /sql` (`engine.py` `sql`): read-only is enforced by a string check (single statement starting
-  with `SELECT` or `WITH`) on an in-memory DuckDB connection; do not point it at a persistent database.
-- `express.json({ limit: '25mb' })` and document uploads: large base64 payloads are accepted by design.
-- Heavy synchronous work in Express handlers blocks the event loop (`.cursor/rules/60-express-api.mdc`);
-  delegate computation to the data engine.
+- Weakening evidence guards (`evidence.check.js`) — they are the main defence against invented numbers.
+- Claude `summary` and `CLAUDE_NOTE` strings are **not** evidence-verified.
+- Forced `tool_choice` works on Haiku 4.5; upgrading to Sonnet 5.5+ may need a different tool policy.
+- Keys (`ANTHROPIC_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) server-side only; rotate before demo.
+- Mock mode db is in-memory — data is lost on restart.
+- `services/data-engine/config/rules.yaml` — colour changes need evaluation re-run (engine owner).
 
 ## Unknowns
 
-- Unknown: who owns the Express integration and when the `clients/node/` examples will be wired in.
-- Unknown: whether the `POST /chat` route from `breederRoutes.example.js` is kept as-is for the chat
-  widget, or reshaped to accept the widget's conversation history.
-- Unknown: where a human-readable crop name comes from (only `CROP_GUID` in the data), and whether
-  corrections should feed the rules (needs the SME).
-- Unknown: which Claude model id `ANTHROPIC_MODEL` should use, and who holds the API key.
-- Unknown: Python lint and formatting conventions for `services/data-engine`.
-- Unknown: whether the override log should move from JSON-Lines to a database (`audit.py` mentions a
-  possible Supabase / Postgres adapter).
+- Unknown: exact `EXPLAIN_MAX_SYNC` UX when some candidates get `EXPLANATION_DEFERRED`.
+- Unknown: chat message shape for multi-turn agent history in 9B.
+- Unknown: whether breeder corrections should feed rules (SME); engine corrections log not built (F1.4).
+- Unknown: crop display name source (`CROP_GUID` only in data).
+- Unknown: Python lint/format for `services/data-engine`.

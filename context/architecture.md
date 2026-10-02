@@ -26,7 +26,8 @@ keeps the final call.
   - `.cursor/rules/` - team coding rules for the JavaScript apps.
 - Entry points:
   - Frontend: `apps/intersfrontend/src/main.jsx` -> `App.jsx` -> `pages/Workspace.jsx`.
-  - Backend: `apps/intersbackend/src/index.js` (`GET /`, `GET /health`).
+  - Backend: `apps/intersbackend/src/index.js` → `createApp()`; API under `/api` per `docs/api-contract.md`;
+    `GET /health` reports `mode` and engine reachability.
   - Data engine REST: `services/data-engine/src/data_engine/api.py` (`uvicorn data_engine.api:app --port 8001`).
   - Data engine MCP server (stdio): `services/data-engine/src/data_engine/mcp_server.py`.
   - Data engine library: `DataEngine` in `services/data-engine/src/data_engine/engine.py`.
@@ -49,17 +50,16 @@ flowchart LR
   EngineLib --> State["services/data-engine/.state (override and correction logs, runs, snapshot)"]
 ```
 
-Current state versus target (synced with `dev` on 2026-09-30):
+Current state versus target (synced with `dev` on 2026-10-01, after PR #12):
 
-- Data engine: implemented.
-- Frontend: a full breeder workspace UI (upload, colour-grouped triage tables, edit / override modal,
-  chat widget) exists on mock data only (`apps/intersfrontend/src/mocks/`, PR #7). It makes no API
-  calls.
-- Express: `apps/intersbackend/src/index.js` still exposes only `/` and `/health`. The wiring exists as
-  drop-in examples in `services/data-engine/clients/node/` (`dataEngineClient.js`,
-  `breederRoutes.example.js`, `agentLoop.example.js`, `constants.js`) that have not been copied into
-  `apps/intersbackend` yet.
-- The link between the three is the critical path; see `gendd/specs/feature-roadmap.md`, Phase 1.
+- Data engine: implemented; reads documents and serves llm-context payloads.
+- Frontend: full workspace UI on mock data only (PR #7); no `fetch` to Express yet.
+- Express: gateway implemented — chats, multipart messages, candidates (with engine detail refresh),
+  engine trust passthrough, mock/live modes, Supabase + in-memory db. Claude justification layer
+  (`src/llm/`) is tested and used by `claude:smoke`; **live analysis orchestration** (upload → ingest →
+  explain → persist) is **not wired** yet (Step 9A).
+- Critical path: wire UI to `/api`, then live analysis and chat agent (9A/9B); see
+  `gendd/specs/feature-roadmap.md`.
 
 ### Data engine pipeline
 
@@ -76,8 +76,10 @@ These come from the use case's non-negotiable constraints and are enforced in co
 
 - The deterministic rules decide the colour. Statistics and the LLM only qualify or explain it
   (`services/data-engine/README.md`, "Design rule"; thresholds in `services/data-engine/config/rules.yaml`).
-- The LLM never computes numbers; it quotes `statement` or `value` from engine payloads
-  (`services/data-engine/docs/CONTRACTS.md`; system prompt in `services/data-engine/src/data_engine/agent_tools.py`).
+- The data engine reads uploaded documents; Claude does **not** extract tabular records in the product path.
+- Claude never computes numbers; justifications are checked in Express (`evidence.check.js`) and fall back
+  to the engine reason when unverified. Chat answers (when wired) use engine tools only
+  (`services/data-engine/src/data_engine/agent_tools.py` system prompt).
 - There is no override tool for the agent. Overrides are human-only, via `POST /overrides`, appended
   to a JSON-Lines audit log that never changes `engine_colour`
   (`services/data-engine/src/data_engine/audit.py`, `services/data-engine/docs/INTEGRATION.md` section 3).
@@ -127,10 +129,10 @@ These come from the use case's non-negotiable constraints and are enforced in co
 
 - Unknown: deployment target and hosting for each component (frontend, Express, Python engine) on
   `stg` and `main`.
-- Unknown: which agent host the demo uses: the Claude API loop inside Express
-  (`agentLoop.example.js`), an MCP client, or both.
-- Unknown: whether the Express backend will proxy all engine calls, or the frontend may call the
-  engine directly (the engine allows any origin via `CORSMiddleware(allow_origins=["*"])` in `api.py`).
+- Unknown: whether the demo also shows MCP clients or only the web UI + Express Claude loop (9B).
+- Express is the intended browser-facing API (`docs/api-contract.md`); the engine must not be exposed
+  directly to the internet (open CORS in `api.py` is for local dev only).
+- Unknown: hosting layout on Render (Step 10); engine OCR dependencies (Tesseract/Poppler) for production.
 - Unknown: how the UI's "dashboards" (one per upload in the mock) map to the engine, which builds a
   single dataset from its data directory plus uploaded documents.
 - Unknown: whether breeder corrections should feed the rules (and so change `engine_colour`) or stay as

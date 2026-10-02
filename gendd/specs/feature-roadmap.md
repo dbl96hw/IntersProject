@@ -5,8 +5,12 @@ Phased, priority-ordered list of the features that cover the hackathon use case
 readiness: conversational channels (WhatsApp, voice), authentication hardening, deployment beyond `stg`
 and Cropwise packaging are out of this roadmap.
 
-Last synced with `dev` on 2026-09-30, after PR #7 (`feat/frontend-mock-v1`, commit `ced1454`), which
-replaced the landing page with a mock breeder workspace UI.
+Last synced with `dev` on 2026-10-01, after PR #12 (`feature/backend-live-analysis`, merge `f08e178`).
+Merged on `dev` so far for the backend gateway and Claude layer: PR #9 (API contract and paths), PR #10
+and #11 (`feature/backend-core`: Supabase schema, mock/live routes, ingest service, data engine client),
+PR #12 (Claude client, evidence check, live `claude:smoke`). PR #7 added the mock workspace UI. The
+Step 8 explanation prompt work lives on branch `feature/backend-prompts` (not merged yet). PR #8 does not
+appear in `dev`'s merge history.
 
 ## How to read and use this file
 
@@ -56,8 +60,8 @@ flowchart LR
 | Phase | Features | Status |
 |---|---|---|
 | 0. Foundations | F0.1 - F0.5 | done |
-| 1. Demo critical path | F1.1 - F1.5 | in progress (F1.2 and F1.5 have mock UI) |
-| 2. Natural-language assistant | F2.1 | in progress (mock chat UI) |
+| 1. Demo critical path | F1.1 - F1.5 | in progress (Express gateway in mock + partial live; UI on mocks) |
+| 2. Natural-language assistant | F2.1 | in progress (Claude justification layer; chat agent pending) |
 | 3. Demo readiness gate | F3.1 | not started |
 | 4. Trust and data enrichment | F4.1 - F4.4 | in progress (F4.2 has mock upload UI) |
 
@@ -170,25 +174,28 @@ Phase 4 feature, re-run the F3.1 checklist.
 ## Phase 1 - Demo critical path
 
 ### F1.1 Express to data engine integration
-- Status: not started
+- Status: in progress
 - Priority: 1 of 5 in Phase 1
 - Depends on: F0.4
 - Goal: The frontend can reach all breeder data through the Express backend, with the engine's errors
   and numbers passed through unchanged.
-- Evidence / pointers: `services/data-engine/docs/INTEGRATION.md` section 2,
-  `services/data-engine/clients/node/`, `apps/intersbackend/src/index.js`, `context/backend-development.md`,
-  `agents/backend-dev.md`.
+- Evidence / pointers: `docs/api-contract.md`, `apps/intersbackend/src/app.js`,
+  `apps/intersbackend/src/services/dataEngineClient.js`, `apps/intersbackend/src/constants/paths.js`,
+  `context/backend-development.md`, `agents/backend-dev.md`.
 - Checklist:
-  - [ ] Copy `clients/node/constants.js` into `apps/intersbackend/src/constants/` and `dataEngineClient.js` into `apps/intersbackend/src/services/`
-  - [ ] Mount the breeder router at `/api/breeder` with `express.json({ limit: '25mb' })`: candidates, candidate detail, trial, search, override reasons, overrides, baseline, quality, documents (leave `/chat` for F2.1)
-  - [ ] Add `DATA_ENGINE_URL` to `apps/intersbackend/.env.example` and document running the engine alongside Express
-  - [ ] `GET /health` reports whether the data engine is reachable, keeping `{ healthy: ... }` accurate
-  - [ ] Engine errors forwarded in the team shape; 502 `DATA_ENGINE_UNAVAILABLE` when the engine is down
-  - [ ] Frontend API helper (base URL from `src/constants/api.js`, path constants, `res.ok` check) and a small backend / engine status indicator in the workspace, replacing the removed landing-page check
-  - [ ] Choose a backend test framework with a mentor, record it in `gendd/adr/`, add a `test` script and route tests with a mocked engine client (success, 404 forwarded, engine down)
-  - [ ] `npm run lint` passes
-- Done when: `GET /api/breeder/candidates` on port 3000 returns the engine's triage table and the UI
-  shows whether the backend and engine are reachable.
+  - [x] Data engine client and path constants in `apps/intersbackend` (from `clients/node/`, adapted)
+  - [x] Gateway routes under `/api` per `docs/api-contract.md`: chats, messages (multipart upload),
+    candidates (list + detail with `engine_detail`), engine passthrough (`override-reasons`, `baseline`,
+    `quality`); `express.json({ limit: '25mb' })`
+  - [x] `DATA_ENGINE_URL` and related timeouts in `apps/intersbackend/.env.example`
+  - [x] `GET /health` reports `{ healthy, mode, engine: up|down|skipped }`
+  - [x] Engine errors forwarded in the team shape; 502 `DATA_ENGINE_UNAVAILABLE` when the engine is down
+  - [ ] Frontend API helper (base URL from `src/constants/api.js`, path constants, `res.ok` check) and a
+    backend / engine status indicator in the workspace
+  - [ ] Record backend test choice in `gendd/adr/` (`node:test` is in use with 110 tests and mocked SDK/engine)
+  - [x] `npm run lint` passes
+- Done when: the UI calls `GET /api/candidates` on port 3000 (mock or live) and shows whether the backend
+  and engine are reachable.
 
 ### F1.2 Connect the triage dashboard to the engine
 - Status: in progress (UI built on mocks in F0.5)
@@ -198,11 +205,11 @@ Phase 4 feature, re-run the F3.1 checklist.
   reason, instead of mock rows.
 - Evidence / pointers: `apps/intersfrontend/src/components/DashboardView.jsx`, `TriageSection.jsx`,
   `DashboardFilters.jsx`, `src/pages/Workspace.jsx`, `src/mocks/dashboards.js`,
-  `services/data-engine/docs/CONTRACTS.md` ("Output: candidate row"), engine `query_candidates` in
-  `services/data-engine/src/data_engine/engine.py`.
+  `docs/api-contract.md` (`GET /api/candidates`), `services/data-engine/docs/CONTRACTS.md` ("Output:
+  candidate row").
 - Checklist:
   - [x] Colour-grouped tables, search, status chips, counts and empty states (F0.5)
-  - [ ] Replace `RECENT_DASHBOARDS` / `createMockDashboard` with `GET /api/breeder/candidates`, with visible loading and error states
+  - [ ] Replace `RECENT_DASHBOARDS` / `createMockDashboard` with `GET /api/candidates`, with visible loading and error states
   - [ ] Align columns with the contract: the engine row has no `crop` or `mean_yield_t_ha`. Either the engine exposes `mean_yield_t_ha` (from its `MEAN_YIELD_T_HA` feature) and a crop label, or the UI drops those columns. The mock data has only `CROP_GUID`, no crop name
   - [ ] Show the `ambiguous_trials` and `atypical` flags on each row
   - [ ] Decide the section order with the team (the UI shows green first; the engine sorts red first for "what to look at first")
@@ -218,11 +225,10 @@ Phase 4 feature, re-run the F3.1 checklist.
 - Goal: Opening a candidate shows why it got its colour, with evidence the breeder can check and
   challenge.
 - Evidence / pointers: expanded row in `apps/intersfrontend/src/components/TriageSection.jsx` (today it
-  only un-truncates the row), `services/data-engine/docs/INTEGRATION.md` section 6, `CONTRACTS.md`
-  ("Output: evidence item"), engine `get_candidate_profile` (already returns `lineage`,
-  `document_evidence`, `data_gaps`, `trials`, `similar_candidates`).
+  only un-truncates the row), `docs/api-contract.md` (`GET /api/candidates/:id` returns `engine_detail`),
+  `services/data-engine/docs/CONTRACTS.md` ("Output: evidence item").
 - Checklist:
-  - [ ] Expanding a row (or opening a side panel from it) fetches `GET /api/breeder/candidates/:id`
+  - [ ] Expanding a row (or opening a side panel from it) fetches `GET /api/candidates/:id`
   - [ ] Header with colour, one-line reason, verdict and rule version
   - [ ] Evidence list using `evidence[].statement` exactly as returned (no recomputed numbers)
   - [ ] Trials list with `explained_by_data` and `ambiguous` flags, and data gaps (`data_gaps`) shown as such
@@ -246,7 +252,7 @@ Phase 4 feature, re-run the F3.1 checklist.
   - [ ] `POST /corrections` and `GET /corrections` in `api.py`, with the team error contract
   - [ ] Candidate row and profile expose the corrected value, the original value and a `corrected` flag; `engine_colour` is not changed by a correction
   - [ ] Agent tools and the LLM context label corrected values as breeder corrections, not engine values
-  - [ ] `CONTRACTS.md` documents the new endpoints and fields; Express forwards them under `/api/breeder/corrections`
+  - [ ] `CONTRACTS.md` documents the new endpoints and fields; Express exposes corrections when designed (not mounted yet)
   - [ ] pytest tests: correction logged, original preserved, invalid field rejected, colour unchanged
 - Done when: a breeder correction to a candidate's mean yield is logged and shown next to the original
   value, and the engine's source data is unchanged.
@@ -262,9 +268,9 @@ Phase 4 feature, re-run the F3.1 checklist.
   `services/data-engine/src/data_engine/audit.py`, `CONTRACTS.md` ("Override").
 - Checklist:
   - [x] Edit modal from the row context menu with status change, reason required when the status changes, comment, and an "Overridden" badge (F0.5)
-  - [ ] Load reasons from `GET /api/breeder/override-reasons` instead of the hardcoded `OVERRIDE_REASONS`
+  - [ ] Load reasons from `GET /api/engine/override-reasons` instead of the hardcoded `OVERRIDE_REASONS`
   - [ ] Comment required when the reason is `OTHER` (the engine rejects it otherwise; the UI says "optional")
-  - [ ] Save sends a status change to `POST /api/breeder/overrides` and field edits to `POST /api/breeder/corrections`, showing the `field` from any error response
+  - [ ] Save sends a colour change via `PATCH /api/candidates/:id` (forwards to engine `POST /overrides`) and records reviews in Supabase; field edits per F1.4 when available
   - [ ] Table and card show `engine_colour` next to `colour` when overridden, and original next to corrected values
   - [ ] Real breeder name instead of `MOCK_USER`; override and correction history visible per candidate
   - [ ] Tests: override accepted, `OTHER` without comment rejected, engine colour unchanged, correction shown beside the original
@@ -276,20 +282,21 @@ Phase 4 feature, re-run the F3.1 checklist.
 ## Phase 2 - Natural-language assistant
 
 ### F2.1 Breeder assistant chat
-- Status: in progress (chat widget built on mock replies in F0.5)
+- Status: in progress (chat widget on mocks; Claude justification layer done; chat agent pending)
 - Priority: 1 of 1 in Phase 2
 - Depends on: F1.1 (F1.3 recommended, so answers can link to the evidence card)
 - Goal: The breeder asks questions in their own language ("which lines should I look at first?") and
   gets answers that cite the engine's values and remind them that they decide.
 - Evidence / pointers: `apps/intersfrontend/src/components/ChatWidget.jsx`, `src/mocks/chatReplies.js`,
-  `services/data-engine/clients/node/agentLoop.example.js`, `breederRoutes.example.js` (`/chat`),
+  `apps/intersbackend/src/llm/`, `apps/intersbackend/src/prompts/explanation.v1.md`,
   `services/data-engine/docs/INTEGRATION.md` section 3, `services/data-engine/src/data_engine/agent_tools.py`
-  (`SYSTEM_PROMPT`).
+  (`SYSTEM_PROMPT`), `docs/api-contract.md` (messages on chats).
 - Checklist:
   - [x] Chat widget with open / minimize / close, conversation history, typing state and `data-testid`s (F0.5)
-  - [ ] Add `@anthropic-ai/sdk` to `apps/intersbackend` with mentor approval; `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL` only in `.env` and documented in `.env.example` without values
-  - [ ] Wire the agent loop and `POST /api/breeder/chat` (validates `question`, caps rounds with `MAX_TOOL_ROUNDS`)
-  - [ ] Replace `getMockChatReply` with the chat endpoint, sending the conversation history
+  - [x] `@anthropic-ai/sdk` in `apps/intersbackend`; `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL` in `.env.example` (no values)
+  - [x] Claude client, tool schemas, evidence check and explanation prompt (`submit_justifications` only; documents ingested by the engine)
+  - [ ] Wire chat agent (`agent.service.ask`) through engine tools on `POST /api/chats/:id/messages` (text-only path); cap rounds with `MAX_TOOL_ROUNDS`
+  - [ ] Replace `getMockChatReply` with the live answer path, sending conversation history
   - [ ] Answers render the colour, the one-line reason and the cited evidence, plus the "you decide" reminder from the system prompt
   - [ ] Clear message in the widget when the API key is missing or the engine is unreachable, instead of a crash
   - [ ] No override or colour-changing path through the chat (overrides stay in F1.5)
@@ -328,10 +335,10 @@ Phase 4 feature, re-run the F3.1 checklist.
 - Depends on: F1.1
 - Goal: A sceptical breeder can see how well the rules match the official logic, what the known data
   problems are, and what is still pending SME confirmation.
-- Evidence / pointers: engine `GET /baseline`, `GET /quality`, `services/data-engine/docs/FINDINGS.md`,
-  `services/data-engine/README.md` ("Honest limits").
+- Evidence / pointers: `GET /api/engine/baseline`, `GET /api/engine/quality`, engine passthrough in
+  `apps/intersbackend/src/routes/engine.routes.js`, `services/data-engine/docs/FINDINGS.md`.
 - Checklist:
-  - [ ] Trust view in the workspace (for example a sidebar entry) fetching `GET /api/breeder/baseline` and `GET /api/breeder/quality`
+  - [ ] Trust view in the workspace (for example a sidebar entry) fetching `GET /api/engine/baseline` and `GET /api/engine/quality`
   - [ ] Parity with the official verdicts (72/72) and the rule version in force
   - [ ] Rule weights and root causes of mismatches, in plain language
   - [ ] Data-quality issues with status (fixed, proposed, not fixable) and the open SME questions
@@ -346,15 +353,15 @@ Phase 4 feature, re-run the F3.1 checklist.
 - Goal: The breeder can drop in new files (tables, PDF, scan, DOCX) and find any id or word across
   candidates, reasons and documents.
 - Evidence / pointers: `apps/intersfrontend/src/components/WelcomeView.jsx`, `Workspace.jsx`
-  (`handleSubmitFiles` is a mock), `src/constants/triage.js` (`ACCEPTED_FILE_TYPES`), engine
-  `POST /documents/base64`, `GET /documents`, `POST /ingest/records`, `GET /search`;
-  `services/data-engine/docs/INTEGRATION.md` section 5; `CONTRACTS.md` ("Input 1: files").
+  (`handleSubmitFiles` is a mock), `docs/api-contract.md` (`POST /api/chats/:id/messages` multipart),
+  `apps/intersbackend/src/services/ingest.service.js` (tables via `/ingest/records`; documents via engine
+  `/documents/base64` — not wired to live analysis yet), engine `POST /ingest/records`, `GET /search`.
 - Checklist:
   - [x] Drag-and-drop / browse upload with accepted types matching the engine's formats and removable file chips (F0.5)
-  - [ ] Send each file to `POST /api/breeder/documents` with a size limit shown to the user
+  - [ ] Send each file through `POST /api/chats/:id/messages` (multipart) with a size limit shown to the user
   - [ ] Show the ingestion result per file: accepted source and rows, or rejected with the best-guess detection
   - [ ] Triage and evidence card refresh after an accepted upload; document evidence appears on the card
-  - [ ] Replace the client-side search (id, crop, reason) with, or complement it by, `GET /api/breeder/search` over ids, reasons and document text
+  - [ ] Replace the client-side search (id, crop, reason) with, or complement it by, engine search exposed on Express (not mounted yet)
   - [ ] Search results link to the matching candidate or trial
   - [ ] Loading, error and "no results" states with `data-testid`s, and tests for them
 - Done when: a document uploaded during the demo shows up as evidence on the right candidate.
@@ -368,7 +375,7 @@ Phase 4 feature, re-run the F3.1 checklist.
   agent tool `compare_candidates`, row context menu in `RowContextMenu.jsx` (natural place for
   "Add to comparison").
 - Checklist:
-  - [ ] Add `GET /api/breeder/compare` to Express, forwarding `ids`
+  - [ ] Add compare on Express (engine `GET /compare`), forwarding `ids` — route not in `paths.js` yet
   - [ ] Select two to four candidates from the triage tables
   - [ ] Comparison view with colour, reason and key evidence per candidate, side by side
   - [ ] Same rules as the evidence card: statements quoted as returned, no recomputed numbers
@@ -396,11 +403,53 @@ Phase 4 feature, re-run the F3.1 checklist.
 
 ---
 
+## Backend next steps (Step 9 onward)
+
+Work after the Step 8 explanation prompt branch merges. See `context/backend-development.md` and
+`agents/backend-dev.md` for the current layout.
+
+### 9A — Live upload orchestration
+
+- Wire `analysis.service` in live mode: tables through `ingest.service` → engine `POST /ingest/records`;
+  documents through engine `POST /documents/base64` (no Claude extraction).
+- Reuse explanations when `evidence_hash` unchanged (design in Step 9 story).
+- `EXPLAIN_MAX_SYNC=30`: explain synchronously with priority RED > AMBER > GREEN; defer the rest with
+  warning `EXPLANATION_DEFERRED`.
+- Build the analysis **summary** on the backend from engine data (Claude's summary is advisory only;
+  do not trust unverified counts).
+- Persist `usage` (see Usage in `docs/api-contract.md`) and `versions` via `getPromptVersions`
+  (`explanation_prompt`, `rule_version`, `model`).
+
+### 9B — Chat agent with engine tools
+
+- `agent.service.ask`: Claude loop using engine `GET /tools` and `POST /tools/:name`, max 6 rounds.
+- Answer verification warning `ANSWER_UNVERIFIED_NUMBERS` when numbers are not backed by tool results.
+
+### Ticket 3 — Candidate decisions
+
+- Implement `PATCH /api/candidates/:id` and `POST /api/candidates/:id/decision` (today 501 after validation).
+- Colour changes forward to engine `POST /overrides`; keep `engine_colour` vs effective `colour` visible.
+
+### Step 10 — Demo ops
+
+- `baseline.js`, `warmup.js`, Render deploy, root `README.md` runbook.
+
+### Engine owner backlog (Sebastián)
+
+- Trial status counts in llm-context evidence (reduces `number_word` false rejects when Claude writes "tres ensayos en HOLD").
+- Dedupe in `POST /ingest/records`.
+- In-memory engine state lost on restarts.
+- Docker deploy with Tesseract / Poppler for OCR.
+
+### Claude tooling note
+
+- Forced `tool_choice` for a single tool works on **Haiku 4.5** (`claude-haiku-4-5-20251001`, current default).
+- Sonnet 5.5 and newer may need `tool_choice: auto` plus strict tool schemas (not implemented).
+
 ## Open questions affecting this roadmap
 
-- Unknown: backend, frontend and end-to-end test frameworks (decided inside F1.1, F1.2 and F3.1, each
-  recorded in `gendd/adr/`).
-- Unknown: Claude model id for `ANTHROPIC_MODEL` and who owns the API key (F2.1).
+- Unknown: record `node:test` choice in `gendd/adr/` (backend already uses it; 110 tests, lint-only CI).
+- Unknown: who owns the Anthropic API key long term; current model `claude-haiku-4-5-20251001`.
 - Unknown: whether the demo runs locally or from `stg` (F3.1).
 - Unknown: how "dashboards" in the UI map to the engine, which holds a single dataset (F1.2).
 - Unknown: where a human-readable crop name comes from; the mock data only has `CROP_GUID` (F1.2, F1.4).
