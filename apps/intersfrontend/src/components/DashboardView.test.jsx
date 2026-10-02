@@ -31,7 +31,7 @@ function many(colour, count) {
 }
 
 describe('DashboardView live rows', () => {
-  it('shows red then amber then green, 54, 71 and 25, each with its reason', () => {
+  it('shows green then amber then red, 25, 71 and 54, each with its reason', () => {
     render(
       <DashboardView
         title="Germplasm"
@@ -41,13 +41,13 @@ describe('DashboardView live rows', () => {
 
     const sections = screen.getAllByTestId(/^triage-section-/);
     expect(sections.map((section) => section.getAttribute('data-testid'))).toEqual([
-      'triage-section-red',
-      'triage-section-amber',
       'triage-section-green',
+      'triage-section-amber',
+      'triage-section-red',
     ]);
-    expect(screen.getByTestId('triage-count-red')).toHaveTextContent('54');
-    expect(screen.getByTestId('triage-count-amber')).toHaveTextContent('71');
     expect(screen.getByTestId('triage-count-green')).toHaveTextContent('25');
+    expect(screen.getByTestId('triage-count-amber')).toHaveTextContent('71');
+    expect(screen.getByTestId('triage-count-red')).toHaveTextContent('54');
     expect(screen.getByTestId('dashboard-summary')).toHaveTextContent('150');
     expect(screen.getByTestId('candidate-reason-RED-0')).toHaveTextContent('RED reason 0');
     expect(screen.queryByRole('columnheader', { name: 'Crop' })).not.toBeInTheDocument();

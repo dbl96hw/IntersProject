@@ -29,8 +29,8 @@ export const TRIAGE_STATUS = {
 // Filter value meaning "show every status"; kept separate from the real status keys.
 export const STATUS_FILTER_ALL = 'ALL';
 
-// Red first: the engine sorts that way so the breeder looks at concerns before the rest.
-export const TRIAGE_STATUS_ORDER = [TRIAGE_STATUS.RED.key, TRIAGE_STATUS.AMBER.key, TRIAGE_STATUS.GREEN.key];
+// Green first: strong candidates lead, concerns come last. Also drives the filter chips and colour options.
+export const TRIAGE_STATUS_ORDER = [TRIAGE_STATUS.GREEN.key, TRIAGE_STATUS.AMBER.key, TRIAGE_STATUS.RED.key];
 
 // One shared config keeps the three tables' columns aligned (used with table-layout: fixed).
 export const TABLE_COLUMNS = [
@@ -44,13 +44,13 @@ export const CANDIDATE_DECISIONS = {
   NO_PASS: 'no_pass',
 };
 
-// Same list as the backend (ALLOWED_FILE_EXTENSIONS); any other type is refused with UNSUPPORTED_FILE_TYPE.
+// Must match the formats the backend accepts (apps/intersbackend/src/constants/uploads.js).
+// Create dashboard sends the files: POST /api/chats, then POST /api/chats/:id/messages (multipart).
 export const ACCEPTED_FILE_TYPES = '.csv,.xlsx,.xls,.pdf,.docx,.png,.jpg,.jpeg,.webp';
 
-// Create dashboard sends the files: POST /api/chats, then POST /api/chats/:id/messages (multipart).
-export const FILE_UPLOAD_AVAILABLE = true;
+// These mirror the backend defaults. Checking them in the browser avoids a wasted request.
+export const MAX_UPLOAD_FILES = 10;
+export const MAX_UPLOAD_FILE_MB = 10;
 
 // The modal sends a real colour change and a real pass / no pass.
 export const CANDIDATE_SAVE_AVAILABLE = true;
-
-export const MOCK_ANALYSIS_DELAY_MS = 1500;

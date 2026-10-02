@@ -1,3 +1,5 @@
+import { MAX_UPLOAD_FILE_MB } from './triage.js';
+
 export const APP_NAME = 'Git Push & Pray';
 
 export const SIDEBAR_TEXT = {
@@ -22,8 +24,29 @@ export const WELCOME_TEXT = {
   ANALYZING: 'Analyzing your files. With many candidates this takes about a minute and a half; keep this tab open.',
   UPLOAD_FAILED: 'The files could not be analyzed. Try again, or check the backend status above.',
   FILES_SELECTED: 'Selected files',
-  UPLOAD_COMING_SOON: 'File upload is coming soon. Creating a dashboard from files is not available yet.',
 };
+
+export const UPLOAD_TEXT = {
+  FORMATS_HINT: 'CSV, XLSX, XLS, PDF, DOCX, PNG, JPG, WEBP. Up to 10 files, 10 MB each.',
+  TRY_AGAIN: 'Try again in a moment.',
+  NETWORK: 'The server did not answer. Check that the backend is running and try again.',
+};
+
+export function emptyFileText(name) {
+  return `"${name}" is empty. Choose a file with data.`;
+}
+
+export function unsupportedFileText(name) {
+  return `"${name}" is not a supported format. Use CSV, XLSX, XLS, PDF, DOCX, PNG, JPG or WEBP.`;
+}
+
+export function tooLargeFileText(name, sizeMb) {
+  return `"${name}" is ${sizeMb.toFixed(1)} MB. The limit is ${MAX_UPLOAD_FILE_MB} MB.`;
+}
+
+export function tooManyFilesText(max) {
+  return `You can upload up to ${max} files at a time.`;
+}
 
 export const HEALTH_TEXT = {
   LOADING: 'Checking whether the backend and the data engine are reachable.',

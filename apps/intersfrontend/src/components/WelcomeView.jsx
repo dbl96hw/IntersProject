@@ -1,24 +1,30 @@
 import { useRef, useState } from 'react';
 import Logo from './Logo';
-import { ACCEPTED_FILE_TYPES, APP_NAME, FILE_UPLOAD_AVAILABLE, WELCOME_TEXT } from '../constants';
+import { validateUploadFiles } from '../validateUploadFiles';
+import { ACCEPTED_FILE_TYPES, APP_NAME, UPLOAD_TEXT, WELCOME_TEXT } from '../constants';
 import './WelcomeView.css';
 
-function WelcomeView({ isAnalyzing = false, errorMessage = '', onSubmitFiles = () => {} }) {
+function WelcomeView({
+  isAnalyzing = false,
+  errorMessage = '',
+  onSubmitFiles = () => {},
+  onFilesChange,
+}) {
   const fileInputRef = useRef(null);
   const [files, setFiles] = useState([]);
+  const [pickErrors, setPickErrors] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
 
   const hasFiles = files.length > 0;
-  const fileNames = files.map((file) => file.name);
 
-  // The File objects are kept (not only their names) because they are what gets uploaded.
-  // A second file with the same name replaces the first.
-  function addFiles(picked) {
-    const added = Array.from(picked);
-    setFiles((current) => {
-      const addedNames = new Set(added.map((file) => file.name));
-      return [...current.filter((file) => !addedNames.has(file.name)), ...added];
-    });
+  // File objects are kept because they are what gets uploaded. Validation runs here so a bad
+  // file never leaves the browser. A duplicate name is ignored; remove it first to replace it.
+  function addFiles(pickedFiles) {
+    const { accepted, rejected } = validateUploadFiles(files, Array.from(pickedFiles));
+    setFiles([...files, ...accepted]);
+    // Each pick replaces the previous list, so old messages never linger.
+    setPickErrors(rejected);
+    onFilesChange?.();
   }
 
   function handleBrowseClick() {
@@ -54,13 +60,15 @@ function WelcomeView({ isAnalyzing = false, errorMessage = '', onSubmitFiles = (
   }
 
   function handleRemoveFile(fileName) {
-    setFiles((current) => current.filter((file) => file.name !== fileName));
+    setFiles((currentFiles) => currentFiles.filter((file) => file.name !== fileName));
+    setPickErrors([]);
+    onFilesChange?.();
   }
 
   function handleSubmit(event) {
     event.preventDefault();
     // One analysis at a time: the button is gone while analysing, and this guard covers Enter.
-    if (!FILE_UPLOAD_AVAILABLE || !hasFiles || isAnalyzing) {
+    if (!hasFiles || isAnalyzing) {
       return;
     }
     onSubmitFiles(files);
@@ -117,17 +125,17 @@ function WelcomeView({ isAnalyzing = false, errorMessage = '', onSubmitFiles = (
 
         {hasFiles && (
           <ul className="welcome__files" aria-label={WELCOME_TEXT.FILES_SELECTED} data-testid="selected-files">
-            {fileNames.map((fileName) => (
-              <li key={fileName} className="welcome__file-chip">
-                <span className="welcome__file-name" title={fileName}>
-                  {fileName}
+            {files.map((file) => (
+              <li key={file.name} className="welcome__file-chip">
+                <span className="welcome__file-name" title={file.name}>
+                  {file.name}
                 </span>
                 <button
                   type="button"
                   className="welcome__file-remove"
-                  onClick={() => handleRemoveFile(fileName)}
+                  onClick={() => handleRemoveFile(file.name)}
                   disabled={isAnalyzing}
-                  aria-label={`${WELCOME_TEXT.REMOVE_FILE}: ${fileName}`}
+                  aria-label={`${WELCOME_TEXT.REMOVE_FILE}: ${file.name}`}
                 >
                   &times;
                 </button>
@@ -136,14 +144,20 @@ function WelcomeView({ isAnalyzing = false, errorMessage = '', onSubmitFiles = (
           </ul>
         )}
 
-        {!FILE_UPLOAD_AVAILABLE && (
-          <p className="welcome__coming-soon" role="status" data-testid="upload-coming-soon">
-            {WELCOME_TEXT.UPLOAD_COMING_SOON}
-          </p>
+        <p className="welcome__formats-hint" data-testid="upload-formats-hint">
+          {UPLOAD_TEXT.FORMATS_HINT}
+        </p>
+
+        {pickErrors.length > 0 && (
+          <ul className="welcome__problems" role="alert" data-testid="upload-file-errors">
+            {pickErrors.map((problem) => (
+              <li key={problem.message}>{problem.message}</li>
+            ))}
+          </ul>
         )}
 
-        {errorMessage && !isAnalyzing && (
-          <p className="welcome__coming-soon" role="alert" data-testid="upload-error">
+        {errorMessage && (
+          <p className="welcome__problems" role="alert" data-testid="upload-error">
             {errorMessage}
           </p>
         )}
@@ -156,7 +170,7 @@ function WelcomeView({ isAnalyzing = false, errorMessage = '', onSubmitFiles = (
           <button
             type="submit"
             className="welcome__submit-button"
-            disabled={!FILE_UPLOAD_AVAILABLE || !hasFiles}
+            disabled={!hasFiles}
             data-testid="upload-submit"
           >
             {WELCOME_TEXT.SUBMIT}

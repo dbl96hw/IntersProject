@@ -1,7 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { API_BASE_URL, API_ERROR_CODES, CANDIDATES_PAGE_SIZE, HEALTH_PATH, MAX_CANDIDATE_PAGES } from '../constants/api';
+import {
+  API_BASE_URL,
+  API_ERROR_CODES,
+  API_PATHS,
+  CANDIDATES_PAGE_SIZE,
+  HEALTH_PATH,
+  MAX_CANDIDATE_PAGES,
+  UPLOAD_FIELD,
+} from '../constants/api';
 import { DASHBOARD_TEXT, HEALTH_TEXT } from '../constants/messages';
-import { ApiError, listChatCandidates, requestJson } from './client';
+import { ApiError, createChat, listChatCandidates, postChatFiles, requestJson } from './client';
 
 describe('requestJson', () => {
   afterEach(() => {
@@ -108,5 +116,57 @@ describe('listChatCandidates', () => {
 
     expect(error.message).toBe(DASHBOARD_TEXT.LIST_INCOMPLETE);
     expect(fetchMock).toHaveBeenCalledTimes(MAX_CANDIDATE_PAGES);
+  });
+});
+
+describe('createChat', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('posts to the chats path and returns the created chat', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ chat: { id: 'chat-1', title: 'New chat' } }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const chat = await createChat();
+
+    expect(chat).toEqual({ id: 'chat-1', title: 'New chat' });
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${API_BASE_URL}${API_PATHS.CHATS}`,
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  it('rejects a body without a chat id', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) }));
+
+    const error = await createChat().catch((caught) => caught);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error.code).toBe(API_ERROR_CODES.UNEXPECTED);
+  });
+});
+
+describe('postChatFiles', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('sends one files entry per file as FormData without a Content-Type header', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ assistant_message: {} }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const files = [new File(['a'], 'a.csv'), new File(['b'], 'b.pdf')];
+
+    await postChatFiles('chat-1', files);
+
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toBe(`${API_BASE_URL}${API_PATHS.CHATS}/chat-1/messages`);
+    expect(options.method).toBe('POST');
+    expect(options.body).toBeInstanceOf(FormData);
+    expect(options.body.getAll(UPLOAD_FIELD)).toEqual(files);
+    expect(options.headers?.['Content-Type']).toBeUndefined();
   });
 });
