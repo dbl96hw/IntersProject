@@ -68,7 +68,8 @@ History has one source: messages already saved on that chat. The backend ignores
 - A number written only as a word is invisible to `extractNumbers`. The answer warning covers `NUMBER_WORDS`. Other words (`eleven`, `once`) are not in that set.
 - The 90 second deadline can fire while a single Claude call is still inside its own timeout. The message is then `ANSWER_TIMEOUT`.
 - `query_candidates` returns a bare list. The default limit is 20. The payload has no total and no truncated flag (`CONTRACTS.md` documents the candidate row, not a wrapper). A live answer counted that page and said there were 20 red lines. `apply_scoring` already returns colour counts for every candidate (rule colour RED 54 on this dataset). With `limit` 200 the same filter returned 50 rows, because overrides had moved some lines off red. The chat can report the page instead of either figure.
-- On a live check, `ANSWER_UNVERIFIED_NUMBERS` fired on 2 of 3 answers (the page count 20, and the word `dos`). The third answer did not warn.
+- On the first live chat, `ANSWER_UNVERIFIED_NUMBERS` fired on 3 of 4 answers. Two of those were the word `dos` for a count the text had already named. The third answer, about data quality, did not warn.
+- A later widget check asked for colour counts and got rule colours 54 / 71 / 25 with no warning, while that chat's board showed 53 / 72 / 25. The follow-up about SYN-MZ-00001 warned, and `GET /api/chats/:id` still returned that warning on `answer.warnings` after reload.
 - Small digits can match a different field and pass with no warning. On the red page, 5 is `n_trials` on every row, 3 and 4 are `n_fail` and also sit inside `reason`, and 4 is the digit in `rule_version` `UC4_MATERIAL_V0`. On one candidate context, 1 appears inside trial strings. An answer can cite 1, 3, 4 or 5 from the wrong place and still look backed.
 
 ## Size

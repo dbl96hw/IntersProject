@@ -253,7 +253,7 @@ Assistant message:
 }
 ```
 
-`warnings` is an empty array when every number in the text was in this question's tool results. The browser does not send conversation history; the backend loads prior user and answer messages for that chat and skips `kind: "analysis"`.
+`warnings` lives inside `answer` for a successful chat answer, and inside `analysis` for a file analysis. It is not a field beside `answer` on the message. `GET /api/chats/:id` returns the same shape, so a reload can show `answer.warnings`. The array is empty when every checked number was in this question's tool results. An empty array does not mean the answer was verified: small digits can match another field and pass. The browser does not send conversation history; the backend loads prior user and answer messages for that chat and skips `kind: "analysis"`.
 
 ## Endpoints
 
@@ -315,7 +315,7 @@ Errors: 404 `NOT_FOUND`.
 | `text` | Yes if no files are sent | The question or a note about the files |
 | `files` | No | Repeat the field once per file (`formData.append('files', file)`). Up to `MAX_FILES` (10) files of `MAX_FILE_MB` (10 MB) each. Allowed: `.csv .xlsx .xls .pdf .docx .png .jpg .jpeg .webp`. UTF-8 file names (e.g. `análisis.csv`) are kept as sent. |
 
-With files, the backend runs an **analysis**: tables go to `POST /ingest/records`, documents that pass the relevance gate go to `POST /documents/base64`, then each candidate is explained. Claude does not extract documents. Without files, it runs an **answer**: Claude answers through the engine's tools (max 6 rounds). That answer path is not wired yet in live mode.
+With files, the backend runs an **analysis**: tables go to `POST /ingest/records`, documents that pass the relevance gate go to `POST /documents/base64`, then each candidate is explained. Claude does not extract documents. Without files, it runs an **answer**: Claude answers through the engine's tools (max 6 rounds, and a 90 second deadline). Live mode is wired. The widget posts `{ text }` only.
 
 > **Always check `assistant_message.status` before rendering.** The HTTP status is **201 even when the analysis failed**, so that the user message is saved and the frontend gets a `messageId` it can retry. When `status` is `"error"`, show `assistant_message.error.message` and a retry button; `analysis` and `answer` are both `null`.
 

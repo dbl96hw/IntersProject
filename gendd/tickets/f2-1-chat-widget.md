@@ -8,7 +8,7 @@ trello:
 
 ## Problem
 
-The chat widget still replies from `getMockChatReply`. A breeder who asks a question in the browser does not see the engine-backed answer the backend now stores. The widget must not invent history: the backend reads saved messages itself.
+The widget posts `{ text }` and shows the saved answer. It does not invent history: the backend reads saved messages itself. `src/mocks/chatReplies.js` is gone.
 
 ## Acceptance criteria
 
@@ -55,8 +55,13 @@ The widget always posts the question and renders the saved answer. It does not s
 
 ## Known risks
 
-- An answer can mention a colour the open chat's rows do not show, because overrides on the engine are global (see 9B).
-- Search answers can mention ingested documents.
+- `query_candidates` returns at most 20 rows, with no total and no truncated flag. A live answer said "20 red lines" when the rule colour count is 54.
+- `apply_scoring` counts rule colour (RED 54). `query_candidates` filters effective colour after overrides (50 on that check). The chat can report both. On the widget check it said 54 / 71 / 25 while the open board showed 53 / 72 / 25.
+- `ANSWER_UNVERIFIED_NUMBERS` is a partial net. It fired on 3 of 4 answers in the first live chat, including correct counts written as words (`dos`). Digits 1, 3, 4 and 5 can match another field and pass. The widget shows a calm notice when the warning is present and never a verified mark. No warning does not mean the numbers were checked.
+- The chat uses the engine's effective colour, which is global. The board uses the colour saved on that chat. They can differ after an override in another chat.
+- Ingested documents can appear in `search`. The chat is read-only, so the risk is misleading text.
+- Switching chats while a question is in flight drops that answer; it is not painted on the new chat.
+- `GET /api/chats/:id` returns warnings on `answer.warnings` (not on the message root). After reload, the SYN-MZ-00001 answer still showed the notice. The colour-count answer (12.0 s) had no notice; the line question (13.9 s) did. The welcome screen shows `chat-no-chat` and does not call the server. Candidate ids stay plain text.
 
 ## Size
 

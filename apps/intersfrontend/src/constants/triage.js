@@ -55,5 +55,3 @@ export const FILE_UPLOAD_AVAILABLE = false;
 export const CANDIDATE_SAVE_AVAILABLE = true;
 
 export const MOCK_ANALYSIS_DELAY_MS = 1500;
-
-export const MOCK_CHAT_DELAY_MS = 800;

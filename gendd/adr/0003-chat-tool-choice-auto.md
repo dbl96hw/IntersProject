@@ -18,6 +18,8 @@ The loop also stops at `MAX_TOOL_ROUNDS` (6) and at `CHAT_QUESTION_DEADLINE_MS` 
 
 An answer can warn on a number the tools did not return, including when the model called no tool. Digits that exist only inside `SYN-MZ-00003` do not warn and do not count as evidence for the number 3. Words outside `NUMBER_WORDS` are not checked. Analysis messages are unchanged.
 
+`ANSWER_UNVERIFIED_NUMBERS` is a partial net. Small numbers (1, 3, 4, 5) can match another field, including the `4` in `UC4_MATERIAL_V0`, and pass with no warning. A derived count written as a word (`dos`) can warn even when the count is right. No warning does not mean the answer was verified. The widget must not show a verified mark when the warning is absent.
+
 ## Status
 
 accepted

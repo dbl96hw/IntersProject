@@ -79,6 +79,26 @@
   align-items: flex-end;
 }
 
+.chat-widget__notice,
+.chat-message__warning {
+  margin: 0;
+  padding: 0.55rem 0.85rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--color-text-secondary);
+}
+
+.chat-widget__notice {
+  border-bottom: 1px solid var(--color-divider);
+  background: var(--color-card-bg);
+}
+
+.chat-message__warning {
+  border: 1px solid var(--color-divider);
+  border-radius: 10px;
+  background: var(--color-page-bg);
+}
+
 .chat-message__text {
   margin: 0;
   padding: 0.6rem 0.85rem;
@@ -86,6 +106,7 @@
   font-size: 0.88rem;
   line-height: 1.4;
   overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .chat-message--bot .chat-message__text {
