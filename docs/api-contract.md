@@ -8,8 +8,8 @@ The engine's own contract is [`services/data-engine/docs/CONTRACTS.md`](../servi
 
 | Who | Decides / does |
 |---|---|
-| **Data engine** | Decides the colour (`GREEN` / `AMBER` / `RED`), the verdict and the evidence, by applying `config/rules.yaml` to the 7 Syngenta sources. It also stores every colour override and its audit log. |
-| **Claude** | Extracts records from PDF, Word and images, and explains each candidate in plain language, citing only the engine's evidence. It answers chat questions through the engine's tools. It never decides or changes a colour. |
+| **Data engine** | Decides the colour (`GREEN` / `AMBER` / `RED`), the verdict and the evidence, by applying `config/rules.yaml` to the 7 Syngenta sources. It reads uploaded documents (PDF, scans, Office). It also stores every colour override and its audit log. |
+| **Claude** | Explains each candidate in plain language, citing only the engine's evidence (`submit_justifications`). It answers chat questions through the engine's tools (`GET /tools`, `POST /tools/:name`, max 6 rounds). It never decides or changes a colour and does not extract tabular data from documents (the data engine ingests documents). |
 | **Breeder** | Validates, edits and decides **pass / no pass**. Can change a colour; that change is sent to the engine as an override. |
 
 UI copy must never say the system "approved" or "rejected" a line. The system suggests; the breeder decides.
@@ -127,7 +127,7 @@ The engine's candidate row, **verbatim**, plus our fields.
 | `justification` | string | Plain-language explanation |
 | `justification_source` | `"claude"` \| `"engine"` | `"engine"` means Claude's text was not used and `justification` is the engine's `reason` |
 | `verified` | boolean | `true` when every number in the justification exists in the engine's evidence for this candidate |
-| `confidence` | `"high"` \| `"medium"` \| `"low"` | How sure the explanation is |
+| `confidence` | `"high"` \| `"medium"` \| `"low"` \| `null` | How sure the explanation is. `null` when `justification_source` is `"engine"`. |
 | `decision` | `"pending"` \| `"pass"` \| `"no_pass"` | The breeder's decision. Starts as `"pending"`. |
 | `edited` | boolean | `true` once the breeder edited the justification. `justification_source` and `verified` keep describing the original generated text. |
 | `created_at` | timestamp | When the row was created |
@@ -152,13 +152,15 @@ One per uploaded file (or per table inside a file). `accepted`, `rows` and `mess
 Totals for every Claude call made for this message. All zeros in mock mode.
 
 ```json
-{ "input_tokens": 5120, "output_tokens": 830, "cache_read_tokens": 4096, "cost_usd": 0.0284, "duration_ms": 6210 }
+{ "input_tokens": 5120, "output_tokens": 830, "cache_read_tokens": 4096, "cache_write_tokens": 100, "cost_usd": 0.0284 }
 ```
+
+`cost_usd` is `null` when the model id is not listed in `apps/intersbackend/src/constants/pricing.js`. All token fields are zero in mock mode.
 
 ### Versions
 
 ```json
-{ "explanation_prompt": "explain_v1", "extraction_prompt": "extract_v1", "rule_version": "UC4_MATERIAL_V0", "model": "claude-..." }
+{ "explanation_prompt": "explanation.v1", "rule_version": "UC4_MATERIAL_V0", "model": "claude-..." }
 ```
 
 `rule_version` comes from the engine. `model` is `"mock"` in mock mode.
@@ -309,8 +311,8 @@ With files, the backend runs an **analysis**: tables are sent to the engine, doc
       "candidates": [ /* Candidate objects */ ],
       "warnings": [],
       "ingestion": [{ "file": "trials-2024.xlsx", "kind": "table", "accepted": true, "source": "trial_recommendations", "rows": 72, "message": null }],
-      "usage": { "input_tokens": 5120, "output_tokens": 830, "cache_read_tokens": 4096, "cost_usd": 0.0284, "duration_ms": 6210 },
-      "versions": { "explanation_prompt": "explain_v1", "extraction_prompt": "extract_v1", "rule_version": "UC4_MATERIAL_V0", "model": "claude-..." }
+      "usage": { "input_tokens": 5120, "output_tokens": 830, "cache_read_tokens": 4096, "cache_write_tokens": 100, "cost_usd": 0.0284 },
+      "versions": { "explanation_prompt": "explanation.v1", "rule_version": "UC4_MATERIAL_V0", "model": "claude-..." }
     },
     "answer": null,
     "created_at": "..."
@@ -326,7 +328,7 @@ With files, the backend runs an **analysis**: tables are sent to the engine, doc
   "assistant_message": {
     "id": "...", "role": "assistant", "kind": "answer", "status": "ok", "error": null, "analysis": null,
     "answer": { "text": "4 lines are red. ...", "tool_calls": [{ "name": "query_candidates", "input": { "colour": "RED" } }],
-                "usage": { "input_tokens": 2100, "output_tokens": 240, "cache_read_tokens": 0, "cost_usd": 0.0099, "duration_ms": 3400 } },
+                "usage": { "input_tokens": 2100, "output_tokens": 240, "cache_read_tokens": 0, "cache_write_tokens": 0, "cost_usd": 0.0099 } },
     "...": "..."
   }
 }

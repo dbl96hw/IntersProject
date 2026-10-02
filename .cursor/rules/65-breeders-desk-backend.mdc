@@ -15,7 +15,7 @@ alwaysApply: false
 
 ## Architecture (hybrid)
 
-- **Data engine** (`services/data-engine`, FastAPI at `DATA_ENGINE_URL`, default `http://localhost:8001`) is the only component that decides colours and produces numbers. It unifies the 7 Syngenta sources and applies `services/data-engine/config/rules.yaml`.
+- **Data engine** (`services/data-engine`, FastAPI at `DATA_ENGINE_URL`, default `http://localhost:8001`) is the only component that decides colours and produces numbers. It unifies the 7 Syngenta sources, applies `services/data-engine/config/rules.yaml`, and reads uploaded documents (PDF, scans, Office).
 - The backend never recomputes, reshapes or overrides the engine's colour, verdict or evidence.
 - **`apps/intersbackend`** (Express, JS ESM) is the gateway: chats, messages, files (Supabase Storage), history and breeder reviews (Supabase Postgres), and calls to the engine and to Claude.
 - Do not modify `services/data-engine`, `data/raw` or `data/synthetic`. Request engine changes from its owner.
@@ -25,20 +25,20 @@ alwaysApply: false
 - The backend never changes a colour by itself.
 - A breeder's colour change is forwarded to the engine's `POST /overrides`. The engine stays the single place for colours and their audit log.
 
-## Claude: three jobs only
+## Claude: two jobs
 
-1. Extract records from PDF, Word and images using the engine's original column names (tool `submit_records`).
-2. Write each candidate's justification citing only the engine's evidence (tool `submit_justifications`).
-3. Answer chat questions through the engine's tools (`GET /tools`, `POST /tools/:name`), max 6 tool rounds.
+1. Write each candidate's justification citing only the engine's evidence (tool `submit_justifications`).
+2. Answer chat questions through the engine's tools (`GET /tools`, `POST /tools/:name`), max 6 tool rounds.
 
+- Documents are ingested by the data engine, not extracted by Claude. `src/prompts/extraction.v1.md`, tool `submit_records` and `extractRecords` are unused optional code from an earlier step.
 - Claude never decides or changes a colour. Reject a justification that names a colour different from the engine's.
-- Never send `TRIAL_RECOMMENDATION` or `RECOMMENDATION_RATIONALE` to Claude.
 - Claude never invents values. Missing values stay missing (do not fill, guess or default them).
+- Use only `GET /candidates/{id}/llm-context` payloads for explanations; those payloads omit raw `TRIAL_RECOMMENDATION` / `RECOMMENDATION_RATIONALE` columns (trials are summarized as id, location, year and verdict).
 
 ## Evidence check
 
-- Every number in a justification must exist in that candidate's engine evidence. The check lives in `src/llm/evidence.check.js`.
-- If a number is not found, use the engine's reason instead and mark the justification as unverified.
+- Every number, count-as-word, entity id and cited value in a justification must be backed by that candidate's engine payload. Guards live in `src/llm/evidence.check.js` (types: `id`, `number`, `number_word`, `cited_value`, `colour`).
+- If a check fails, use the engine's reason instead and mark the justification as unverified (`justification_source` `"engine"`, `verified` false).
 
 ## Contract naming
 
@@ -57,7 +57,7 @@ alwaysApply: false
 ## Secrets and logging
 
 - `ANTHROPIC_API_KEY` and `SUPABASE_SERVICE_ROLE_KEY` live only on the server (`process.env`). Never send them to the frontend.
-- Never log secrets or uploaded file contents. Log route and reason only (see testability rule).
+- Never log secrets, prompts, uploaded file contents or full Claude payloads. Log route, model, tool, batch, duration, tokens and cost only.
 
 ## Constants
 

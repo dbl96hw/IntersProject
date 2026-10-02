@@ -60,16 +60,17 @@ Source for the target: `services/data-engine/docs/INTEGRATION.md` section 6 and 
 
 | Screen | UI today | Pending (roadmap feature) |
 |---|---|---|
-| Triage tables | Built on mocks | `GET /api/breeder/candidates`, `ambiguous_trials` / `atypical` flags (F1.2) |
-| Evidence card | Row only expands the text | `GET /api/breeder/candidates/:id` in the expanded row (F1.3) |
-| Override and correction modal | Built on mocks | `POST /api/breeder/overrides`, `POST /api/breeder/corrections`, reasons from the API (F1.4, F1.5) |
-| Chat | Built on mock replies | `POST /api/breeder/chat` (F2.1) |
-| Upload | Built, files stay in the browser | `POST /api/breeder/documents` (F4.2) |
-| Backend status | Removed | Status indicator (F1.1) |
+| Triage tables | Built on mocks | `GET /api/candidates` (mock works today), `ambiguous_trials` / `atypical` when live (F1.2) |
+| Evidence card | Row only expands the text | `GET /api/candidates/:id` → `engine_detail` (F1.3) |
+| Override and correction modal | Built on mocks | `PATCH /api/candidates/:id` (501 until ticket 3), engine overrides; corrections F1.4 |
+| Chat | Built on mock replies | `POST /api/chats/:id/messages` text path + live agent (F2.1 / 9B) |
+| Upload | Built, files stay in the browser | `POST /api/chats/:id/messages` multipart (F4.2 / 9A) |
+| Backend status | Removed | `GET /health` → `mode`, `engine` (F1.1) |
 | Trust panel, comparison, disagreements | Not built | F4.1, F4.3, F4.4 |
 
-The `/api/breeder/*` routes exist only in `services/data-engine/clients/node/breederRoutes.example.js`;
-they are not mounted in `apps/intersbackend` yet.
+The backend implements `/api/*` per `docs/api-contract.md` and returns mock analysis in
+`ANALYSIS_MODE=mock`. The UI can wire against mock mode before live ingest/explain is complete (Step 9A).
+The old `/api/breeder/*` example router in `services/data-engine/clients/node/` is superseded.
 
 ## Conventions in force
 

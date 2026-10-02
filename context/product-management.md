@@ -55,10 +55,10 @@ data in one place with a recommendation and its reasoning, without chasing five 
 
 ### Coverage of the use case today
 
-- Implemented and pending features, by phase and priority, each with its checklist:
-  `gendd/specs/feature-roadmap.md`. Phase 0 is done: the data engine, the scaffold, and the breeder
-  workspace UI prototype on mock data (PR #7). Pending: the Express integration, wiring each screen to
-  real data, the breeder corrections capability, and the real chat assistant.
+- Implemented and pending features: `gendd/specs/feature-roadmap.md`. Phase 0 done. Express gateway and
+  Claude justification layer exist (PRs #9–#12; Step 8 prompt on branch `feature/backend-prompts`).
+  Pending: UI wiring to `/api`, live upload orchestration (9A), chat agent (9B), breeder decisions
+  (ticket 3), corrections (F1.4), demo ops (Step 10).
 
 ### Product decisions
 
@@ -69,6 +69,8 @@ data in one place with a recommendation and its reasoning, without chasing five 
 - UI shape from PR #7: one "dashboard" per upload, listed as "Recent dashboards" in the sidebar, with
   candidates grouped into Approved (GREEN), Conditional (AMBER) and Not approved (RED). The app is
   branded "Git Push & Pray" (`apps/intersfrontend/src/constants/messages.js`, `APP_NAME`).
+- 2026-10-01, accepted: the **data engine reads documents**; Claude **only explains** (and will answer
+  chat via engine tools). The breeder decides pass / no pass; the system never "approves" a line.
 
 ## Conventions in force
 
@@ -104,5 +106,6 @@ data in one place with a recommendation and its reasoning, without chasing five 
 - Unknown: whether the demo includes a conversational channel beyond the web UI (for example WhatsApp
   or voice).
 - Unknown: whether integration with Cropwise should be shown or only described.
-- Unknown: the language(s) the breeder persona uses (English, Spanish, or both).
+- Unknown: the language(s) the breeder persona uses in the demo; the explanation prompt follows the
+  breeder's message (Spanish or English) when provided (`explanation.v1.md`, verified in `claude:smoke`).
 - Unknown: who acts as product owner for prioritisation on the Trello board.
