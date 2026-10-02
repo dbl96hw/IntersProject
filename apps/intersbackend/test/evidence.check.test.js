@@ -94,8 +94,70 @@ test('a justification with an invented number falls back to the engine reason', 
   assert.equal(checked.rejection.justification, 'Fails in 3 of 5 trials with a yield of 11,2 t/ha.');
 });
 
-test('numbers outside the evidence fields (document_mentions) are not accepted', () => {
-  assertEngineFallback(checkJustification(PAYLOAD, item('A lab report shows yield reached 12.5 t/ha.')));
+test('a number quoted from document_mentions is accepted', () => {
+  const checked = checkJustification(PAYLOAD, item('A document (lab-report.pdf p.3) says yield reached 12.5 t/ha.'));
+  assert.equal(checked.result.verified, true);
+  assert.equal(checked.result.justification_source, 'claude');
+  assert.equal(checked.rejection, null);
+});
+
+test('a count written as an English or Spanish word is rejected as number_word', () => {
+  const english = checkJustification(PAYLOAD, item('Two trials are ambiguous.'));
+  assertEngineFallback(english);
+  assert.equal(english.rejection.type, 'number_word');
+  assert.equal(english.rejection.token, 'Two');
+  assert.match(english.warning.message, /Two/);
+
+  const spanish = checkJustification(PAYLOAD, item('Tres ensayos están en estado HOLD.'));
+  assertEngineFallback(spanish);
+  assert.equal(spanish.rejection.type, 'number_word');
+  assert.equal(spanish.rejection.token, 'Tres');
+
+  assert.equal(checkJustification(PAYLOAD, item('La línea DIÉZ veces falla.')).rejection.token, 'DIÉZ');
+});
+
+test('digit counts and articles are not number words', () => {
+  assert.equal(checkJustification(PAYLOAD, item('Falla en 3 de 5 ensayos.')).result.verified, true);
+  assert.equal(checkJustification(PAYLOAD, item('One trial is ambiguous; una línea similar es SYN-MZ-00042.')).result.verified, true);
+  assert.equal(checkJustification(PAYLOAD, item('The line is often below target.')).result.verified, true);
+});
+
+test('a number word that the payload itself writes is accepted', () => {
+  const payload = { ...PAYLOAD, data_gaps: ['two trials have no harvest date'] };
+  const checked = checkJustification(payload, item('Two trials have no harvest date.'));
+  assert.equal(checked.result.verified, true);
+  assert.equal(checked.rejection, null);
+});
+
+test('an invented trial id is rejected as id', () => {
+  const checked = checkJustification(PAYLOAD, item('SYN-TR-0099 is on HOLD.'));
+  assertEngineFallback(checked);
+  assert.equal(checked.rejection.type, 'id');
+  assert.equal(checked.rejection.token, 'SYN-TR-0099');
+  assert.match(checked.warning.message, /SYN-TR-0099/);
+});
+
+test('ids from trials, evidence, similar and the candidate itself are accepted', () => {
+  const payload = { ...PAYLOAD, evidence: [...PAYLOAD.evidence, 'failed in SYN-TR-0007 (YIELD_T_HA = 9.0)'] };
+  const checked = checkJustification(payload, item(
+    'SYN-MZ-00001 fails in SYN-TR-0001 and SYN-TR-0007; SYN-TR-0025 is ambiguous; similar to SYN-MZ-00042.',
+  ));
+  assert.equal(checked.result.verified, true);
+  assert.equal(checked.rejection, null);
+});
+
+test('the id check is case-insensitive', () => {
+  assert.equal(checkJustification(PAYLOAD, item('syn-tr-0001 fails; Syn-Mz-00001 is the line.')).result.verified, true);
+  const invented = checkJustification(PAYLOAD, item('syn-tr-0099 fails.'));
+  assert.equal(invented.rejection.type, 'id');
+  assert.equal(invented.rejection.token, 'syn-tr-0099');
+});
+
+test('a number absent from every payload field is still rejected', () => {
+  const checked = checkJustification(PAYLOAD, item('A document says yield reached 13.4 t/ha.'));
+  assertEngineFallback(checked);
+  assert.equal(checked.rejection.type, 'number');
+  assert.equal(checked.rejection.token, '13.4');
 });
 
 test('a cited value that is not in the evidence is rejected, with the offending value as token', () => {

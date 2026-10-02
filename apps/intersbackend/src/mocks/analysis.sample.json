@@ -115,5 +115,5 @@
     }
   ],
   "usage": { "input_tokens": 0, "output_tokens": 0, "cache_read_tokens": 0, "cost_usd": 0, "duration_ms": 0 },
-  "versions": { "explanation_prompt": "explanation.v1", "extraction_prompt": "extraction.v1", "rule_version": "UC4_MATERIAL_V0", "model": "mock" }
+  "versions": { "explanation_prompt": "explanation.v1", "rule_version": "UC4_MATERIAL_V0", "model": "mock" }
 }

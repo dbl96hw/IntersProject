@@ -4,14 +4,17 @@
 
 import {
   COLOUR_NAMES,
+  ENTITY_ID_PATTERN,
   EVIDENCE_FALLBACK_STATEMENTS,
   JUSTIFICATION_SOURCES,
+  NUMBER_WORDS,
   REJECTION_TYPES,
   WARNING_CODES,
 } from '../constants/index.js';
 
 const TEXT_FIELDS = ['candidate_id', 'verdict', 'reason'];
-const LIST_FIELDS = ['evidence', 'trials', 'similar', 'data_gaps'];
+// document_mentions are quoted document sentences; a number Claude repeats from one is not invented.
+const LIST_FIELDS = ['evidence', 'trials', 'similar', 'data_gaps', 'document_mentions'];
 
 // A comma between digits is a decimal mark ("7,7" is 7.7); ids such as SYN-TR-0025 yield 25.
 const NUMBER_PATTERN = /\d+(?:[.,]\d+)?/g;
@@ -41,14 +44,24 @@ export function normaliseLabel(text) {
   return normaliseText(text).replace(/[\s_-]+/g, ' ').trim();
 }
 
+const entityIds = (text) => [...String(text).matchAll(ENTITY_ID_PATTERN)].map((match) => match[0]);
+
 export function evidenceCorpus(payload) {
   const parts = [
     ...TEXT_FIELDS.map((field) => payload[field]),
     ...LIST_FIELDS.flatMap((field) => (Array.isArray(payload[field]) ? payload[field] : [])),
   ].filter((part) => part !== undefined && part !== null && part !== '');
   const text = normaliseText(parts.join(' \n '));
-  return { labels: normaliseLabel(text), numbers: extractNumbers(text) };
+  return {
+    labels: normaliseLabel(text),
+    numbers: extractNumbers(text),
+    words: new Set(text.match(/\p{L}+/gu) ?? []),
+    ids: new Set(entityIds(text).map((id) => id.toLowerCase())),
+  };
 }
+
+// Every candidate / trial id must be one the payload names; an invented id would point the breeder elsewhere.
+const unknownIdIn = (text, corpus) => entityIds(text).find((id) => !corpus.ids.has(id.toLowerCase()));
 
 export function labelInCorpus(text, corpus) {
   const label = normaliseLabel(text);
@@ -62,6 +75,14 @@ export function namedColours(text) {
 
 const rawNumbers = (text) => [...String(text).matchAll(NUMBER_PATTERN)].map((match) => match[0]);
 const unknownNumberIn = (text, corpus) => rawNumbers(text).find((raw) => !corpus.numbers.has(normaliseNumber(raw)));
+
+// A spelled-out count ("two trials", "tres ensayos") is derived unless the payload writes that word itself.
+function numberWordIn(text, corpus) {
+  return (String(text).match(/\p{L}+/gu) ?? []).find((word) => {
+    const normalised = normaliseText(word);
+    return NUMBER_WORDS.has(normalised) && !corpus.words.has(normalised);
+  });
+}
 
 function otherColourIn(text, allowed) {
   return (String(text).match(/\p{L}+/gu) ?? []).find((word) => {
@@ -85,9 +106,22 @@ function citedValueProblem(cited, corpus) {
 // Returns { type, token, message } for the first reason the justification cannot be used, or null.
 function findProblem(payload, item) {
   const corpus = evidenceCorpus(payload);
+  // Ids go first: the digits inside an invented id would otherwise be reported as a plain number.
+  const unknownId = unknownIdIn(item.justification, corpus);
+  if (unknownId !== undefined) {
+    return { type: REJECTION_TYPES.ID, token: unknownId, message: `an id (${unknownId}) not found in the evidence` };
+  }
   const unknownNumber = unknownNumberIn(item.justification, corpus);
   if (unknownNumber !== undefined) {
     return { type: REJECTION_TYPES.NUMBER, token: unknownNumber, message: `a number (${unknownNumber}) not found in the evidence` };
+  }
+  const numberWord = numberWordIn(item.justification, corpus);
+  if (numberWord !== undefined) {
+    return {
+      type: REJECTION_TYPES.NUMBER_WORD,
+      token: numberWord,
+      message: `a count written as a word (${numberWord}) that the evidence does not contain`,
+    };
   }
   for (const cited of item.cited_values ?? []) {
     const token = citedValueProblem(cited, corpus);

@@ -23,7 +23,22 @@ export const MAX_JUSTIFICATION_SENTENCES = 3;
 export const EVIDENCE_FALLBACK_STATEMENTS = 2;
 
 // Why the evidence check rejected a justification (internal, not part of the API contract).
-export const REJECTION_TYPES = { NUMBER: 'number', CITED_VALUE: 'cited_value', COLOUR: 'colour' };
+export const REJECTION_TYPES = {
+  ID: 'id',
+  NUMBER: 'number',
+  NUMBER_WORD: 'number_word',
+  CITED_VALUE: 'cited_value',
+  COLOUR: 'colour',
+};
+
+// Candidate and trial ids such as SYN-MZ-00001 or SYN-TR-0025, matched case-insensitively.
+export const ENTITY_ID_PATTERN = /\b[A-Z]{2,5}-[A-Z]{2,5}-\d{3,6}\b/gi;
+
+// Spelled-out counts (lower-case, accent-free). One / uno / una / un are left out: they are also articles.
+export const NUMBER_WORDS = new Set([
+  'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+  'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve', 'diez',
+]);
 
 // Lower-case, accent-free colour words (English and Spanish, with common Spanish inflections).
 export const COLOUR_NAMES = {

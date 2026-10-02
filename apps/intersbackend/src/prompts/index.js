@@ -17,3 +17,8 @@ export function loadPrompt(id) {
   if (prompt === undefined) throw new Error(`Unknown prompt "${id}"`);
   return prompt;
 }
+
+// Shape of messages.versions (docs/api-contract.md).
+export function getPromptVersions({ ruleVersion, model }) {
+  return { explanation_prompt: PROMPT_IDS.EXPLANATION, rule_version: ruleVersion, model };
+}
