@@ -58,6 +58,18 @@ def _frame_hash(df: pd.DataFrame) -> str:
     return hashlib.sha256(pd.util.hash_pandas_object(df, index=False).values.tobytes()).hexdigest()
 
 
+def _trial_counts(trials: list[dict]) -> dict:
+    """Counts of the candidate's trials, so an explanation can cite "2 of 5 trials FAIL" instead of
+    counting itself. Derived only from `trials` (already in the payload), so it adds no new facts."""
+    out = {"total": len(trials), "PASS": 0, "HOLD": 0, "FAIL": 0, "ambiguous": 0, "not_explained_by_data": 0}
+    for t in trials:
+        if t.get("official_verdict") in ("PASS", "HOLD", "FAIL"):
+            out[t["official_verdict"]] += 1
+        out["ambiguous"] += bool(t.get("ambiguous"))
+        out["not_explained_by_data"] += not t.get("explained_by_data", True)
+    return out
+
+
 _ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)?$")
 
 
@@ -194,8 +206,11 @@ class DataEngine:
         if not detection.confident:
             return {"accepted": False, "detection": detection.as_dict(),
                     "message": "no known source matches these fields: needs classification by a human or the LLM"}
-        self.raw_tables.append(table)
-        self._build()
+        failure = self._rebuild_or_rollback(raw_tables=[*self.raw_tables, table])
+        if failure:
+            return {"accepted": False, "detection": detection.as_dict(), "rows": len(table.frame),
+                    "rows_added": 0, "duplicates_ignored": 0, "conflicts": 0, "conflict_examples": [],
+                    "message": failure}
         stats = self.merge_stats.get(table.name, {})
         conflicts = [c for c in self.document_conflicts if c["table"] == table.name]
         return jsonable({"accepted": True, "detection": detection.as_dict(), "rows": len(table.frame),
@@ -229,13 +244,37 @@ class DataEngine:
             return jsonable({**ing.summary(), "accepted": False, "needs_review": False,
                              "message": "this file does not look like breeding / trial data, so it was not indexed: "
                                         + "; ".join(ing.relevance["reasons"])})
-        self.documents.append(ing)
-        self.raw_tables.extend(ing.accepted_tables)
-        self._build(tel)
+        failure = self._rebuild_or_rollback(raw_tables=[*self.raw_tables, *ing.accepted_tables],
+                                            documents=[*self.documents, ing], telemetry=tel)
+        if failure:
+            return jsonable({**ing.summary(), "accepted": False, "needs_review": False, "message": failure})
         uncertain = ing.relevance["decision"] == rel.UNCERTAIN
         return jsonable({**ing.summary(), "accepted": True, "needs_review": uncertain,
                          "message": ("indexed, but it is unclear whether this file is about breeding: please confirm"
                                      if uncertain else None)})
+
+    def _rebuild_or_rollback(self, raw_tables: list, documents: list | None = None,
+                             telemetry: Telemetry | None = None) -> str | None:
+        """Rebuild with the new inputs; if anything fails, restore the previous state exactly.
+
+        An ingest is a transaction. Without this, one bad upload stayed in raw_tables and every later
+        rebuild failed with the same error (a 500 on every ingest until the process restarted).
+        The state is restored by swapping back the attribute dictionary: the new inputs were given as
+        new lists, so the old lists were never mutated. Returns None on success, else a message.
+        """
+        snapshot = dict(self.__dict__)
+        self.raw_tables = raw_tables
+        if documents is not None:
+            self.documents = documents
+        try:
+            self._build(telemetry)
+            return None
+        except Exception as exc:  # roll back, report, keep serving the previous model
+            log.exception("rebuild failed; previous state restored")
+            self.__dict__.clear()
+            self.__dict__.update(snapshot)
+            return (f"the engine could not integrate this upload ({type(exc).__name__}); nothing was changed and the "
+                    "previous data is still served")
 
     def assess_relevance(self, text: str = "", tables: list[list[str]] | None = None) -> dict:
         """Relevance of a file (text + table headers) to UC4; see relevance.py for the decision ladder."""
@@ -348,6 +387,9 @@ class DataEngine:
     # Primary key per source, used to reconcile uploaded tables with exports.
     # lab_observations has no single-column key (several rows per material): exact duplicates are
     # removed instead.
+    # Readable identifiers that must stay unique next to the GUID. The 28-Sep drop re-keyed the same trials
+    # (SYN-TR-0001 under another TRIAL_GUID): merging it as "new keys" would duplicate every trial.
+    _NATURAL_KEYS = {"trial": "TRIAL_ID", "germplasm": "MATERIAL_ID"}
     _SOURCE_KEYS = {"genomics": "MATERIAL_GUID", "germplasm": "MATERIAL_GUID", "trial": "TRIAL_GUID",
                     "trial_recommendations": "TRIAL_GUID", "operations": "OPERATION_GUID",
                     "observations": "OBSERVATION_UUID"}
@@ -407,6 +449,17 @@ class DataEngine:
                         else:
                             stats["duplicates_ignored"] += 1
                     accepted = f[~known]
+                    natural = self._NATURAL_KEYS.get(source)
+                    if natural and natural in accepted.columns and natural in base.columns:
+                        owner = base.dropna(subset=[natural]).drop_duplicates(natural).set_index(natural)[key]
+                        clash = accepted[natural].isin(owner.index)
+                        for _, row in accepted[clash].iterrows():
+                            stats["conflicts"] += 1
+                            self.document_conflicts.append({
+                                "source": source, "key": row[natural], "table": t.name,
+                                "kind": "document" if t.meta.get("from_document") else "records",
+                                "differences": jsonable({key: {"export": owner[row[natural]], "uploaded": row[key]}})})
+                        accepted = accepted[~clash]
                 else:
                     # No usable key: drop rows identical (on the shared columns) to rows already accepted.
                     shared = [c for c in f.columns if c in base.columns]
@@ -642,13 +695,26 @@ class DataEngine:
                 "note": None if available else "pedigree fields are empty in the germplasm export: lineage unavailable"}
 
     def apply_scoring(self, level: str = "candidate") -> dict:
-        """Re-run the rules and return the colour distribution plus the rule versions used."""
+        """Colour distribution, both as the rules decided it and as the breeders see it after overrides.
+
+        `counts` is the rule colour (what the engine decided). `effective_counts` applies the latest
+        override per record, i.e. what the dashboard and query_candidates show. They differ exactly by
+        the overrides, so a chat answer can state both instead of contradicting the board.
+        """
         decisions = self.candidate_decisions if level == "candidate" else self.trial_decisions
-        counts: dict[str, int] = {}
-        for d in decisions.values():
+        counts: dict[str, int] = {c: 0 for c in ("RED", "AMBER", "GREEN")}
+        effective: dict[str, int] = dict(counts)
+        overridden = 0
+        for record, d in decisions.items():
             counts[d.colour] = counts.get(d.colour, 0) + 1
+            eff = self._effective(level, record, d)
+            effective[eff["colour"]] = effective.get(eff["colour"], 0) + 1
+            overridden += eff["colour"] != d.colour
         version = self.candidate_rules.version if level == "candidate" else self.trial_rules.version
-        return {"level": level, "rule_version": version, "counts": counts, "total": len(decisions)}
+        return {"level": level, "rule_version": version, "total": len(decisions),
+                "counts": counts, "effective_counts": effective, "overridden": overridden,
+                "note": ("counts = colours decided by the rules; effective_counts = colours after the breeders' "
+                         "overrides (what the dashboard shows)")}
 
     def get_trial(self, trial_id: str) -> dict:
         """One trial: official vs engine verdict, evidence, ambiguity, documents mentioning it."""
@@ -814,6 +880,7 @@ class DataEngine:
             "similar": [s["candidate_id"] for s in p["similar_candidates"]],
             "document_mentions": [f"{f['source']} p.{f['page']}: {f['sentence']}" for f in p["document_evidence"]][:5],
             "data_gaps": p["data_gaps"],
+            "trial_counts": _trial_counts(p["trials"]),
             "instructions": "Cite only these values. Never compute new numbers. The breeder decides.",
         }
         guid = self.model.materials.loc[self.model.materials["candidate_id"] == candidate_id, "MATERIAL_GUID"].iloc[0]
