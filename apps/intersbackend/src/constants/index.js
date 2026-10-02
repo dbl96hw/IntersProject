@@ -9,5 +9,8 @@ export * from './db.js';
 export * from './defaults.js';
 export * from './errors.js';
 export * from './ingest.js';
+export * from './llm.js';
 export * from './modes.js';
+export * from './pricing.js';
+export * from './sources.js';
 export * from './uploads.js';
