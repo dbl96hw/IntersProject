@@ -26,7 +26,7 @@
       yield, justification, status, override reason, comment).
     - Chat: `ChatWidget` (floating widget; open, minimize, close, history, typing indicator).
   - `apps/intersfrontend/src/constants/` - re-exported from `index.js`:
-    - `api.js` - `API_BASE_URL` only (`HEALTH_PATH` was removed).
+    - `api.js` - `API_BASE_URL` (`VITE_API_URL`), `HEALTH_PATH`, `API_PATHS`, `CANDIDATES_PAGE_SIZE`.
     - `messages.js` - `APP_NAME` ("Git Push & Pray") and UI copy per area (`SIDEBAR_TEXT`,
       `WELCOME_TEXT`, `DASHBOARD_TEXT`, `FILTER_TEXT`, `EDIT_TEXT`, `CHAT_TEXT`).
     - `triage.js` - `TRIAGE_STATUS` (GREEN / AMBER / RED labelled Approved / Conditional / Not
@@ -40,16 +40,19 @@
   - `apps/intersfrontend/index.html` -> `src/main.jsx` -> `src/App.jsx` -> `src/pages/Workspace.jsx`.
   - Run: `npm run dev:frontend` from the root (http://localhost:5173); build: `npm run build -w apps/intersfrontend`.
   - Configuration: `VITE_API_URL` (`apps/intersfrontend/.env.example`, default `http://localhost:3000`).
+    `VITE_BREEDER_USER` is the name recorded on an override or a decision. It is not a login.
 
 ### Current behaviour
 
-The whole UI runs on mock data. There is no `fetch` call anywhere in `src/`, and the previous
-landing-page health check is gone.
+`GET /health` is called from `BackendStatus`. Recent dashboards are the first
+`RECENT_DASHBOARD_LIMIT` chats from `GET /api/chats`. Opening one loads every page of
+`GET /api/candidates?chat_id=` (`page_size` 100, cap `MAX_CANDIDATE_PAGES`). The chat widget still
+uses mock replies.
 
-- "Create dashboard" waits `MOCK_ANALYSIS_DELAY_MS` and builds rows with `createMockDashboard`; no file
-  leaves the browser (`Workspace.jsx`, `handleSubmitFiles`).
-- Edits and overrides live only in React state (`Workspace.jsx`, `handleUpdateCandidate`); a reload
-  loses them.
+- "Create dashboard" does not start an analysis. The welcome screen shows that file upload is coming
+  soon (`data-testid="upload-coming-soon"`).
+- A colour change sends `PATCH /api/candidates/:id`. Pass / no pass sends `POST /api/candidates/:id/decision`.
+  The row becomes the `candidate` in the response. The screen does not move the colour itself.
 - The chat answers from `mocks/chatReplies.js` by matching a candidate id in the message.
 - Mock rows follow the engine's candidate row, plus two fields the engine does not return: `crop` and
   `mean_yield_t_ha` (`mocks/dashboards.js`).
@@ -60,12 +63,12 @@ Source for the target: `services/data-engine/docs/INTEGRATION.md` section 6 and 
 
 | Screen | UI today | Pending (roadmap feature) |
 |---|---|---|
-| Triage tables | Built on mocks | `GET /api/candidates` (mock works today), `ambiguous_trials` / `atypical` when live (F1.2) |
+| Triage tables | `GET /api/chats` and `GET /api/candidates` for the open chat | Evidence card (F1.3) |
 | Evidence card | Row only expands the text | `GET /api/candidates/:id` → `engine_detail` (F1.3) |
-| Override and correction modal | Built on mocks | `PATCH /api/candidates/:id` (501 until ticket 3), engine overrides; corrections F1.4 |
+| Override and decision modal | `PATCH /api/candidates/:id` and `POST /api/candidates/:id/decision`. Reasons from `GET /api/engine/override-reasons` | Crop and yield corrections (F1.4) |
 | Chat | Built on mock replies | `POST /api/chats/:id/messages` text path + live agent (F2.1 / 9B) |
 | Upload | Built, files stay in the browser | `POST /api/chats/:id/messages` multipart (F4.2 / 9A) |
-| Backend status | Removed | `GET /health` → `mode`, `engine` (F1.1) |
+| Backend status | `GET /health` shows `mode` and `engine` | Live candidate list is still F1.2 |
 | Trust panel, comparison, disagreements | Not built | F4.1, F4.3, F4.4 |
 
 The backend implements `/api/*` per `docs/api-contract.md` and returns mock analysis in
@@ -94,8 +97,8 @@ The old `/api/breeder/*` example router in `services/data-engine/clients/node/` 
 
 ## Testing expectations
 
-- No test framework or `test` script in `apps/intersfrontend/package.json`. See
-  `context/quality-assurance.md`.
+- Vitest and Testing Library. `npm test -w apps/intersfrontend`. Fetch is replaced in the test.
+  Recorded in `gendd/adr/0001-frontend-tests-use-vitest.md`. See `context/quality-assurance.md`.
 - Minimum today: `npm run lint` passes, and the `data-testid` attributes stay stable so a future
   end-to-end suite can target them.
 
@@ -104,21 +107,12 @@ The old `/api/breeder/*` example router in `services/data-engine/clients/node/` 
 - The UI must never show a verdict without its reason, and must never let the product look like it
   decides for the breeder (`gendd/specs/uc4-use-case.md`, non-negotiable constraints). Every colour
   shown needs its `reason` or evidence next to it.
-- When `overridden` is true, the table shows only an "Overridden" badge. The engine's colour must
-  also be visible (`engine_colour`, `services/data-engine/docs/INTEGRATION.md` section 6).
-- The UI must not compute scores or colours itself; it only displays what the engine returned
+- When `overridden` is true, the row shows the engine reason and, separately, the breeder override
+  (`override.reason_code` and `override.comment`) plus `engine_colour`.
+- The UI must not compute scores or colours itself; it only displays what the server returned
   (`services/data-engine/docs/CONTRACTS.md`).
-- `EditCandidateModal` lets the breeder edit crop, mean yield and justification. This is an accepted
-  product decision (`context/product-management.md`), but those edits must go through the audited
-  corrections endpoint (roadmap F1.4). They must never be sent as if they were engine values, and
-  corrected values must be shown as breeder corrections next to the original.
-- Mock shape versus contract: `crop` and `mean_yield_t_ha` are not in the engine's candidate row, and
-  the data only has `CROP_GUID`. Wiring F1.2 needs either an engine change or dropping the columns.
-- `OVERRIDE_REASONS` duplicates the engine's reason codes in `audit.py`; if they drift, overrides are
-  rejected. Load them from `GET /api/breeder/override-reasons` when wiring.
-- The modal labels the comment "optional", but the engine rejects `OTHER` without a comment.
-- Section order is GREEN, AMBER, RED (`TRIAGE_STATUS_ORDER`), while the engine sorts RED first for
-  "what to look at first". Changing it is a product decision.
+- Crop and mean yield are not fields on the candidate. Corrections for them are F1.4.
+- `OTHER` without a comment is blocked in the modal and is not sent.
 - Hardcoding `http://localhost:*` in components instead of `API_BASE_URL` breaks non-local environments.
 
 ## Unknowns

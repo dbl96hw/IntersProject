@@ -1,10 +1,29 @@
 import Logo from './Logo';
 import PlantDecoration from './PlantDecoration';
-import { APP_NAME, SIDEBAR_TEXT } from '../constants';
+import { APP_NAME, RECENT_DASHBOARD_LIMIT, SIDEBAR_TEXT } from '../constants';
 import './Sidebar.css';
 
-function Sidebar({ dashboards, activeDashboardId, user, onNewDashboard, onSelectDashboard }) {
-  const isNewDashboardActive = activeDashboardId === null;
+function initialsFrom(name) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) {
+    return '?';
+  }
+  return parts.slice(0, 2).map((part) => part[0].toUpperCase()).join('');
+}
+
+function Sidebar({
+  chats,
+  chatsStatus,
+  chatsMessage,
+  activeChatId,
+  onNewDashboard,
+  onSelectChat,
+  breederUser = '',
+  onBreederUserChange = () => {},
+}) {
+  const isNewDashboardActive = activeChatId === null;
+  const visibleChats = chats.slice(0, RECENT_DASHBOARD_LIMIT);
+  const hiddenCount = Math.max(chats.length - visibleChats.length, 0);
 
   return (
     <aside className="sidebar" data-testid="sidebar">
@@ -33,37 +52,66 @@ function Sidebar({ dashboards, activeDashboardId, user, onNewDashboard, onSelect
           {SIDEBAR_TEXT.RECENT_DASHBOARDS}
         </h2>
 
-        {dashboards.length === 0 ? (
+        {chatsStatus === 'loading' && (
+          <p className="sidebar__empty" role="status" data-testid="chats-loading">
+            {SIDEBAR_TEXT.LOADING}
+          </p>
+        )}
+
+        {chatsStatus === 'error' && (
+          <p className="sidebar__empty" role="alert" data-testid="chats-error">
+            {chatsMessage}
+          </p>
+        )}
+
+        {chatsStatus === 'ready' && visibleChats.length === 0 && (
           <p className="sidebar__empty">{SIDEBAR_TEXT.NO_DASHBOARDS}</p>
-        ) : (
+        )}
+
+        {chatsStatus === 'ready' && visibleChats.length > 0 && (
           <ul className="sidebar__list">
-            {dashboards.map((dashboard) => {
-              const isActive = dashboard.id === activeDashboardId;
+            {visibleChats.map((chat) => {
+              const isActive = chat.id === activeChatId;
 
               return (
-                <li key={dashboard.id}>
+                <li key={chat.id}>
                   <button
                     type="button"
                     className={`sidebar__dashboard${isActive ? ' sidebar__dashboard--active' : ''}`}
-                    onClick={() => onSelectDashboard(dashboard.id)}
+                    onClick={() => onSelectChat(chat.id)}
                     aria-current={isActive ? 'page' : undefined}
-                    title={dashboard.title}
-                    data-testid={`recent-dashboard-${dashboard.id}`}
+                    title={chat.title}
+                    data-testid={`recent-dashboard-${chat.id}`}
                   >
-                    {dashboard.title}
+                    {chat.title}
                   </button>
                 </li>
               );
             })}
           </ul>
         )}
+
+        {chatsStatus === 'ready' && hiddenCount > 0 && (
+          <p className="sidebar__empty" role="status" data-testid="hidden-dashboards-count">
+            {hiddenCount} {SIDEBAR_TEXT.HIDDEN_DASHBOARDS}
+          </p>
+        )}
       </nav>
 
       <div className="sidebar__user" data-testid="sidebar-user">
         <span className="sidebar__avatar" aria-hidden="true">
-          {user.initials}
+          {initialsFrom(breederUser)}
         </span>
-        <span className="sidebar__user-name">{user.name}</span>
+        <label className="sidebar__user-field">
+          {SIDEBAR_TEXT.BREEDER}
+          <input
+            className="sidebar__user-input"
+            type="text"
+            value={breederUser}
+            onChange={(event) => onBreederUserChange(event.target.value)}
+            data-testid="breeder-user-input"
+          />
+        </label>
       </div>
     </aside>
   );

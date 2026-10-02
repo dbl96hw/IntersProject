@@ -124,6 +124,14 @@
   overflow-wrap: anywhere;
 }
 
+.triage-table__row--expanded .triage-table__override-comment {
+  display: block;
+  margin-top: 0.35rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+}
+
 .triage-table__badge {
   display: inline-block;
   margin-right: 0.5rem;

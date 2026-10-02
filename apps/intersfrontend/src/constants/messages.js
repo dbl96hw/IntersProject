@@ -4,6 +4,10 @@ export const SIDEBAR_TEXT = {
   NEW_DASHBOARD: 'New dashboard',
   RECENT_DASHBOARDS: 'Recent dashboards',
   NO_DASHBOARDS: 'No dashboards yet',
+  LOADING: 'Loading dashboards.',
+  LOAD_FAILED: 'The dashboard list could not be loaded.',
+  HIDDEN_DASHBOARDS: 'more dashboards are not shown',
+  BREEDER: 'Breeder',
 };
 
 export const WELCOME_TEXT = {
@@ -16,6 +20,17 @@ export const WELCOME_TEXT = {
   SUBMIT: 'Create dashboard',
   ANALYZING: 'Analyzing your files...',
   FILES_SELECTED: 'Selected files',
+  UPLOAD_COMING_SOON: 'File upload is coming soon. Creating a dashboard from files is not available yet.',
+};
+
+export const HEALTH_TEXT = {
+  LOADING: 'Checking whether the backend and the data engine are reachable.',
+  UNREACHABLE: 'The backend is not reachable.',
+  UNEXPECTED: 'The backend returned an unexpected error.',
+  STATUS_LABEL: 'Backend status',
+  MODE_LABEL: 'Mode',
+  ENGINE_LABEL: 'Engine',
+  MOCK_NOTICE: 'The backend is in mock mode. Colour changes are not saved.',
 };
 
 export const DASHBOARD_TEXT = {
@@ -28,11 +43,21 @@ export const DASHBOARD_TEXT = {
   EMPTY_SECTION: 'No candidates in this group',
   OVERRIDDEN_BADGE: 'Overridden',
   ROW_HINT: 'Click a row to expand it. Right-click a row to edit it.',
+  LOADING: 'Loading candidates.',
+  EMPTY: 'This dashboard has no candidates.',
+  LIST_INCOMPLETE: 'The candidate list stopped before every row arrived. Nothing is shown.',
+  UNVERIFIED_BADGE: 'Unverified',
+  AMBIGUOUS_TRIALS: 'Ambiguous trials',
+  ATYPICAL: 'Atypical',
+  SOURCE_LABEL: 'Source',
+  ENGINE_REASON: 'Engine reason',
+  BREEDER_OVERRIDE: 'Breeder override',
+  DECISION_LABEL: 'Decision',
 };
 
 export const FILTER_TEXT = {
   SEARCH_LABEL: 'Search candidates',
-  SEARCH_PLACEHOLDER: 'Search by ID, crop, or justification',
+  SEARCH_PLACEHOLDER: 'Search by ID or justification',
   STATUS_GROUP_LABEL: 'Filter by status',
   STATUS_ALL: 'All',
   NO_RESULTS: 'No candidates match your filters.',
@@ -41,20 +66,29 @@ export const FILTER_TEXT = {
 export const EDIT_TEXT = {
   MENU_EDIT_ROW: 'Edit row',
   MODAL_TITLE: 'Edit candidate',
-  CROP: 'Crop',
-  MEAN_YIELD: 'Mean yield (t/ha)',
-  JUSTIFICATION: 'Justification',
   STATUS: 'Status',
   OVERRIDE_REASON: 'Override reason',
   OVERRIDE_REASON_PLACEHOLDER: 'Select a reason',
-  COMMENT: 'Comment (optional)',
+  COMMENT_OPTIONAL: 'Comment (optional)',
+  COMMENT_REQUIRED: 'Comment (required for Other)',
   REASON_REQUIRED: 'Choose an override reason to change the status.',
-  YIELD_INVALID: 'Enter a yield of zero or more.',
-  CROP_REQUIRED: 'Enter a crop.',
-  JUSTIFICATION_REQUIRED: 'Enter a justification.',
+  COMMENT_REQUIRED_ERROR: 'A comment is required when the reason is Other.',
+  USER_REQUIRED: 'Enter a breeder name before saving. This is not a login.',
+  REASONS_LOADING: 'Loading override reasons.',
+  REASONS_FAILED: 'Override reasons could not be loaded.',
+  ENGINE_DOWN: 'The data engine is down. The row was not changed.',
+  PASS: 'Pass',
+  NO_PASS: 'No pass',
   CANCEL: 'Cancel',
-  SAVE: 'Save changes',
+  SAVE: 'Save colour change',
 };
+
+export function missingReasonText(count) {
+  if (count === 1) {
+    return '1 candidate has no reason and is not shown';
+  }
+  return `${count} candidates have no reason and are not shown`;
+}
 
 export const CHAT_TEXT = {
   TITLE: 'Chat with Git Push & Pray',

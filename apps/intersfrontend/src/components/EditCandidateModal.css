@@ -111,3 +111,22 @@
   outline: 2px solid var(--color-logo-terracotta);
   outline-offset: 2px;
 }
+
+.edit-modal__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.edit-modal__readonly {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0;
+}
+
+.edit-modal__readonly-label,
+.edit-modal__decision-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}

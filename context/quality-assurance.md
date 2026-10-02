@@ -25,7 +25,7 @@ lint only** — neither pytest nor `npm test` runs on pull requests yet.
   `.env`; print ids and summaries, never secrets or raw payloads.
 - **Fixtures:** `data/synthetic/uc4/` (engine); `apps/intersbackend/test/fixtures.js`;
   `apps/intersbackend/test/fixtures/lab-report.pdf` (manual engine document checks, not used in CI tests).
-- **Frontend:** no automated test framework yet; rich `data-testid` coverage since PR #7 (listed below).
+- **Frontend:** Vitest and Testing Library (`npm test -w apps/intersfrontend`). Fetch is replaced in the test. See `gendd/adr/0001-frontend-tests-use-vitest.md`.
 
 ## Conventions in force
 
@@ -50,5 +50,5 @@ lint only** — neither pytest nor `npm test` runs on pull requests yet.
 ## Unknowns
 
 - Unknown: add pytest and `npm test` to CI (roadmap F3.1).
-- Unknown: frontend unit framework (Vitest) and E2E (Playwright).
+- Unknown: end-to-end runner (Playwright is not chosen; F3.1). Vitest is recorded in `gendd/adr/0001-frontend-tests-use-vitest.md`. Backend runner is `node:test` (`gendd/adr/0002-backend-tests-use-node-test.md`).
 - Unknown: Tesseract in CI for document tests.

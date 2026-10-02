@@ -1,91 +1,161 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { getChat, listChatCandidates, listChats } from '../api/client';
+import { replaceCandidate } from '../replaceCandidate';
+import BackendStatus from '../components/BackendStatus';
 import ChatWidget from '../components/ChatWidget';
 import DashboardView from '../components/DashboardView';
 import LeafDecoration from '../components/LeafDecoration';
 import Sidebar from '../components/Sidebar';
 import WelcomeView from '../components/WelcomeView';
-import { MOCK_ANALYSIS_DELAY_MS } from '../constants';
-import { MOCK_USER, RECENT_DASHBOARDS, createMockDashboard } from '../mocks/dashboards';
+import { BREEDER_USER, DASHBOARD_TEXT, HEALTH_TEXT } from '../constants';
 import './Workspace.css';
 
+function latestAnalysisWarnings(messages) {
+  if (!Array.isArray(messages)) {
+    return [];
+  }
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message?.kind === 'analysis' && message.analysis) {
+      return Array.isArray(message.analysis.warnings) ? message.analysis.warnings : [];
+    }
+  }
+  return [];
+}
+
 function Workspace() {
-  const [dashboards, setDashboards] = useState(RECENT_DASHBOARDS);
-  // null means "New dashboard" is selected, which shows the welcome screen.
-  const [activeDashboardId, setActiveDashboardId] = useState(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const analysisTimeout = useRef(null);
+  const [chatsState, setChatsState] = useState({ state: 'loading', chats: [], message: '' });
+  const [activeChatId, setActiveChatId] = useState(null);
+  const [dashboardState, setDashboardState] = useState({ state: 'idle' });
+  const [breederUser, setBreederUser] = useState(BREEDER_USER);
 
-  const activeDashboard = dashboards.find((dashboard) => dashboard.id === activeDashboardId) ?? null;
+  const activeChat = chatsState.chats.find((chat) => chat.id === activeChatId) ?? null;
 
-  useEffect(() => () => window.clearTimeout(analysisTimeout.current), []);
+  useEffect(() => {
+    let cancelled = false;
+
+    listChats()
+      .then((chats) => {
+        if (!cancelled) {
+          setChatsState({ state: 'ready', chats, message: '' });
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setChatsState({ state: 'error', chats: [], message: error.message || HEALTH_TEXT.UNREACHABLE });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!activeChatId) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    Promise.all([listChatCandidates(activeChatId), getChat(activeChatId)])
+      .then(([list, chat]) => {
+        if (!cancelled) {
+          setDashboardState({
+            state: 'ready',
+            candidates: list.candidates,
+            total: list.total,
+            warnings: latestAnalysisWarnings(chat.messages),
+          });
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setDashboardState({ state: 'error', message: error.message || DASHBOARD_TEXT.LIST_INCOMPLETE });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeChatId]);
 
   function handleNewDashboard() {
-    setActiveDashboardId(null);
+    setActiveChatId(null);
   }
 
-  function handleSelectDashboard(dashboardId) {
-    setActiveDashboardId(dashboardId);
+  function handleCandidateUpdated(updated) {
+    setDashboardState((current) => {
+      if (current.state !== 'ready') {
+        return current;
+      }
+      return { ...current, candidates: replaceCandidate(current.candidates, updated) };
+    });
   }
 
-  // The upload is a mock: no file leaves the browser, the rows come from mocks/dashboards.js.
-  function handleSubmitFiles(fileNames) {
-    setIsAnalyzing(true);
-
-    analysisTimeout.current = window.setTimeout(() => {
-      const newDashboard = createMockDashboard(fileNames);
-      setDashboards((currentDashboards) => [newDashboard, ...currentDashboards]);
-      setActiveDashboardId(newDashboard.id);
-      setIsAnalyzing(false);
-    }, MOCK_ANALYSIS_DELAY_MS);
+  function handleSelectChat(chatId) {
+    setActiveChatId(chatId);
+    setDashboardState({ state: 'loading' });
   }
 
-  function handleUpdateCandidate(candidateId, changes) {
-    setDashboards((currentDashboards) =>
-      currentDashboards.map((dashboard) => {
-        if (dashboard.id !== activeDashboardId) {
-          return dashboard;
-        }
-
-        return {
-          ...dashboard,
-          candidates: dashboard.candidates.map((candidate) =>
-            candidate.candidate_id === candidateId
-              ? { ...candidate, ...changes, overridden: changes.colour !== candidate.engine_colour }
-              : candidate,
-          ),
-        };
-      }),
-    );
-  }
+  const dashboardFailed = activeChat && dashboardState.state === 'error';
+  const dashboardLoading = activeChat && dashboardState.state === 'loading';
+  const dashboardEmpty = activeChat && dashboardState.state === 'ready' && dashboardState.total === 0;
+  const dashboardReady = activeChat && dashboardState.state === 'ready' && dashboardState.total > 0;
 
   return (
     <div className="workspace">
       <Sidebar
-        dashboards={dashboards}
-        activeDashboardId={activeDashboardId}
-        user={MOCK_USER}
+        chats={chatsState.chats}
+        chatsStatus={chatsState.state}
+        chatsMessage={chatsState.message}
+        activeChatId={activeChatId}
         onNewDashboard={handleNewDashboard}
-        onSelectDashboard={handleSelectDashboard}
+        onSelectChat={handleSelectChat}
+        breederUser={breederUser}
+        onBreederUserChange={setBreederUser}
       />
 
       <main className="workspace__main">
+        <BackendStatus />
         <LeafDecoration position="top-right" />
         <LeafDecoration position="bottom-left" />
 
         <div className="workspace__scroll" data-testid="workspace-scroll">
-          {activeDashboard ? (
+          {!activeChat && <WelcomeView />}
+
+          {dashboardLoading && (
+            <p className="workspace__status" role="status" data-testid="dashboard-loading">
+              {DASHBOARD_TEXT.LOADING}
+            </p>
+          )}
+
+          {dashboardFailed && (
+            <p className="workspace__status" role="alert" data-testid="dashboard-error">
+              {dashboardState.message}
+            </p>
+          )}
+
+          {dashboardEmpty && (
+            <p className="workspace__status" role="status" data-testid="dashboard-empty">
+              {DASHBOARD_TEXT.EMPTY}
+            </p>
+          )}
+
+          {dashboardReady && (
             <DashboardView
-              key={activeDashboard.id}
-              dashboard={activeDashboard}
-              onUpdateCandidate={handleUpdateCandidate}
+              key={activeChat.id}
+              title={activeChat.title}
+              candidates={dashboardState.candidates}
+              warnings={dashboardState.warnings}
+              breederUser={breederUser}
+              onCandidateUpdated={handleCandidateUpdated}
             />
-          ) : (
-            <WelcomeView isAnalyzing={isAnalyzing} onSubmitFiles={handleSubmitFiles} />
           )}
         </div>
       </main>
 
-      {activeDashboard && <ChatWidget key={activeDashboard.id} candidates={activeDashboard.candidates} />}
+      {dashboardReady && <ChatWidget key={activeChat.id} candidates={dashboardState.candidates} />}
     </div>
   );
 }

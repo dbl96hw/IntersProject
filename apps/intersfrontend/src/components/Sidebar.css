@@ -152,7 +152,21 @@
   font-weight: 600;
 }
 
-.sidebar__user-name {
-  font-size: 0.9rem;
-  font-weight: 500;
+.sidebar__user-field {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+  font-size: 0.75rem;
+}
+
+.sidebar__user-input {
+  width: 100%;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--color-sidebar-secondary);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
 }

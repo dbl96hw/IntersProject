@@ -16,6 +16,10 @@ export default [
         window: 'readonly',
         document: 'readonly',
         fetch: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
+        URL: 'readonly',
+        URLSearchParams: 'readonly',
       },
       parserOptions: {
         ecmaFeatures: { jsx: true },
@@ -33,6 +37,14 @@ export default [
       // No prop-types in this scaffold — turn back on if the project adopts them
       'react/prop-types': 'off',
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+    },
+  },
+  {
+    files: ['**/*.test.{js,jsx}'],
+    languageOptions: {
+      globals: {
+        File: 'readonly',
+      },
     },
   },
 ];

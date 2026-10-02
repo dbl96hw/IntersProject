@@ -1,6 +1,5 @@
 import {
   DASHBOARD_TEXT,
-  OVERRIDE_REASONS,
   TABLE_COLUMNS,
 } from '../constants';
 import './TriageSection.css';
@@ -8,11 +7,6 @@ import './TriageSection.css';
 function formatCandidateCount(count) {
   const noun = count === 1 ? DASHBOARD_TEXT.CANDIDATE_ONE : DASHBOARD_TEXT.CANDIDATE_OTHER;
   return `${count} ${noun}`;
-}
-
-function getOverrideReasonLabel(candidate) {
-  const reason = OVERRIDE_REASONS.find(({ code }) => code === candidate.override?.reason_code);
-  return reason ? reason.label : DASHBOARD_TEXT.OVERRIDDEN_BADGE;
 }
 
 function TriageSection({ status, candidates, expandedIds, onToggleRow, onRowContextMenu }) {
@@ -81,8 +75,6 @@ function TriageSection({ status, candidates, expandedIds, onToggleRow, onRowCont
                   data-testid={`candidate-row-${candidate.candidate_id}`}
                 >
                   <td title={isExpanded ? undefined : candidate.candidate_id}>{candidate.candidate_id}</td>
-                  <td title={isExpanded ? undefined : candidate.crop}>{candidate.crop}</td>
-                  <td>{candidate.mean_yield_t_ha}</td>
                   <td>
                     {candidate.n_fail}/{candidate.n_trials}
                   </td>
@@ -90,13 +82,83 @@ function TriageSection({ status, candidates, expandedIds, onToggleRow, onRowCont
                     {candidate.overridden && (
                       <span
                         className="triage-table__badge"
-                        title={getOverrideReasonLabel(candidate)}
+                        title={candidate.override?.reason_code || DASHBOARD_TEXT.OVERRIDDEN_BADGE}
                         data-testid={`overridden-badge-${candidate.candidate_id}`}
                       >
                         {DASHBOARD_TEXT.OVERRIDDEN_BADGE}
                       </span>
                     )}
-                    {candidate.reason}
+                    {candidate.overridden && (
+                      <span
+                        className="triage-table__badge"
+                        data-testid={`engine-colour-${candidate.candidate_id}`}
+                      >
+                        {candidate.engine_colour}
+                      </span>
+                    )}
+                    {candidate.justification_source && (
+                      <span
+                        className="triage-table__badge"
+                        data-testid={`justification-source-${candidate.candidate_id}`}
+                      >
+                        {DASHBOARD_TEXT.SOURCE_LABEL} {candidate.justification_source}
+                      </span>
+                    )}
+                    {candidate.verified === false && (
+                      <span
+                        className="triage-table__badge"
+                        data-testid={`unverified-badge-${candidate.candidate_id}`}
+                      >
+                        {DASHBOARD_TEXT.UNVERIFIED_BADGE}
+                      </span>
+                    )}
+                    {Array.isArray(candidate.ambiguous_trials) && candidate.ambiguous_trials.length > 0 && (
+                      <span
+                        className="triage-table__badge"
+                        data-testid={`ambiguous-trials-${candidate.candidate_id}`}
+                      >
+                        {DASHBOARD_TEXT.AMBIGUOUS_TRIALS}
+                      </span>
+                    )}
+                    {candidate.atypical === true && (
+                      <span className="triage-table__badge" data-testid={`atypical-flag-${candidate.candidate_id}`}>
+                        {DASHBOARD_TEXT.ATYPICAL}
+                      </span>
+                    )}
+                    {candidate.overridden && (
+                      <span
+                        className="triage-table__badge"
+                        data-testid={`engine-reason-label-${candidate.candidate_id}`}
+                      >
+                        {DASHBOARD_TEXT.ENGINE_REASON}
+                      </span>
+                    )}
+                    <span data-testid={`candidate-reason-${candidate.candidate_id}`}>{candidate.reason}</span>
+                    {candidate.overridden && candidate.override && (
+                      <span data-testid={`breeder-override-${candidate.candidate_id}`}>
+                        <span
+                          className="triage-table__badge"
+                          data-testid={`breeder-override-label-${candidate.candidate_id}`}
+                        >
+                          {DASHBOARD_TEXT.BREEDER_OVERRIDE}
+                        </span>
+                        {candidate.override.reason_code}
+                        {candidate.override.comment ? (
+                          <span
+                            className="triage-table__override-comment"
+                            data-testid={`breeder-override-comment-${candidate.candidate_id}`}
+                          >
+                            {candidate.override.comment}
+                          </span>
+                        ) : null}
+                      </span>
+                    )}
+                    {typeof candidate.decision === 'string' && (
+                      <span data-testid={`candidate-decision-${candidate.candidate_id}`}>
+                        <span className="triage-table__badge">{DASHBOARD_TEXT.DECISION_LABEL}</span>
+                        {candidate.decision}
+                      </span>
+                    )}
                   </td>
                 </tr>
               );
