@@ -34,12 +34,14 @@ export const TRIAGE_STATUS_ORDER = [TRIAGE_STATUS.GREEN.key, TRIAGE_STATUS.AMBER
 
 // One shared config keeps the three tables' columns aligned (used with table-layout: fixed).
 export const TABLE_COLUMNS = [
-  { key: 'candidate_id', label: 'Candidate ID', width: '22%' },
-  { key: 'trials', label: 'Trials failed/total', width: '18%' },
-  { key: 'reason', label: 'Justification', width: '60%' },
+  { key: 'candidate_id', label: 'Candidate ID', width: '20%' },
+  { key: 'trials', label: 'Trials failed/total', width: '16%' },
+  { key: 'reason', label: 'Justification', width: '48%' },
+  { key: 'decision', label: 'Decision', width: '16%' },
 ];
 
 export const CANDIDATE_DECISIONS = {
+  PENDING: 'pending',
   PASS: 'pass',
   NO_PASS: 'no_pass',
 };

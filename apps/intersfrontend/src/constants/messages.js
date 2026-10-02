@@ -8,7 +8,6 @@ export const SIDEBAR_TEXT = {
   NO_DASHBOARDS: 'No dashboards yet',
   LOADING: 'Loading dashboards.',
   LOAD_FAILED: 'The dashboard list could not be loaded.',
-  HIDDEN_DASHBOARDS: 'more dashboards are not shown',
   BREEDER: 'Breeder',
 };
 
@@ -21,13 +20,12 @@ export const WELCOME_TEXT = {
   BROWSE_FILES: 'Browse files',
   REMOVE_FILE: 'Remove file',
   SUBMIT: 'Create dashboard',
-  ANALYZING: 'Analyzing your files. With many candidates this takes about a minute and a half; keep this tab open.',
+  ANALYZING: 'We\'re building your dashboard. This can take a minute or two, so please keep this tab open.',
   UPLOAD_FAILED: 'The files could not be analyzed. Try again, or check the backend status above.',
   FILES_SELECTED: 'Selected files',
 };
 
 export const UPLOAD_TEXT = {
-  FORMATS_HINT: 'CSV, XLSX, XLS, PDF, DOCX, PNG, JPG, WEBP. Up to 10 files, 10 MB each.',
   TRY_AGAIN: 'Try again in a moment.',
   NETWORK: 'The server did not answer. Check that the backend is running and try again.',
 };
@@ -67,7 +65,7 @@ export const DASHBOARD_TEXT = {
   CANDIDATE_OTHER: 'candidates',
   EMPTY_SECTION: 'No candidates in this group',
   OVERRIDDEN_BADGE: 'Overridden',
-  ROW_HINT: 'Click a row to expand it. Right-click a row to edit it.',
+  ROW_HINT: 'Right-click a row to edit it.',
   LOADING: 'Loading candidates.',
   EMPTY: 'This dashboard has no candidates.',
   LIST_INCOMPLETE: 'The candidate list stopped before every row arrived. Nothing is shown.',
@@ -78,6 +76,7 @@ export const DASHBOARD_TEXT = {
   ENGINE_REASON: 'Engine reason',
   BREEDER_OVERRIDE: 'Breeder override',
   DECISION_LABEL: 'Decision',
+  DECISION_PENDING: 'Pending',
   FILES_TITLE: 'Files in this analysis',
   FILE_USED: 'used',
   FILE_NOT_USED: 'not used',
@@ -96,6 +95,7 @@ export const EDIT_TEXT = {
   MENU_EDIT_ROW: 'Edit row',
   MODAL_TITLE: 'Edit candidate',
   STATUS: 'Status',
+  STATUS_REASON: 'Reason of the status',
   OVERRIDE_REASON: 'Override reason',
   OVERRIDE_REASON_PLACEHOLDER: 'Select a reason',
   COMMENT_OPTIONAL: 'Comment (optional)',
@@ -109,7 +109,7 @@ export const EDIT_TEXT = {
   PASS: 'Pass',
   NO_PASS: 'No pass',
   CANCEL: 'Cancel',
-  SAVE: 'Save colour change',
+  SAVE: 'Save',
 };
 
 export function missingReasonText(count) {
@@ -124,6 +124,7 @@ export const CHAT_TEXT = {
   INPUT_PLACEHOLDER: 'Ask about a candidate...',
   SEND: 'Send message',
   MINIMIZE: 'Minimize chat',
+  EXPAND: 'Expand chat',
   CLOSE: 'Close chat',
   OPEN: 'Open chat',
   TYPING: 'Typing...',

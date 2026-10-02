@@ -55,10 +55,10 @@ data in one place with a recommendation and its reasoning, without chasing five 
 
 ### Coverage of the use case today
 
-- Implemented and pending features: `gendd/specs/feature-roadmap.md`. Phase 0 done. Express gateway and
-  Claude justification layer exist (PRs #9–#12; Step 8 prompt on branch `feature/backend-prompts`).
-  Pending: UI wiring to `/api`, live upload orchestration (9A), chat agent (9B), breeder decisions
-  (ticket 3), corrections (F1.4), demo ops (Step 10).
+- Implemented features and later improvements: `gendd/specs/feature-roadmap.md` (Improvements). The
+  workspace that ships uploads files, triages candidates, records an override or a pass / no pass, and
+  chats. Rename and delete on the left panel, the health indicator, ingestion warnings, and the
+  evidence card are improvements, not part of this commit.
 
 ### Product decisions
 

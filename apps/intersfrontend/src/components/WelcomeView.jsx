@@ -1,8 +1,37 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Logo from './Logo';
 import { validateUploadFiles } from '../validateUploadFiles';
-import { ACCEPTED_FILE_TYPES, APP_NAME, UPLOAD_TEXT, WELCOME_TEXT } from '../constants';
+import { ACCEPTED_FILE_TYPES, APP_NAME, WELCOME_TEXT } from '../constants';
 import './WelcomeView.css';
+
+const THINKING_DOT_MS = 450;
+
+// Grows from one dot to three so the wait looks active, then starts again.
+function prefersReducedMotion() {
+  return window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
+}
+
+function ThinkingDots() {
+  const [dotCount, setDotCount] = useState(() => (prefersReducedMotion() ? 3 : 1));
+
+  useEffect(() => {
+    if (prefersReducedMotion()) {
+      return undefined;
+    }
+
+    const timer = setInterval(() => {
+      setDotCount((current) => (current % 3) + 1);
+    }, THINKING_DOT_MS);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <span className="welcome__thinking-dots" aria-hidden="true">
+      {'.'.repeat(dotCount)}
+    </span>
+  );
+}
 
 function WelcomeView({
   isAnalyzing = false,
@@ -81,7 +110,14 @@ function WelcomeView({
         <h1 id="welcome-title" className="welcome__title">
           {APP_NAME}
         </h1>
-        <p className="welcome__greeting">{WELCOME_TEXT.GREETING}</p>
+        <p
+          className={`welcome__greeting${isAnalyzing ? ' welcome__greeting--status' : ''}`}
+          role={isAnalyzing ? 'status' : undefined}
+          data-testid={isAnalyzing ? 'analysis-loading' : undefined}
+        >
+          {isAnalyzing ? WELCOME_TEXT.ANALYZING.replace(/\.$/, '') : WELCOME_TEXT.GREETING}
+          {isAnalyzing && <ThinkingDots />}
+        </p>
       </div>
 
       <form className="welcome__form" onSubmit={handleSubmit}>
@@ -101,7 +137,6 @@ function WelcomeView({
             {isDragging ? WELCOME_TEXT.DROPZONE_ACTIVE : WELCOME_TEXT.DROPZONE_TITLE}
           </p>
           <p className="welcome__dropzone-hint">{WELCOME_TEXT.DROPZONE_HINT}</p>
-          <p className="welcome__dropzone-hint" data-testid="upload-limits">{WELCOME_TEXT.LIMITS}</p>
 
           <input
             ref={fileInputRef}
@@ -112,41 +147,40 @@ function WelcomeView({
             onChange={handleFilesChange}
             data-testid="upload-input"
           />
-          <button
-            type="button"
-            className="welcome__browse-button"
-            onClick={handleBrowseClick}
-            disabled={isAnalyzing}
-            data-testid="upload-add-button"
-          >
-            {WELCOME_TEXT.BROWSE_FILES}
-          </button>
+          {!isAnalyzing && (
+            <button
+              type="button"
+              className="welcome__browse-button"
+              onClick={handleBrowseClick}
+              data-testid="upload-add-button"
+            >
+              {WELCOME_TEXT.BROWSE_FILES}
+            </button>
+          )}
+
+          {hasFiles && (
+            <ul className="welcome__files" aria-label={WELCOME_TEXT.FILES_SELECTED} data-testid="selected-files">
+              {files.map((file) => (
+                <li key={file.name} className="welcome__file-chip">
+                  <span className="welcome__file-name" title={file.name}>
+                    {file.name}
+                  </span>
+                  <button
+                    type="button"
+                    className="welcome__file-remove"
+                    onClick={() => handleRemoveFile(file.name)}
+                    disabled={isAnalyzing}
+                    aria-label={`${WELCOME_TEXT.REMOVE_FILE}: ${file.name}`}
+                  >
+                    &times;
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
-        {hasFiles && (
-          <ul className="welcome__files" aria-label={WELCOME_TEXT.FILES_SELECTED} data-testid="selected-files">
-            {files.map((file) => (
-              <li key={file.name} className="welcome__file-chip">
-                <span className="welcome__file-name" title={file.name}>
-                  {file.name}
-                </span>
-                <button
-                  type="button"
-                  className="welcome__file-remove"
-                  onClick={() => handleRemoveFile(file.name)}
-                  disabled={isAnalyzing}
-                  aria-label={`${WELCOME_TEXT.REMOVE_FILE}: ${file.name}`}
-                >
-                  &times;
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <p className="welcome__formats-hint" data-testid="upload-formats-hint">
-          {UPLOAD_TEXT.FORMATS_HINT}
-        </p>
+        <p className="welcome__formats-hint" data-testid="upload-limits">{WELCOME_TEXT.LIMITS}</p>
 
         {pickErrors.length > 0 && (
           <ul className="welcome__problems" role="alert" data-testid="upload-file-errors">
@@ -162,11 +196,7 @@ function WelcomeView({
           </p>
         )}
 
-        {isAnalyzing ? (
-          <p className="welcome__analyzing" role="status" data-testid="analysis-loading">
-            {WELCOME_TEXT.ANALYZING}
-          </p>
-        ) : (
+        {!isAnalyzing && (
           <button
             type="submit"
             className="welcome__submit-button"

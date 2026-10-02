@@ -117,8 +117,24 @@
   outline-offset: -2px;
 }
 
+.triage-table__justification,
+.triage-table__detail {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .triage-table__row--expanded td {
-  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.triage-table__row--expanded .triage-table__justification,
+.triage-table__row--expanded .triage-table__detail {
+  overflow: hidden;
   text-overflow: clip;
   white-space: normal;
   overflow-wrap: anywhere;
@@ -132,14 +148,11 @@
   text-overflow: clip;
 }
 
-.triage-table__badge {
-  display: inline-block;
-  margin-right: 0.5rem;
-  padding: 0.05rem 0.5rem;
-  border-radius: 999px;
-  background: var(--color-sidebar-secondary);
-  cursor: help;
-  font-size: 0.72rem;
+.triage-table__decision {
+  font-weight: 600;
+}
+
+.triage-table__decision--pending {
   font-weight: 500;
-  color: var(--color-card-bg);
+  color: var(--color-text-secondary);
 }

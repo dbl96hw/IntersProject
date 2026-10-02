@@ -8,10 +8,8 @@ import {
   postChatFiles,
 } from '../api/client';
 import { replaceCandidate } from '../replaceCandidate';
-import BackendStatus from '../components/BackendStatus';
 import ChatWidget from '../components/ChatWidget';
 import DashboardView from '../components/DashboardView';
-import IngestionList from '../components/IngestionList';
 import LeafDecoration from '../components/LeafDecoration';
 import Sidebar from '../components/Sidebar';
 import WelcomeView from '../components/WelcomeView';
@@ -145,7 +143,7 @@ function Workspace() {
         return;
       }
 
-      // Zero candidates still opens the dashboard: the backend's ingestion list explains each file.
+      // Zero candidates still opens the dashboard. Ingestion details stay on the analysis payload and are not shown.
       setUploadState(IDLE_UPLOAD_STATE);
       handleSelectChat(chat.id);
     } catch (error) {
@@ -186,7 +184,6 @@ function Workspace() {
       />
 
       <main className="workspace__main">
-        <BackendStatus />
         <LeafDecoration position="top-right" />
         <LeafDecoration position="bottom-left" />
 
@@ -217,26 +214,13 @@ function Workspace() {
               <p role="status" data-testid="dashboard-empty">
                 {DASHBOARD_TEXT.EMPTY}
               </p>
-              <IngestionList ingestion={dashboardState.ingestion} />
-              {dashboardState.warnings?.length > 0 && (
-                <ul data-testid="analysis-warnings">
-                  {dashboardState.warnings.map((warning, index) => (
-                    <li key={`${warning.code}-${index}`} data-testid={`analysis-warning-${warning.code}`}>
-                      {warning.code}: {warning.message}
-                    </li>
-                  ))}
-                </ul>
-              )}
             </div>
           )}
 
           {dashboardReady && (
             <DashboardView
               key={activeChat.id}
-              title={activeChat.title}
               candidates={dashboardState.candidates}
-              warnings={dashboardState.warnings}
-              ingestion={dashboardState.ingestion}
               breederUser={breederUser}
               onCandidateUpdated={handleCandidateUpdated}
             />

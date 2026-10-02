@@ -72,8 +72,8 @@ async function openEditor(candidateId) {
 
 async function chooseAmber(reasonCode, comment) {
   fireEvent.change(screen.getByTestId('edit-status-select'), { target: { value: 'AMBER' } });
-  const reasonSelect = await screen.findByTestId('edit-override-reason-select');
-  fireEvent.change(reasonSelect, { target: { value: reasonCode } });
+  await screen.findByTestId('edit-override-reason-select');
+  fireEvent.click(screen.getByTestId(`edit-override-reason-${reasonCode}`));
   if (comment !== undefined) {
     fireEvent.change(screen.getByTestId('edit-comment-input'), { target: { value: comment } });
   }
@@ -118,7 +118,7 @@ describe('colour override and decision', () => {
     expect(screen.queryByTestId('edit-save-coming-soon')).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByTestId('edit-status-select'), { target: { value: 'AMBER' } });
-    expect(await screen.findByRole('option', { name: 'From the engine: field observation' })).toBeInTheDocument();
+    expect(await screen.findByRole('radio', { name: 'From the engine: field observation' })).toBeInTheDocument();
     await chooseAmber('FIELD_OBSERVATION', 'good vigour in plot 12');
     fireEvent.click(screen.getByTestId('edit-save-button'));
 
@@ -137,10 +137,10 @@ describe('colour override and decision', () => {
     expect(screen.getByTestId('triage-section-red')).toContainElement(screen.getByTestId('candidate-row-SYN-STAY'));
     expect(screen.getByTestId('candidate-reason-SYN-STAY')).toHaveTextContent('fails in 1 of 1 trials');
     expect(screen.queryByTestId('breeder-override-SYN-STAY')).not.toBeInTheDocument();
-    expect(screen.getByTestId('engine-colour-SYN-MOVE')).toHaveTextContent('RED');
-    expect(screen.getByTestId('engine-reason-label-SYN-MOVE')).toHaveTextContent('Engine reason');
+    expect(screen.queryByTestId('engine-colour-SYN-MOVE')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('engine-reason-label-SYN-MOVE')).not.toBeInTheDocument();
     expect(screen.getByTestId('candidate-reason-SYN-MOVE')).toHaveTextContent('fails in 1 of 1 trials');
-    expect(screen.getByTestId('breeder-override-label-SYN-MOVE')).toHaveTextContent('Breeder override');
+    expect(screen.queryByTestId('breeder-override-label-SYN-MOVE')).not.toBeInTheDocument();
     expect(screen.getByTestId('breeder-override-SYN-MOVE')).toHaveTextContent('FIELD_OBSERVATION');
     expect(screen.getByTestId('breeder-override-SYN-MOVE')).toHaveTextContent('good vigour in plot 12');
     expect(screen.getByTestId('filter-status-all')).toHaveTextContent('2');
@@ -176,7 +176,6 @@ describe('colour override and decision', () => {
     await waitFor(() => {
       expect(screen.getByTestId('triage-section-amber')).toContainElement(screen.getByTestId('candidate-row-SYN-MOVE'));
     });
-    expect(screen.queryByTestId('engine-colour-SYN-MOVE')).not.toBeInTheDocument();
     expect(screen.queryByTestId('breeder-override-SYN-MOVE')).not.toBeInTheDocument();
     expect(screen.getByTestId('candidate-reason-SYN-MOVE')).toHaveTextContent('fails in 1 of 1 trials');
   });
@@ -187,8 +186,8 @@ describe('colour override and decision', () => {
     const { unmount } = render(<Board rows={[row({ id: 'row-move', candidate_id: 'SYN-MOVE' })]} breederUser="" />);
     await openEditor('SYN-MOVE');
     await chooseAmber('FIELD_OBSERVATION', 'note');
+    fireEvent.change(screen.getByTestId('edit-decision-select'), { target: { value: 'no_pass' } });
     fireEvent.click(screen.getByTestId('edit-save-button'));
-    fireEvent.click(screen.getByTestId('decision-no-pass-button'));
 
     expect(screen.getByTestId('edit-user-required')).toHaveTextContent(EDIT_TEXT.USER_REQUIRED);
     expect(callsFor(fetchMock, 'PATCH')).toHaveLength(0);
@@ -270,21 +269,21 @@ describe('colour override and decision', () => {
     });
 
     render(<Board rows={[before]} />);
-    expect(screen.getByTestId('engine-colour-SYN-DECIDE')).toHaveTextContent('RED');
+    expect(screen.getByTestId('candidate-decision-SYN-DECIDE')).toHaveTextContent('Pending');
     expect(screen.getByTestId('triage-section-red')).toContainElement(screen.getByTestId('candidate-row-SYN-DECIDE'));
 
     await openEditor('SYN-DECIDE');
-    fireEvent.click(screen.getByTestId('decision-no-pass-button'));
+    fireEvent.change(screen.getByTestId('edit-decision-select'), { target: { value: 'no_pass' } });
+    fireEvent.click(screen.getByTestId('edit-save-button'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('candidate-decision-SYN-DECIDE')).toHaveTextContent('no_pass');
+      expect(screen.getByTestId('candidate-decision-SYN-DECIDE')).toHaveTextContent('No pass');
     });
 
     const decisionCalls = callsFor(fetchMock, 'POST');
     expect(decisionCalls).toHaveLength(1);
     expect(JSON.parse(decisionCalls[0][1].body)).toEqual({ decision: 'no_pass', user: 'Ada Breeder' });
     expect(screen.getByTestId('triage-section-red')).toContainElement(screen.getByTestId('candidate-row-SYN-DECIDE'));
-    expect(screen.getByTestId('engine-colour-SYN-DECIDE')).toHaveTextContent(before.engine_colour);
     expect(screen.getByTestId('filter-status-red')).toHaveTextContent('1');
     expect(screen.getByTestId('filter-status-amber')).toHaveTextContent('0');
     expect(callsFor(fetchMock, 'PATCH')).toHaveLength(0);

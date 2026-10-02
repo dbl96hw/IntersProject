@@ -160,8 +160,12 @@ function ChatWidget({ chatId = null, storedMessages = EMPTY_MESSAGES }) {
     }
   }
 
-  function handleToggleMinimize() {
-    setIsMinimized((currentValue) => !currentValue);
+  function handleExpand() {
+    setIsMinimized(false);
+  }
+
+  function handleMinimize() {
+    setIsMinimized(true);
   }
 
   function handleClose() {
@@ -194,17 +198,32 @@ function ChatWidget({ chatId = null, storedMessages = EMPTY_MESSAGES }) {
       data-testid="chat-widget"
     >
       <header className="chat-widget__header">
-        <h2 className="chat-widget__title">{CHAT_TEXT.TITLE}</h2>
-        <button
-          type="button"
-          className="chat-widget__header-button"
-          onClick={handleToggleMinimize}
-          aria-label={CHAT_TEXT.MINIMIZE}
-          aria-expanded={!isMinimized}
-          data-testid="chat-minimize-button"
-        >
-          &minus;
-        </button>
+        {isMinimized ? (
+          <button
+            type="button"
+            className="chat-widget__expand"
+            onClick={handleExpand}
+            aria-label={CHAT_TEXT.EXPAND}
+            aria-expanded={false}
+            data-testid="chat-widget-header"
+          >
+            <span className="chat-widget__title">{CHAT_TEXT.TITLE}</span>
+          </button>
+        ) : (
+          <h2 className="chat-widget__title">{CHAT_TEXT.TITLE}</h2>
+        )}
+        {!isMinimized && (
+          <button
+            type="button"
+            className="chat-widget__header-button"
+            onClick={handleMinimize}
+            aria-label={CHAT_TEXT.MINIMIZE}
+            aria-expanded
+            data-testid="chat-minimize-button"
+          >
+            &minus;
+          </button>
+        )}
         <button
           type="button"
           className="chat-widget__header-button"

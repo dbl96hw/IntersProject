@@ -11,7 +11,6 @@ export {
   OTHER_REASON_CODE,
   UPLOAD_FIELD,
 } from './api.js';
-export { RECENT_DASHBOARD_LIMIT } from './dashboards.js';
 export { LEAF_PATH } from './decorations.js';
 export {
   APP_NAME,

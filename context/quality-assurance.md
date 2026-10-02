@@ -9,7 +9,7 @@
 
 - `services/data-engine/tests/` with pytest (`services/data-engine/pyproject.toml`).
 - `services/data-engine/tests/` — 91 tests (1 skipped where Tesseract is missing).
-- `apps/intersbackend/test/` — `node --test`, 152 tests; Anthropic SDK and engine mocked. Frontend Vitest: 47 tests.
+- `apps/intersbackend/test/` — `node --test`, 152 tests; Anthropic SDK and engine mocked. Frontend Vitest: 60 tests.
 - `.github/workflows/lint.yml` (lint) and `.github/workflows/test.yml` (pytest, node:test, Vitest) on pull requests.
 - `.cursor/rules/80-testability-lite.mdc`.
 
@@ -33,7 +33,15 @@ there is no end-to-end browser test yet (F3.1).
 - Optional deps skipped in pytest via `importorskip`.
 - Backend: mock external services in unit tests; no real Anthropic or engine HTTP.
 - Frontend testability: `data-testid` on interactive elements (workspace, upload, dashboard, edit modal,
-  chat widget) — see prior list in this file's history; ids unchanged for E2E later.
+  chat widget). The workspace UI refactor removed `backend-status`, `backend-status-loading`,
+  `backend-status-error`, `backend-mock-notice`, `ingestion-list`, `ingestion-item-*`,
+  `analysis-warnings`, `analysis-warning-*`, `hidden-dashboards-count`, `engine-colour-*`,
+  `engine-reason-label-*`, `breeder-override-label-*`, `justification-source-*`, `unverified-badge-*`,
+  `ambiguous-trials-*`, `atypical-flag-*`, `overridden-badge-*`, `decision-pass-button`,
+  `decision-no-pass-button`, and `upload-formats-hint`. It added `chat-widget-header` (expand),
+  `edit-decision-select`, and `edit-override-reason-<code>`. `candidate-decision-*` is on every row
+  and reads Pending, Pass, or No pass. `upload-limits` is the formats and size hint. Keep the ids
+  that remain stable for a later end-to-end suite.
 - Gherkin in stories; DoD expects tests per criterion (`gendd/definition-of-ready.md`, `definition-of-done.md`).
 
 ## Testing expectations

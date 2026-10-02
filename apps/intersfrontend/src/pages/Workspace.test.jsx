@@ -3,9 +3,6 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   DASHBOARD_TEXT,
-  HEALTH_REFRESH_MS,
-  HEALTH_TEXT,
-  SIDEBAR_TEXT,
   UPLOAD_FIELD,
   UPLOAD_TEXT,
   WELCOME_TEXT,
@@ -83,80 +80,9 @@ function uploadApi({ analysis = null, candidates = [], error = null }) {
   return state;
 }
 
-describe('Workspace backend status and welcome', () => {
+describe('Workspace welcome and dashboard', () => {
   afterEach(() => {
-    vi.useRealTimers();
     vi.unstubAllGlobals();
-  });
-
-  it('shows a loading status before health answers', () => {
-    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
-
-    render(<Workspace />);
-
-    expect(screen.getByTestId('backend-status-loading')).toHaveTextContent(HEALTH_TEXT.LOADING);
-  });
-
-  it('shows the mode and engine returned by health', async () => {
-    mockApi({ health: { healthy: true, mode: 'live', engine: 'down' } });
-
-    render(<Workspace />);
-
-    const status = await screen.findByTestId('backend-status');
-    expect(status).toHaveTextContent('live');
-    expect(status).toHaveTextContent('down');
-  });
-
-  it('shows an error message when health cannot be reached', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
-
-    render(<Workspace />);
-
-    expect(await screen.findByTestId('backend-status-error')).toHaveTextContent(HEALTH_TEXT.UNREACHABLE);
-    expect(screen.queryByTestId('backend-status')).not.toBeInTheDocument();
-  });
-
-  it('asks for health again after the refresh interval', async () => {
-    vi.useFakeTimers();
-    let healthCalls = 0;
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url) => {
-        const parsed = new URL(url);
-        if (parsed.pathname === '/health') {
-          healthCalls += 1;
-          const engine = healthCalls === 1 ? 'down' : 'up';
-          return Promise.resolve(jsonResponse({ healthy: true, mode: 'live', engine }));
-        }
-        if (parsed.pathname === '/api/chats') {
-          return Promise.resolve(jsonResponse({ chats: [] }));
-        }
-        return Promise.resolve(jsonResponse({ error: { code: 'NOT_FOUND', message: 'Missing', field: null } }, false));
-      }),
-    );
-
-    render(<Workspace />);
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    expect(screen.getByTestId('backend-status')).toHaveTextContent('down');
-    expect(healthCalls).toBe(1);
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(HEALTH_REFRESH_MS);
-    });
-
-    expect(screen.getByTestId('backend-status')).toHaveTextContent('up');
-    expect(healthCalls).toBe(2);
-  });
-
-  it('shows a mock-mode notice when health mode is mock', async () => {
-    mockApi({ health: { healthy: true, mode: 'mock', engine: 'skipped' } });
-
-    render(<Workspace />);
-
-    expect(await screen.findByTestId('backend-mock-notice')).toHaveTextContent(HEALTH_TEXT.MOCK_NOTICE);
   });
 
   it('creates a chat, sends the files as multipart and opens the new dashboard', async () => {
@@ -186,6 +112,7 @@ describe('Workspace backend status and welcome', () => {
     // While the analysis runs: a status instead of the button, so no second submit.
     expect(await screen.findByTestId('analysis-loading')).toHaveTextContent(WELCOME_TEXT.ANALYZING);
     expect(screen.queryByTestId('upload-submit')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('upload-add-button')).not.toBeInTheDocument();
     expect(api.created).toBe(1);
     const form = api.posted[0];
     expect(form).toBeInstanceOf(FormData);
@@ -196,9 +123,8 @@ describe('Workspace backend status and welcome', () => {
     });
 
     expect(await screen.findByTestId('candidate-row-SYN-MZ-00001')).toBeInTheDocument();
-    expect(screen.getByTestId('ingestion-item-0')).toHaveTextContent('trials.csv: used (trial_recommendations, 72 rows)');
-    expect(screen.getByTestId('ingestion-item-1')).toHaveTextContent('invoice.pdf: not used - Not about breeding or trial data');
-    expect(screen.getByTestId('analysis-warning-IRRELEVANT_FILE')).toBeInTheDocument();
+    expect(screen.queryByTestId('ingestion-list')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('analysis-warning-IRRELEVANT_FILE')).not.toBeInTheDocument();
     expect(api.created).toBe(1);
   });
 
@@ -222,7 +148,7 @@ describe('Workspace backend status and welcome', () => {
     });
 
     expect(await screen.findByTestId('dashboard-empty')).toHaveTextContent(DASHBOARD_TEXT.EMPTY);
-    expect(screen.getByTestId('ingestion-item-0')).toHaveTextContent('invoice.pdf: not used');
+    expect(screen.queryByTestId('ingestion-item-0')).not.toBeInTheDocument();
   });
 
   it('stays on the upload screen with the error when the analysis fails', async () => {
@@ -241,7 +167,7 @@ describe('Workspace backend status and welcome', () => {
     expect(screen.queryByTestId('dashboard-view')).not.toBeInTheDocument();
   });
 
-  it('lists only the latest eight chats and shows how many are hidden', async () => {
+  it('lists every chat in the sidebar', async () => {
     const chats = Array.from({ length: 9 }, (_, index) => ({
       id: `chat-${index}`,
       title: `Chat ${index}`,
@@ -251,9 +177,8 @@ describe('Workspace backend status and welcome', () => {
     render(<Workspace />);
 
     expect(await screen.findByTestId('recent-dashboard-chat-0')).toBeInTheDocument();
-    expect(screen.getByTestId('recent-dashboard-chat-7')).toBeInTheDocument();
-    expect(screen.queryByTestId('recent-dashboard-chat-8')).not.toBeInTheDocument();
-    expect(screen.getByTestId('hidden-dashboards-count')).toHaveTextContent(`1 ${SIDEBAR_TEXT.HIDDEN_DASHBOARDS}`);
+    expect(screen.getByTestId('recent-dashboard-chat-8')).toBeInTheDocument();
+    expect(screen.queryByTestId('hidden-dashboards-count')).not.toBeInTheDocument();
   });
 
   it('shows a loading status while candidates are in flight and no colour before they arrive', async () => {
@@ -570,7 +495,7 @@ describe('Workspace file upload', () => {
     await submitFile(user);
 
     expect(await screen.findByTestId('dashboard-empty')).toHaveTextContent(DASHBOARD_TEXT.EMPTY);
-    expect(screen.getByTestId('ingestion-item-0')).toHaveTextContent('the file is damaged');
+    expect(screen.queryByTestId('ingestion-item-0')).not.toBeInTheDocument();
     expect(screen.queryByTestId('welcome-view')).not.toBeInTheDocument();
   });
 

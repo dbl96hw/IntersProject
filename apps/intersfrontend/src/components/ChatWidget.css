@@ -31,6 +31,21 @@
   font-weight: 600;
 }
 
+.chat-widget__expand {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
 .chat-widget__header-button {
   display: inline-flex;
   align-items: center;
