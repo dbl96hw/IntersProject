@@ -5,12 +5,12 @@ Phased, priority-ordered list of the features that cover the hackathon use case
 readiness: conversational channels (WhatsApp, voice), authentication hardening, deployment beyond `stg`
 and Cropwise packaging are out of this roadmap.
 
-Last synced with `dev` on 2026-10-01, after PR #12 (`feature/backend-live-analysis`, merge `f08e178`).
+Last synced with `dev` on 2026-10-02, after PR #13 (`feature/backend-prompts`, merge `86c829b`).
 Merged on `dev` so far for the backend gateway and Claude layer: PR #9 (API contract and paths), PR #10
 and #11 (`feature/backend-core`: Supabase schema, mock/live routes, ingest service, data engine client),
-PR #12 (Claude client, evidence check, live `claude:smoke`). PR #7 added the mock workspace UI. The
-Step 8 explanation prompt work lives on branch `feature/backend-prompts` (not merged yet). PR #8 does not
-appear in `dev`'s merge history.
+PR #12 (Claude client, evidence check, live `claude:smoke`), PR #13 (Step 8 explanation prompt). PR #7
+added the mock workspace UI. Step 9A (live upload) is implemented on `feature/9a-live-upload`. PR #8 does
+not appear in `dev`'s merge history.
 
 ## How to read and use this file
 
@@ -355,10 +355,10 @@ Phase 4 feature, re-run the F3.1 checklist.
 - Evidence / pointers: `apps/intersfrontend/src/components/WelcomeView.jsx`, `Workspace.jsx`
   (`handleSubmitFiles` is a mock), `docs/api-contract.md` (`POST /api/chats/:id/messages` multipart),
   `apps/intersbackend/src/services/ingest.service.js` (tables via `/ingest/records`; documents via engine
-  `/documents/base64` — not wired to live analysis yet), engine `POST /ingest/records`, `GET /search`.
+  `/documents/base64` after the relevance gate, wired to live analysis), engine `POST /ingest/records`, `GET /search`.
 - Checklist:
   - [x] Drag-and-drop / browse upload with accepted types matching the engine's formats and removable file chips (F0.5)
-  - [x] Relevance gate: off-topic documents are refused before Claude reads them (engine `POST /relevance`, used by the Express ingest service), with an `IRRELEVANT_FILE` warning
+  - [x] Relevance gate: off-topic documents are refused before the engine indexes them (`POST /relevance`), with an `IRRELEVANT_FILE` warning
   - [x] Uploads never overwrite the exports: identical rows are ignored, contradicting rows are counted as `conflicts` and shown (`UPLOAD_CONFLICTS` warning, engine quality report)
   - [ ] Send each file through `POST /api/chats/:id/messages` (multipart) with a size limit shown to the user
   - [ ] Show the ingestion result per file: accepted source and rows, or rejected with the best-guess detection
@@ -407,19 +407,19 @@ Phase 4 feature, re-run the F3.1 checklist.
 
 ## Backend next steps (Step 9 onward)
 
-Work after the Step 8 explanation prompt branch merges. See `context/backend-development.md` and
-`agents/backend-dev.md` for the current layout.
+Step 8 is merged. 9A is done. See `context/backend-development.md` and `agents/backend-dev.md`.
 
 ### 9A — Live upload orchestration
 
-- Wire `analysis.service` in live mode: tables through `ingest.service` → engine `POST /ingest/records`;
+- [x] Wire `analysis.service` in live mode: tables through `ingest.service` → engine `POST /ingest/records`;
   documents through engine `POST /documents/base64` (no Claude extraction).
-- Reuse explanations when `evidence_hash` unchanged (design in Step 9 story).
-- `EXPLAIN_MAX_SYNC=30`: explain synchronously with priority RED > AMBER > GREEN; defer the rest with
+- [x] Reuse explanations when `evidence_hash` unchanged (SHA-256 of the llm-context payload, without
+  `instructions` or `tokens`).
+- [x] `EXPLAIN_MAX_SYNC=30`: explain synchronously with priority RED > AMBER > GREEN; defer the rest with
   warning `EXPLANATION_DEFERRED`.
-- Build the analysis **summary** on the backend from engine data (Claude's summary is advisory only;
+- [x] Build the analysis **summary** on the backend from engine data (Claude's summary is advisory only;
   do not trust unverified counts).
-- Persist `usage` (see Usage in `docs/api-contract.md`) and `versions` via `getPromptVersions`
+- [x] Persist `usage` (see Usage in `docs/api-contract.md`) and `versions` via `getPromptVersions`
   (`explanation_prompt`, `rule_version`, `model`).
 
 ### 9B — Chat agent with engine tools

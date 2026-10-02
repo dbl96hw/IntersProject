@@ -9,6 +9,7 @@ export const LLM_TOOL_NAMES = {
 
 export const LLM_MAX_TOKENS = 8192;
 export const LLM_TIMEOUT_MS = 60_000;
+export const EXPLAIN_MAX_SYNC = 30;
 export const LLM_RETRY_DELAY_MS = 1000;
 export const RETRYABLE_STATUSES = [429, 529];
 export const MIN_SERVER_ERROR_STATUS = 500;

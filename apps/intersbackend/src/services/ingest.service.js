@@ -1,25 +1,21 @@
-// Sends uploaded files to the data engine. Tables go as-is; documents go through Claude's extraction
-// (injected) and then as records. This layer never computes colours or joins sources: it only maps
-// readable ids to the engine's GUIDs (and back) through the engine's own read-only SQL.
-// Documents first pass the engine's relevance gate, so an off-topic file (an invoice, a holiday photo)
-// never reaches Claude or the evidence index. Tables need no gate: the engine already rejects any
-// table whose columns match no known source.
+// Sends uploaded files to the data engine. Tables go as records (POST /ingest/records).
+// Documents first pass the engine's relevance gate, then go as bytes (POST /documents/base64).
+// Claude does not extract them. The gate is the engine's own check, not a Claude call.
+// Tables skip the gate: the engine already rejects a table whose columns match no known source.
+// This layer never computes colours: it only maps readable ids to the engine's GUIDs
+// through the engine's own read-only SQL.
 
-import path from 'node:path';
 import {
   FILE_KINDS,
   HTTP_STATUS,
   ID_VALUE_PATTERN,
   KEY_COLUMNS,
-  MAX_IDS_IN_WARNING,
   MAX_IDS_PER_SQL,
   MAX_RECORDS_PER_INGEST,
   MAX_SQL_ROWS,
   RELEVANCE_DECISIONS,
   WARNING_CODES,
 } from '../constants/index.js';
-import { extractDocxText } from '../extractors/docx.js';
-import { toMedia } from '../extractors/media.js';
 import { extractTables, normalizeHeader } from '../extractors/tables.js';
 import { DataEngineError } from './dataEngineClient.js';
 import { fileKindOf } from './responses.js';
@@ -60,24 +56,12 @@ function keyValue(record, key) {
   return value === '' ? undefined : value;
 }
 
-function listIds(ids) {
-  const shown = ids.slice(0, MAX_IDS_IN_WARNING).join(', ');
-  return ids.length > MAX_IDS_IN_WARNING ? `${shown} (+${ids.length - MAX_IDS_IN_WARNING} more)` : shown;
-}
-
 // Only the file name and the reason are logged, never contents or records.
 function logFailure(fileName, step, err) {
   console.error(`ingest: ${fileName ?? '-'} ${step} failed (${err?.message})`);
 }
 
-async function documentContent(file) {
-  if (path.extname(file.name).toLowerCase() === '.docx') {
-    return { type: 'text', text: await extractDocxText(file.buffer) };
-  }
-  return { type: 'media', ...toMedia(file.name, file.buffer) };
-}
-
-export function createIngestService({ dataEngine, claudeExtract }) {
+export function createIngestService({ dataEngine }) {
   // Runs one SELECT per batch of ids. Engine-side query errors (not outages) return null so the
   // caller can warn and continue; an unreachable engine still fails the whole ingestion.
   async function queryIds(ids, buildQuery, step) {
@@ -152,6 +136,17 @@ export function createIngestService({ dataEngine, claudeExtract }) {
     } catch (err) {
       logFailure(file.name, 'read', err);
       state.warnings.push(warning(WARNING_CODES.EXTRACTION_FAILED, `Could not read "${file.name}": the file is damaged or not a valid spreadsheet`, file.name));
+      state.ingestion.push({
+        file: file.name,
+        kind: FILE_KINDS.TABLE,
+        accepted: false,
+        source: null,
+        rows: null,
+        rows_added: null,
+        duplicates_ignored: null,
+        conflicts: null,
+        message: err.message,
+      });
       return;
     }
     state.warnings.push(...extracted.warnings);
@@ -160,86 +155,7 @@ export function createIngestService({ dataEngine, claudeExtract }) {
     }
   }
 
-  async function extractDocumentRecords(file, state) {
-    let groups;
-    try {
-      groups = await claudeExtract({ file: file.name, content: await documentContent(file) });
-    } catch (err) {
-      logFailure(file.name, 'extract', err);
-      state.warnings.push(warning(WARNING_CODES.EXTRACTION_FAILED, `Could not extract records from "${file.name}"`, file.name));
-      return [];
-    }
-    const nonEmpty = (groups ?? []).filter((group) => Array.isArray(group.records) && group.records.length > 0);
-    if (nonEmpty.length === 0) {
-      state.warnings.push(warning(WARNING_CODES.NO_RECORDS_EXTRACTED, `No records were found in "${file.name}"; nothing from it was sent as records`, file.name));
-    }
-    return nonEmpty;
-  }
-
-  async function lookupGuids(ids, buildQuery, step) {
-    const rows = ids.size > 0 ? await queryIds(ids, buildQuery, step) : [];
-    return new Map((rows ?? []).map((row) => [String(row.id), row.guid]));
-  }
-
-  // Records whose readable id has no GUID in the engine are omitted: a GUID is never guessed.
-  async function resolveDocumentIds(file, groups, state) {
-    const needed = { MATERIAL: new Set(), TRIAL: new Set() };
-    const needsOf = (record) => ({
-      MATERIAL: !keyValue(record, 'MATERIAL_GUID') ? keyValue(record, 'MATERIAL_ID') : undefined,
-      TRIAL: !keyValue(record, 'TRIAL_GUID') ? keyValue(record, 'TRIAL_ID') : undefined,
-    });
-    groups.forEach((group) => group.records.forEach((record) => {
-      const needs = needsOf(record);
-      if (needs.MATERIAL) needed.MATERIAL.add(needs.MATERIAL);
-      if (needs.TRIAL) needed.TRIAL.add(needs.TRIAL);
-    }));
-
-    const materialGuids = await lookupGuids(needed.MATERIAL, (list) => `SELECT candidate_id AS id, MATERIAL_GUID AS guid FROM materials WHERE candidate_id IN (${list})`, 'resolve material ids');
-    const trialGuids = await lookupGuids(needed.TRIAL, (list) => `SELECT TRIAL_ID AS id, TRIAL_GUID AS guid FROM trials WHERE TRIAL_ID IN (${list})`, 'resolve trial ids');
-
-    const unresolved = new Set();
-    let omitted = 0;
-    const resolvedGroups = groups.map((group) => ({
-      source: group.source,
-      records: group.records.flatMap((record) => {
-        const needs = needsOf(record);
-        const materialGuid = needs.MATERIAL && materialGuids.get(needs.MATERIAL);
-        const trialGuid = needs.TRIAL && trialGuids.get(needs.TRIAL);
-        if (needs.MATERIAL && !materialGuid) unresolved.add(needs.MATERIAL);
-        if (needs.TRIAL && !trialGuid) unresolved.add(needs.TRIAL);
-        if ((needs.MATERIAL && !materialGuid) || (needs.TRIAL && !trialGuid)) {
-          omitted += 1;
-          return [];
-        }
-        return [{
-          ...record,
-          ...(materialGuid ? { MATERIAL_GUID: materialGuid } : {}),
-          ...(trialGuid ? { TRIAL_GUID: trialGuid } : {}),
-        }];
-      }),
-    }));
-
-    if (omitted > 0) {
-      state.warnings.push(warning(
-        WARNING_CODES.UNRESOLVED_IDS,
-        `${omitted} record(s) from "${file.name}" were omitted and not sent to the engine because these ids were not found in the engine: ${listIds([...unresolved])}`,
-        file.name,
-      ));
-    }
-    return resolvedGroups;
-  }
-
-  async function uploadDocument(file, state) {
-    try {
-      await dataEngine.uploadDocument(file.name, file.buffer);
-    } catch (err) {
-      if (!(err instanceof DataEngineError) || isEngineUnavailable(err)) throw err;
-      logFailure(file.name, 'upload', err);
-      state.warnings.push(warning(WARNING_CODES.DOCUMENT_UPLOAD_FAILED, `"${file.name}" could not be added as searchable evidence: ${err.message}`, file.name));
-    }
-  }
-
-  // A gate failure that is not an outage (e.g. an engine without /relevance) lets the file through as before.
+  // A gate failure that is not an outage (an engine without /relevance) lets the file through.
   async function relevanceOf(file) {
     if (typeof dataEngine.checkRelevance !== 'function') return null;
     try {
@@ -284,18 +200,34 @@ export function createIngestService({ dataEngine, claudeExtract }) {
     return true;
   }
 
+  // The engine reads the file. We do not turn it into records here.
   async function ingestDocumentFile(file, state) {
     if (!(await passesRelevanceGate(file, state))) return;
-    if (!claudeExtract) {
-      state.warnings.push(warning(WARNING_CODES.NO_RECORDS_EXTRACTED, `Record extraction from documents is not available yet; "${file.name}" was only added as searchable evidence`, file.name));
-    } else {
-      const groups = await extractDocumentRecords(file, state);
-      const resolvedGroups = groups.length > 0 ? await resolveDocumentIds(file, groups, state) : [];
-      for (const group of resolvedGroups.filter((resolved) => resolved.records.length > 0)) {
-        await sendRecords(file, FILE_KINDS.DOCUMENT, `${file.name}#${group.source}`, group.records, state);
-      }
+    const item = {
+      file: file.name,
+      kind: FILE_KINDS.DOCUMENT,
+      accepted: false,
+      source: null,
+      rows: null,
+      rows_added: null,
+      duplicates_ignored: null,
+      conflicts: null,
+      message: null,
+    };
+    try {
+      await dataEngine.uploadDocument(file.name, file.buffer);
+      item.accepted = true;
+    } catch (err) {
+      if (!(err instanceof DataEngineError) || isEngineUnavailable(err)) throw err;
+      logFailure(file.name, 'upload', err);
+      item.message = err.message;
+      state.warnings.push(warning(
+        WARNING_CODES.DOCUMENT_UPLOAD_FAILED,
+        `"${file.name}" could not be added as searchable evidence: ${err.message}`,
+        file.name,
+      ));
     }
-    await uploadDocument(file, state);
+    state.ingestion.push(item);
   }
 
   async function hasTrialLink(state) {

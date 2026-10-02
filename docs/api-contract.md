@@ -147,12 +147,12 @@ The exports are the system of record: an uploaded row whose key is already in an
 ```
 
 ```json
-{ "file": "notes.pdf", "kind": "document", "accepted": false, "source": "UNKNOWN", "rows": null,
+{ "file": "notes.pdf", "kind": "document", "accepted": false, "source": null, "rows": null,
   "rows_added": null, "duplicates_ignored": null, "conflicts": null,
-  "message": "no known source matches these fields: needs classification by a human or the LLM" }
+  "message": "Not about breeding or trial data, so it was not read or added" }
 ```
 
-Documents pass the engine's relevance gate (`POST /relevance`) before Claude reads them. An off-topic file (an invoice, a holiday photo) is not sent to Claude or indexed: it gets an item with `accepted: false`, a message starting with "Not about breeding or trial data", and an `IRRELEVANT_FILE` warning. A file the gate cannot place is processed with a `RELEVANCE_UNCERTAIN` warning, so the breeder can check it. Tables skip the gate because the engine already rejects tables whose columns match no known source.
+Documents pass the engine's relevance gate (`POST /relevance`) and, if they pass, go as bytes to `POST /documents/base64`. The gate is the engine's own check. It does not call Claude, and Claude does not extract the file. An off-topic file is not indexed: `accepted: false`, a message starting with "Not about breeding or trial data", and an `IRRELEVANT_FILE` warning. A file the gate cannot place is uploaded with a `RELEVANCE_UNCERTAIN` warning, so the breeder can check it. Tables skip the gate because the engine already rejects tables whose columns match no known source.
 
 ### Usage
 
@@ -179,6 +179,8 @@ Totals for every Claude call made for this message. All zeros in mock mode.
 ```
 
 `file` is the file name when the warning is about one file, otherwise `null`.
+
+`EXPLANATION_DEFERRED` (`file` null) means more than 30 candidates needed a new explanation. The rest keep the engine `reason` as `justification`, with `justification_source` `"engine"`, `verified` false and `confidence` null. A reused explanation does not use one of those 30 slots.
 
 ### Tool call
 
@@ -226,6 +228,8 @@ Assistant message:
   "versions": { /* Versions */ }
 }
 ```
+
+`summary` is built by the backend from the engine colour counts (`N candidates analysed: X green, Y amber, Z red.`). Claude's summary is not copied into this field.
 
 `answer`:
 
@@ -297,7 +301,7 @@ Errors: 404 `NOT_FOUND`.
 | `text` | Yes if no files are sent | The question or a note about the files |
 | `files` | No | Repeat the field once per file (`formData.append('files', file)`). Up to `MAX_FILES` (10) files of `MAX_FILE_MB` (10 MB) each. Allowed: `.csv .xlsx .xls .pdf .docx .png .jpg .jpeg .webp`. UTF-8 file names (e.g. `análisis.csv`) are kept as sent. |
 
-With files, the backend runs an **analysis**: tables are sent to the engine, documents are extracted by Claude and sent to the engine, then each candidate is explained. Without files, it runs an **answer**: Claude answers through the engine's tools (max 6 rounds).
+With files, the backend runs an **analysis**: tables go to `POST /ingest/records`, documents that pass the relevance gate go to `POST /documents/base64`, then each candidate is explained. Claude does not extract documents. Without files, it runs an **answer**: Claude answers through the engine's tools (max 6 rounds). That answer path is not wired yet in live mode.
 
 > **Always check `assistant_message.status` before rendering.** The HTTP status is **201 even when the analysis failed**, so that the user message is saved and the frontend gets a `messageId` it can retry. When `status` is `"error"`, show `assistant_message.error.message` and a retry button; `analysis` and `answer` are both `null`.
 
