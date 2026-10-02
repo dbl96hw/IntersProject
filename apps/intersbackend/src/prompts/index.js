@@ -18,7 +18,8 @@ export function loadPrompt(id) {
   return prompt;
 }
 
-// Shape of messages.versions (docs/api-contract.md).
+// Analysis messages.versions. A chat answer adds chat_prompt and sets explanation_prompt to null;
+// that object is built in agent.service.js and must not be forced through this helper.
 export function getPromptVersions({ ruleVersion, model }) {
   return { explanation_prompt: PROMPT_IDS.EXPLANATION, rule_version: ruleVersion, model };
 }

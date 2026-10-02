@@ -249,15 +249,35 @@ test('usage and versions are saved and the summary counts engine colours', async
   assert.deepEqual(colours, { 'SYN-MZ-00001': 'RED', 'SYN-MZ-00002': 'AMBER' });
 });
 
-test('a live question with no files stays unavailable', async () => {
-  const { service, calls } = analysisService({ rows: [] });
+test('a live question with no files asks the chat agent and does not explain files', async () => {
+  const service = createAnalysisService({
+    config: { analysisMode: 'live', anthropicModel: MODEL, anthropicApiKey: 'test-key' },
+    ingest: { async ingestFiles() { throw new Error('files should not be ingested'); } },
+    claude: {
+      async explainAll() { throw new Error('explainAll is the file path'); },
+      async completeChat() {
+        return {
+          content: [{ type: 'text', text: 'SYN-MZ-00001 is red.' }],
+          usage: { input_tokens: 3, output_tokens: 2, cache_read_tokens: 0, cache_write_tokens: 0, cost_usd: 0 },
+        };
+      },
+    },
+    dataEngine: {
+      async getTools() {
+        return { tools: [{ name: 'query_candidates', input_schema: { type: 'object', properties: {} } }], system_prompt: 'from-engine' };
+      },
+    },
+    db: createMemoryDb(),
+  });
 
-  const result = await service.handleMessage({ text: 'which lines are red?', files: [] });
+  const result = await service.handleMessage({ text: 'which lines are red?', files: [], history: [] });
 
-  assert.equal(result.message.status, 'error');
-  assert.equal(result.message.error.code, 'LLM_UNAVAILABLE');
+  assert.equal(result.message.status, 'ok');
+  assert.equal(result.message.kind, 'answer');
+  assert.equal(result.message.text, 'SYN-MZ-00001 is red.');
+  assert.equal(result.message.versions.chat_prompt, 'engine');
+  assert.equal(result.message.versions.explanation_prompt, null);
   assert.deepEqual(result.candidates, []);
-  assert.equal(calls.length, 0);
 });
 
 function httpEngine(rows, { ingestError } = {}) {

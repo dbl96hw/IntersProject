@@ -7,3 +7,4 @@ with the sections Context, Decision, Consequences, and Status (proposed, accepte
 
 - `0001-frontend-tests-use-vitest.md` — Vitest and Testing Library for the React app. Status: accepted.
 - `0002-backend-tests-use-node-test.md` — `node:test` for the Express app. Status: accepted.
+- `0003-chat-tool-choice-auto.md` — chat uses `tool_choice: auto` and warns on numbers the tools did not return. Status: accepted.

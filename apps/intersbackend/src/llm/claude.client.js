@@ -311,5 +311,18 @@ export function createClaudeClient({
     };
   }
 
-  return { callTool, extractRecords, explainBatch, explainAll };
+  // Chat answers choose their own tools. Justifications stay on the forced tool_choice in callTool.
+  async function completeChat({ system, messages, tools }) {
+    const sent = await send({
+      model,
+      max_tokens: LLM_MAX_TOKENS,
+      system,
+      messages,
+      tools,
+      tool_choice: { type: 'auto' },
+    }, { toolName: 'chat', label: '-', attempt: 1 });
+    return { content: sent.response.content ?? [], stopReason: sent.response.stop_reason, usage: sent.usage };
+  }
+
+  return { callTool, extractRecords, explainBatch, explainAll, completeChat };
 }

@@ -166,11 +166,19 @@ Totals for every Claude call made for this message. All zeros in mock mode.
 
 ### Versions
 
+File analysis (`kind: "analysis"`) uses `getPromptVersions`. That helper stays these three fields:
+
 ```json
 { "explanation_prompt": "explanation.v1", "rule_version": "UC4_MATERIAL_V0", "model": "claude-..." }
 ```
 
-`rule_version` comes from the engine. `model` is `"mock"` in mock mode.
+A chat answer (`kind: "answer"`) does not use that helper. Its `versions` adds `chat_prompt` and leaves the explanation prompt empty:
+
+```json
+{ "explanation_prompt": null, "rule_version": "UC4_MATERIAL_V0", "model": "claude-...", "chat_prompt": "engine" }
+```
+
+`chat_prompt: "engine"` means the system prompt came from the engine `GET /tools` response. `rule_version` is copied from a tool result when one includes it, otherwise `null`. `model` is `"mock"` in mock mode. Callers that only read `explanation_prompt`, `rule_version` and `model` still work; they must not assume an answer has no `chat_prompt`.
 
 ### Warning
 
@@ -179,6 +187,8 @@ Totals for every Claude call made for this message. All zeros in mock mode.
 ```
 
 `file` is the file name when the warning is about one file, otherwise `null`.
+
+`ANSWER_UNVERIFIED_NUMBERS` (`file` null) is only on a chat answer. The text is still returned. It means a digit, or a count written as a word (`three`, `tres`, and the rest of `NUMBER_WORDS`), was not in this question's tool results. Digits inside a candidate id such as `SYN-MZ-00003` are not treated as that number.
 
 `EXPLANATION_DEFERRED` (`file` null) means more than 30 candidates needed a new explanation. The rest keep the engine `reason` as `justification`, with `justification_source` `"engine"`, `verified` false and `confidence` null. A reused explanation does not use one of those 30 slots.
 
@@ -212,7 +222,7 @@ Assistant message:
 | `role` | `"assistant"` |
 | `kind` | `"analysis"` (the user sent files) or `"answer"` (question only) |
 | `status` | `"ok"` or `"error"` |
-| `error` | `null`, or `{ "code", "message" }` when `status` is `"error"`. Codes: `DATA_ENGINE_UNAVAILABLE`, `LLM_UNAVAILABLE`, `EXTRACTION_FAILED`. |
+| `error` | `null`, or `{ "code", "message" }` when `status` is `"error"`. Codes: `DATA_ENGINE_UNAVAILABLE`, `LLM_UNAVAILABLE`, `EXTRACTION_FAILED`, `ANSWER_TIMEOUT` (the 90 second question limit), `ANSWER_ROUND_LIMIT` (six tool rounds and still no final text). |
 | `analysis` | Set when `kind` is `"analysis"` and `status` is `"ok"`, otherwise `null` |
 | `answer` | Set when `kind` is `"answer"` and `status` is `"ok"`, otherwise `null` |
 
@@ -237,9 +247,13 @@ Assistant message:
 {
   "text": "4 lines are red. SYN-MZ-00001: fails in 3 of 5 trials ... You decide; you can change any colour.",
   "tool_calls": [{ "name": "query_candidates", "input": { "colour": "RED" } }],
-  "usage": { /* Usage */ }
+  "usage": { /* Usage */ },
+  "warnings": [{ "code": "ANSWER_UNVERIFIED_NUMBERS", "message": "This answer includes numbers (4) that were not in the tool results.", "file": null }],
+  "versions": { "explanation_prompt": null, "rule_version": "UC4_MATERIAL_V0", "model": "claude-...", "chat_prompt": "engine" }
 }
 ```
+
+`warnings` is an empty array when every number in the text was in this question's tool results. The browser does not send conversation history; the backend loads prior user and answer messages for that chat and skips `kind: "analysis"`.
 
 ## Endpoints
 

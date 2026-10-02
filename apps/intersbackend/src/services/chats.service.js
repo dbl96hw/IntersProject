@@ -6,6 +6,7 @@ import {
   ROLES,
 } from '../constants/index.js';
 import { notFoundError, validationError } from '../errors.js';
+import { selectChatHistory } from './agent.service.js';
 import { toStoragePath } from './fileStorage.js';
 import { toChatResponse, toMessageResponse } from './responses.js';
 
@@ -51,8 +52,8 @@ export function createChatsService({ db, fileStorage, analysisService }) {
     })));
   }
 
-  async function runAnalysis(chatId, { text, files }) {
-    const result = await analysisService.handleMessage({ text, files });
+  async function runAnalysis(chatId, { text, files, history = [] }) {
+    const result = await analysisService.handleMessage({ text, files, history });
     const assistant = await db.messages.saveMessage({ ...result.message, chat_id: chatId, role: ROLES.ASSISTANT });
     const candidates = await db.candidates.saveCandidates(
       result.candidates.map((candidate) => ({ ...candidate, chat_id: chatId, message_id: assistant.id })),
@@ -99,7 +100,8 @@ export function createChatsService({ db, fileStorage, analysisService }) {
         buffer: upload.buffer,
       }));
 
-      const assistantMessage = await runAnalysis(chatId, { text, files });
+      const history = selectChatHistory(await db.messages.listMessages(chatId), userMessage.created_at);
+      const assistantMessage = await runAnalysis(chatId, { text, files, history });
       if (chat.title === DEFAULT_CHAT_TITLE && files.length > 0) {
         await db.chats.updateChatTitle(chatId, titleFromFiles(files));
       }
@@ -125,7 +127,8 @@ export function createChatsService({ db, fileStorage, analysisService }) {
       if (!userMessage) throw validationError('No user message found before this message', 'messageId');
 
       const files = await loadFileBuffers(await db.files.listFilesByMessage(userMessage.id));
-      return { assistant_message: await runAnalysis(chatId, { text: userMessage.text, files }) };
+      const history = selectChatHistory(messages, userMessage.created_at);
+      return { assistant_message: await runAnalysis(chatId, { text: userMessage.text, files, history }) };
     },
   };
 }

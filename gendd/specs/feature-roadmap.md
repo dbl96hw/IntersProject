@@ -5,7 +5,7 @@ Phased, priority-ordered list of the features that cover the hackathon use case
 readiness: conversational channels (WhatsApp, voice), authentication hardening, deployment beyond `stg`
 and Cropwise packaging are out of this roadmap.
 
-Last synced with `dev` on 2026-10-02, after PR #13 (`feature/backend-prompts`, merge `86c829b`).
+Last synced with the working tree on 2026-10-02, after backend 9B (chat agent) on `feature/chatbot` (not merged).
 Merged on `dev` so far for the backend gateway and Claude layer: PR #9 (API contract and paths), PR #10
 and #11 (`feature/backend-core`: Supabase schema, mock/live routes, ingest service, data engine client),
 PR #12 (Claude client, evidence check, live `claude:smoke`), PR #13 (Step 8 explanation prompt). PR #7
@@ -61,7 +61,7 @@ flowchart LR
 |---|---|---|
 | 0. Foundations | F0.1 - F0.5 | done |
 | 1. Demo critical path | F1.1 - F1.5 | in progress (Express gateway in mock + partial live; UI on mocks; F1.4 deferred after the freeze) |
-| 2. Natural-language assistant | F2.1 | in progress (Claude justification layer; chat agent pending) |
+| 2. Natural-language assistant | F2.1 | in progress (backend chat agent done; widget still on mocks) |
 | 3. Demo readiness gate | F3.1 | not started |
 | 4. Trust and data enrichment | F4.1 - F4.4 | in progress (F4.2 has mock upload UI) |
 
@@ -283,7 +283,7 @@ Phase 4 feature, re-run the F3.1 checklist.
 ## Phase 2 - Natural-language assistant
 
 ### F2.1 Breeder assistant chat
-- Status: in progress (chat widget on mocks; Claude justification layer done; chat agent pending)
+- Status: in progress (backend chat agent done in 9B; widget still on mocks)
 - Priority: 1 of 1 in Phase 2
 - Depends on: F1.1 (F1.3 recommended, so answers can link to the evidence card)
 - Goal: The breeder asks questions in their own language ("which lines should I look at first?") and
@@ -296,12 +296,12 @@ Phase 4 feature, re-run the F3.1 checklist.
   - [x] Chat widget with open / minimize / close, conversation history, typing state and `data-testid`s (F0.5)
   - [x] `@anthropic-ai/sdk` in `apps/intersbackend`; `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL` in `.env.example` (no values)
   - [x] Claude client, tool schemas, evidence check and explanation prompt (`submit_justifications` only; documents ingested by the engine)
-  - [ ] Wire chat agent (`agent.service.ask`) through engine tools on `POST /api/chats/:id/messages` (text-only path); cap rounds with `MAX_TOOL_ROUNDS`
-  - [ ] Replace `getMockChatReply` with the live answer path, sending conversation history
+  - [x] Wire chat agent (`agent.service.ask`) through engine tools on `POST /api/chats/:id/messages` (text-only path); cap rounds with `MAX_TOOL_ROUNDS` and the question with `CHAT_QUESTION_DEADLINE_MS`
+  - [ ] Replace `getMockChatReply` with the live answer path. The widget posts `{ text }` only; the backend reads saved messages and does not trust a history from the browser
   - [ ] Answers render the colour, the one-line reason and the cited evidence, plus the "you decide" reminder from the system prompt
   - [ ] Clear message in the widget when the API key is missing or the engine is unreachable, instead of a crash
-  - [ ] No override or colour-changing path through the chat (overrides stay in F1.5)
-  - [ ] Tests for the route with a mocked Claude client and a mocked engine
+  - [x] No override or colour-changing path through the chat (overrides stay in F1.5)
+  - [x] Tests for the route with a mocked Claude client and a mocked engine
 - Done when: the breeder asks "which lines are red and why?" and receives a cited answer.
 
 ---
@@ -425,8 +425,8 @@ Step 8 is merged. 9A is done. See `context/backend-development.md` and `agents/b
 
 ### 9B — Chat agent with engine tools
 
-- `agent.service.ask`: Claude loop using engine `GET /tools` and `POST /tools/:name`, max 6 rounds.
-- Answer verification warning `ANSWER_UNVERIFIED_NUMBERS` when numbers are not backed by tool results.
+- [x] `agent.service.ask`: Claude loop using engine `GET /tools` and `POST /tools/:name`, max 6 rounds, plus a 90 second deadline (`ANSWER_TIMEOUT`). History is loaded from saved messages; `kind: "analysis"` is skipped.
+- [x] Answer verification warning `ANSWER_UNVERIFIED_NUMBERS` when numbers are not backed by this question's tool results. The text is still returned. Ids are not numbers. Live check: the warning fired on 2 of 3 answers. `query_candidates` has no total, so a reply can count the default page of 20 instead of the full set. Digits 1, 3, 4 and 5 can match another field (including the `4` in `UC4_MATERIAL_V0`) and pass.
 
 ### Ticket 3 — Candidate decisions
 

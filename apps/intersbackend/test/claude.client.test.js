@@ -290,3 +290,22 @@ test('extractRecords sends PDFs as document blocks, images as image blocks and d
 
   await assert.rejects(client.extractRecords({ filename: 'empty.pdf' }), { code: 'VALIDATION_ERROR' });
 });
+
+test('completeChat lets the model choose a tool instead of forcing one', async () => {
+  const anthropic = fakeAnthropic(() => ({
+    content: [{ type: 'text', text: 'done' }],
+    stop_reason: 'end_turn',
+    usage: API_USAGE,
+  }));
+  const client = clientFor(anthropic);
+  const tools = [{ name: 'query_candidates', input_schema: { type: 'object', properties: {} } }];
+
+  const turn = await client.completeChat({ system: 'from-engine', messages: [{ role: 'user', content: 'which are red?' }], tools });
+
+  assert.equal(anthropic.requests.length, 1);
+  assert.deepEqual(anthropic.requests[0].tool_choice, { type: 'auto' });
+  assert.equal(anthropic.requests[0].system, 'from-engine');
+  assert.deepEqual(anthropic.requests[0].tools, tools);
+  assert.equal(turn.content[0].text, 'done');
+  assert.equal(turn.usage.input_tokens, 1000);
+});
