@@ -1,33 +1,37 @@
 import { useEffect, useState } from 'react';
-import { getChat, listChatCandidates, listChats } from '../api/client';
+import { createChat, getChat, listChatCandidates, listChats, postChatFiles } from '../api/client';
 import { replaceCandidate } from '../replaceCandidate';
 import BackendStatus from '../components/BackendStatus';
 import ChatWidget from '../components/ChatWidget';
 import DashboardView from '../components/DashboardView';
+import IngestionList from '../components/IngestionList';
 import LeafDecoration from '../components/LeafDecoration';
 import Sidebar from '../components/Sidebar';
 import WelcomeView from '../components/WelcomeView';
-import { BREEDER_USER, DASHBOARD_TEXT, HEALTH_TEXT } from '../constants';
+import { BREEDER_USER, DASHBOARD_TEXT, HEALTH_TEXT, WELCOME_TEXT } from '../constants';
 import './Workspace.css';
 
-function latestAnalysisWarnings(messages) {
+function latestAnalysis(messages) {
   if (!Array.isArray(messages)) {
-    return [];
+    return null;
   }
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
     if (message?.kind === 'analysis' && message.analysis) {
-      return Array.isArray(message.analysis.warnings) ? message.analysis.warnings : [];
+      return message.analysis;
     }
   }
-  return [];
+  return null;
 }
+
+const listOrEmpty = (value) => (Array.isArray(value) ? value : []);
 
 function Workspace() {
   const [chatsState, setChatsState] = useState({ state: 'loading', chats: [], message: '' });
   const [activeChatId, setActiveChatId] = useState(null);
   const [dashboardState, setDashboardState] = useState({ state: 'idle' });
   const [breederUser, setBreederUser] = useState(BREEDER_USER);
+  const [upload, setUpload] = useState({ state: 'idle', message: '' });
 
   const activeChat = chatsState.chats.find((chat) => chat.id === activeChatId) ?? null;
 
@@ -61,11 +65,13 @@ function Workspace() {
     Promise.all([listChatCandidates(activeChatId), getChat(activeChatId)])
       .then(([list, chat]) => {
         if (!cancelled) {
+          const analysis = latestAnalysis(chat.messages);
           setDashboardState({
             state: 'ready',
             candidates: list.candidates,
             total: list.total,
-            warnings: latestAnalysisWarnings(chat.messages),
+            warnings: listOrEmpty(analysis?.warnings),
+            ingestion: listOrEmpty(analysis?.ingestion),
             messages: chat.messages ?? [],
           });
         }
@@ -83,6 +89,36 @@ function Workspace() {
 
   function handleNewDashboard() {
     setActiveChatId(null);
+    setUpload({ state: 'idle', message: '' });
+  }
+
+  // Create dashboard: a new chat, then the files as one analysis message. The request is never
+  // aborted (150 candidates take about 90 s); the button is replaced by a status while it runs.
+  async function handleSubmitFiles(files) {
+    if (upload.state === 'analyzing') {
+      return;
+    }
+    setUpload({ state: 'analyzing', message: '' });
+    try {
+      const chat = await createChat();
+      const body = await postChatFiles(chat.id, files);
+      // Reload the list so the sidebar shows the title the backend gave the chat (the file names).
+      const chats = await listChats().catch(() => null);
+      setChatsState((current) => ({
+        state: 'ready',
+        chats: chats ?? [chat, ...current.chats.filter((item) => item.id !== chat.id)],
+        message: '',
+      }));
+      const assistant = body?.assistant_message;
+      if (assistant?.status === 'error') {
+        setUpload({ state: 'error', message: assistant.error?.message || WELCOME_TEXT.UPLOAD_FAILED });
+        return;
+      }
+      setUpload({ state: 'idle', message: '' });
+      handleSelectChat(chat.id);
+    } catch (error) {
+      setUpload({ state: 'error', message: error.message || WELCOME_TEXT.UPLOAD_FAILED });
+    }
   }
 
   function handleCandidateUpdated(updated) {
@@ -123,7 +159,13 @@ function Workspace() {
         <LeafDecoration position="bottom-left" />
 
         <div className="workspace__scroll" data-testid="workspace-scroll">
-          {!activeChat && <WelcomeView />}
+          {!activeChat && (
+            <WelcomeView
+              isAnalyzing={upload.state === 'analyzing'}
+              errorMessage={upload.state === 'error' ? upload.message : ''}
+              onSubmitFiles={handleSubmitFiles}
+            />
+          )}
 
           {dashboardLoading && (
             <p className="workspace__status" role="status" data-testid="dashboard-loading">
@@ -138,9 +180,21 @@ function Workspace() {
           )}
 
           {dashboardEmpty && (
-            <p className="workspace__status" role="status" data-testid="dashboard-empty">
-              {DASHBOARD_TEXT.EMPTY}
-            </p>
+            <div className="workspace__empty-analysis">
+              <p role="status" data-testid="dashboard-empty">
+                {DASHBOARD_TEXT.EMPTY}
+              </p>
+              <IngestionList ingestion={dashboardState.ingestion} />
+              {dashboardState.warnings?.length > 0 && (
+                <ul data-testid="analysis-warnings">
+                  {dashboardState.warnings.map((warning, index) => (
+                    <li key={`${warning.code}-${index}`} data-testid={`analysis-warning-${warning.code}`}>
+                      {warning.code}: {warning.message}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           )}
 
           {dashboardReady && (
@@ -149,6 +203,7 @@ function Workspace() {
               title={activeChat.title}
               candidates={dashboardState.candidates}
               warnings={dashboardState.warnings}
+              ingestion={dashboardState.ingestion}
               breederUser={breederUser}
               onCandidateUpdated={handleCandidateUpdated}
             />

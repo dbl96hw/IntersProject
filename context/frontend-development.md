@@ -50,11 +50,16 @@
 `{ text }` to `POST /api/chats/:id/messages` and shows `answer.text`. It starts minimized. With no
 chat open it shows `chat-no-chat` and does not call the server.
 
-- "Create dashboard" does not start an analysis. The welcome screen shows that file upload is coming
-  soon (`data-testid="upload-coming-soon"`).
+- "Create dashboard" uploads the files: `POST /api/chats`, then `POST /api/chats/:id/messages` (multipart,
+  one `files` field per file). While it runs the button is replaced by `analysis-loading`; the request is
+  never aborted (about 90 s for 150 candidates). On `status: "error"` the welcome screen shows
+  `upload-error`. On success the new chat opens; `IngestionList` (`ingestion-list`) shows each file as used
+  or not used with the engine's message, also on an empty dashboard. Accepted types match the backend.
+  `FILE_UPLOAD_AVAILABLE = false` brings back the "coming soon" notice.
 - A colour change sends `PATCH /api/candidates/:id`. Pass / no pass sends `POST /api/candidates/:id/decision`.
   The row becomes the `candidate` in the response. The screen does not move the colour itself.
-- The chat shows the server answer as plain text (`white-space: pre-wrap`). A warning
+- The chat shows the server answer as plain text (`white-space: pre-wrap`); only `**bold**` / `*bold*`
+  become `<strong>` (`src/chatText.jsx`, React elements, never innerHTML). A warning
   `ANSWER_UNVERIFIED_NUMBERS` on `answer.warnings` is a calm notice. There is no verified mark.
 - Mock rows follow the engine's candidate row, plus two fields the engine does not return: `crop` and
   `mean_yield_t_ha` (`mocks/dashboards.js`).

@@ -14,11 +14,13 @@ export const WELCOME_TEXT = {
   GREETING: 'How can I help you today?',
   DROPZONE_TITLE: 'Upload your files to create your dashboard',
   DROPZONE_HINT: 'Drag and drop them here, or browse from your computer',
+  LIMITS: 'Up to 10 files of 10 MB each: CSV, XLSX, XLS, PDF, DOCX, PNG, JPG or WEBP.',
   DROPZONE_ACTIVE: 'Drop your files to add them',
   BROWSE_FILES: 'Browse files',
   REMOVE_FILE: 'Remove file',
   SUBMIT: 'Create dashboard',
-  ANALYZING: 'Analyzing your files...',
+  ANALYZING: 'Analyzing your files. With many candidates this takes about a minute and a half; keep this tab open.',
+  UPLOAD_FAILED: 'The files could not be analyzed. Try again, or check the backend status above.',
   FILES_SELECTED: 'Selected files',
   UPLOAD_COMING_SOON: 'File upload is coming soon. Creating a dashboard from files is not available yet.',
 };
@@ -53,6 +55,10 @@ export const DASHBOARD_TEXT = {
   ENGINE_REASON: 'Engine reason',
   BREEDER_OVERRIDE: 'Breeder override',
   DECISION_LABEL: 'Decision',
+  FILES_TITLE: 'Files in this analysis',
+  FILE_USED: 'used',
+  FILE_NOT_USED: 'not used',
+  ROWS: 'rows',
 };
 
 export const FILTER_TEXT = {

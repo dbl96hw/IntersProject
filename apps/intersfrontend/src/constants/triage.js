@@ -44,12 +44,11 @@ export const CANDIDATE_DECISIONS = {
   NO_PASS: 'no_pass',
 };
 
-// The file upload component accepts these file types (can be changed depending of the BE)
-export const ACCEPTED_FILE_TYPES =
-  '.csv,.tsv,.xlsx,.json,.parquet,.pdf,.png,.jpg,.jpeg,.tiff,.docx,.pptx,.html,.txt';
+// Same list as the backend (ALLOWED_FILE_EXTENSIONS); any other type is refused with UNSUPPORTED_FILE_TYPE.
+export const ACCEPTED_FILE_TYPES = '.csv,.xlsx,.xls,.pdf,.docx,.png,.jpg,.jpeg,.webp';
 
-// Upload through the API is a later story. Until then Create dashboard stays disabled.
-export const FILE_UPLOAD_AVAILABLE = false;
+// Create dashboard sends the files: POST /api/chats, then POST /api/chats/:id/messages (multipart).
+export const FILE_UPLOAD_AVAILABLE = true;
 
 // The modal sends a real colour change and a real pass / no pass.
 export const CANDIDATE_SAVE_AVAILABLE = true;

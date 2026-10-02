@@ -30,6 +30,49 @@ function mockApi({ health, chats = [], route } = {}) {
   );
 }
 
+// Fake API for the upload flow. The analysis POST stays pending until `finish()` is called.
+function uploadApi({ analysis = null, candidates = [], error = null }) {
+  const chat = { id: 'chat-new', title: 'New chat' };
+  const state = { created: 0, posted: [], listed: [], finish: () => {} };
+  const assistant = error
+    ? { id: 'a-1', role: 'assistant', kind: 'analysis', status: 'error', error, analysis: null, answer: null }
+    : { id: 'a-1', role: 'assistant', kind: 'analysis', status: 'ok', error: null, analysis, answer: null };
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url, options = {}) => {
+      const { pathname } = new URL(url);
+      const method = options.method ?? 'GET';
+      if (pathname === '/health') {
+        return Promise.resolve(jsonResponse({ healthy: true, mode: 'live', engine: 'up' }));
+      }
+      if (pathname === '/api/chats' && method === 'POST') {
+        state.created += 1;
+        return Promise.resolve(jsonResponse({ chat }));
+      }
+      if (pathname === '/api/chats') {
+        return Promise.resolve(jsonResponse({ chats: state.listed }));
+      }
+      if (pathname === '/api/chats/chat-new/messages') {
+        state.posted.push(options.body);
+        return new Promise((resolve) => {
+          state.finish = () => {
+            state.listed = [{ ...chat, title: 'trials.csv' }];
+            resolve(jsonResponse({ user_message: { id: 'u-1', role: 'user' }, assistant_message: assistant }));
+          };
+        });
+      }
+      if (pathname === '/api/chats/chat-new') {
+        return Promise.resolve(jsonResponse({ chat, messages: [assistant] }));
+      }
+      if (pathname.startsWith('/api/candidates')) {
+        return Promise.resolve(jsonResponse({ candidates, total: candidates.length, page: 1, page_size: 100 }));
+      }
+      return Promise.resolve(jsonResponse({ error: { code: 'NOT_FOUND', message: 'Missing', field: null } }, false));
+    }),
+  );
+  return state;
+}
+
 describe('Workspace backend status and welcome', () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -106,18 +149,82 @@ describe('Workspace backend status and welcome', () => {
     expect(await screen.findByTestId('backend-mock-notice')).toHaveTextContent(HEALTH_TEXT.MOCK_NOTICE);
   });
 
-  it('shows that file upload is coming soon and does not start an analysis', async () => {
-    mockApi({ health: { healthy: true, mode: 'live', engine: 'up' } });
+  it('creates a chat, sends the files as multipart and opens the new dashboard', async () => {
     const user = userEvent.setup();
+    const api = uploadApi({
+      analysis: {
+        summary: '1 candidates analysed: 0 green, 0 amber, 1 red.',
+        warnings: [{ code: 'IRRELEVANT_FILE', message: '"invoice.pdf" does not look like breeding or trial data; it was skipped', file: 'invoice.pdf' }],
+        ingestion: [
+          { file: 'trials.csv', kind: 'table', accepted: true, source: 'trial_recommendations', rows: 72, message: null },
+          { file: 'invoice.pdf', kind: 'document', accepted: false, source: null, rows: null, message: 'Not about breeding or trial data' },
+        ],
+      },
+      candidates: [{ candidate_id: 'SYN-MZ-00001', colour: 'RED', reason: 'fails in 3 of 5 trials' }],
+    });
 
     render(<Workspace />);
+    expect(screen.queryByTestId('upload-coming-soon')).not.toBeInTheDocument();
+    await user.upload(screen.getByTestId('upload-input'), [
+      new File(['TRIAL_GUID'], 'trials.csv', { type: 'text/csv' }),
+      new File(['%PDF'], 'invoice.pdf', { type: 'application/pdf' }),
+    ]);
+    await user.click(screen.getByTestId('upload-submit'));
 
-    expect(screen.getByTestId('upload-coming-soon')).toHaveTextContent(WELCOME_TEXT.UPLOAD_COMING_SOON);
-    const file = new File(['id'], 'trials.csv', { type: 'text/csv' });
-    await user.upload(screen.getByTestId('upload-input'), file);
+    // While the analysis runs: a status instead of the button, so no second submit.
+    expect(await screen.findByTestId('analysis-loading')).toHaveTextContent(WELCOME_TEXT.ANALYZING);
+    expect(screen.queryByTestId('upload-submit')).not.toBeInTheDocument();
+    expect(api.created).toBe(1);
+    const form = api.posted[0];
+    expect(form).toBeInstanceOf(FormData);
+    expect(form.getAll('files').map((file) => file.name)).toEqual(['trials.csv', 'invoice.pdf']);
 
-    expect(screen.getByTestId('upload-submit')).toBeDisabled();
-    expect(screen.queryByTestId('analysis-loading')).not.toBeInTheDocument();
+    await act(async () => {
+      api.finish();
+    });
+
+    expect(await screen.findByTestId('candidate-row-SYN-MZ-00001')).toBeInTheDocument();
+    expect(screen.getByTestId('ingestion-item-0')).toHaveTextContent('trials.csv: used (trial_recommendations, 72 rows)');
+    expect(screen.getByTestId('ingestion-item-1')).toHaveTextContent('invoice.pdf: not used - Not about breeding or trial data');
+    expect(screen.getByTestId('analysis-warning-IRRELEVANT_FILE')).toBeInTheDocument();
+    expect(api.created).toBe(1);
+  });
+
+  it('explains every file when an upload gives no candidates', async () => {
+    const user = userEvent.setup();
+    const api = uploadApi({
+      analysis: {
+        summary: '0 candidates analysed: 0 green, 0 amber, 0 red.',
+        warnings: [],
+        ingestion: [{ file: 'invoice.pdf', kind: 'document', accepted: false, source: null, rows: null, message: 'Not about breeding or trial data' }],
+      },
+      candidates: [],
+    });
+
+    render(<Workspace />);
+    await user.upload(screen.getByTestId('upload-input'), new File(['%PDF'], 'invoice.pdf', { type: 'application/pdf' }));
+    await user.click(screen.getByTestId('upload-submit'));
+    await act(async () => {
+      api.finish();
+    });
+
+    expect(await screen.findByTestId('dashboard-empty')).toHaveTextContent(DASHBOARD_TEXT.EMPTY);
+    expect(screen.getByTestId('ingestion-item-0')).toHaveTextContent('invoice.pdf: not used');
+  });
+
+  it('stays on the upload screen with the error when the analysis fails', async () => {
+    const user = userEvent.setup();
+    const api = uploadApi({ error: { code: 'DATA_ENGINE_UNAVAILABLE', message: 'Data engine is unreachable' } });
+
+    render(<Workspace />);
+    await user.upload(screen.getByTestId('upload-input'), new File(['x'], 'trials.csv', { type: 'text/csv' }));
+    await user.click(screen.getByTestId('upload-submit'));
+    await act(async () => {
+      api.finish();
+    });
+
+    expect(await screen.findByTestId('upload-error')).toHaveTextContent('Data engine is unreachable');
+    expect(screen.getByTestId('upload-submit')).toBeEnabled();
     expect(screen.queryByTestId('dashboard-view')).not.toBeInTheDocument();
   });
 

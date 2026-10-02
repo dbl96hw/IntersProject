@@ -8,12 +8,13 @@
 ## Signals
 
 - `services/data-engine/tests/` with pytest (`services/data-engine/pyproject.toml`).
-- `apps/intersbackend/test/` — `node --test`, 148 tests; Anthropic SDK and engine mocked. Frontend Vitest: 42 tests.
-- `.github/workflows/lint.yml` — lint only on pull requests.
+- `services/data-engine/tests/` — 91 tests (1 skipped where Tesseract is missing).
+- `apps/intersbackend/test/` — `node --test`, 152 tests; Anthropic SDK and engine mocked. Frontend Vitest: 47 tests.
+- `.github/workflows/lint.yml` (lint) and `.github/workflows/test.yml` (pytest, node:test, Vitest) on pull requests.
 - `.cursor/rules/80-testability-lite.mdc`.
 
-Confidence stays **MEDIUM**: the data engine and Express backend both have automated tests, but **CI runs
-lint only** — neither pytest nor `npm test` runs on pull requests yet.
+Confidence stays **MEDIUM**: all three parts have automated tests and CI runs them on pull requests, but
+there is no end-to-end browser test yet (F3.1).
 
 ## What lives here
 
@@ -39,7 +40,12 @@ lint only** — neither pytest nor `npm test` runs on pull requests yet.
 
 - Data engine changes: `pytest -q`; rule changes also `python -m data_engine.evaluate`.
 - Express changes: `npm test -w apps/intersbackend` and `npm run lint`.
-- CI today: lint only — treat green lint as necessary but not sufficient for backend/engine changes.
+- CI: lint plus all three test suites on every pull request to `dev`, `stg` and `main`.
+- `npm audit` (2026-10-02): backend has no finding with the CDN SheetJS 0.20.3 in `package.json` (the npm
+  registry copy 0.18.5 has a high prototype-pollution / ReDoS advisory, which is why it is not used).
+  Frontend: 3 moderate, dev-only (Vitest mocker path traversal; esbuild dev server via Vite 5). They affect
+  the local dev and test tools, not the built app; fixing needs Vite 8 / Vitest 5 (breaking), after the demo.
+  Do not expose the Vite dev server on a public network.
 
 ## Danger zones
 
@@ -49,6 +55,5 @@ lint only** — neither pytest nor `npm test` runs on pull requests yet.
 
 ## Unknowns
 
-- Unknown: add pytest and `npm test` to CI (roadmap F3.1).
 - Unknown: end-to-end runner (Playwright is not chosen; F3.1). Vitest is recorded in `gendd/adr/0001-frontend-tests-use-vitest.md`. Backend runner is `node:test` (`gendd/adr/0002-backend-tests-use-node-test.md`).
-- Unknown: Tesseract in CI for document tests.
+- CI installs Tesseract (`apt-get install tesseract-ocr`), so the OCR tests run there.

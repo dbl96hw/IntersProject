@@ -24,6 +24,14 @@
   color: var(--color-text-secondary);
 }
 
+/* An analysis with no candidates still explains, file by file, why nothing was used. */
+.workspace__empty-analysis {
+  position: relative;
+  z-index: 1;
+  margin: 2rem;
+  color: var(--color-text-secondary);
+}
+
 .workspace__scroll {
   position: relative;
   z-index: 1;
