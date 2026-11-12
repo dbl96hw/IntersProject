@@ -44,10 +44,11 @@ Every error has the same shape. `field` is `null` when the error is not about on
 | 404 | `NOT_FOUND` | Unknown or malformed (non-uuid) chat, message or candidate id, or unknown route |
 | 413 | `FILE_TOO_LARGE` | A file is over `MAX_FILE_MB` (10 MB by default), or the JSON body is over 25 MB |
 | 501 | `NOT_IMPLEMENTED` | Mock mode only, after the body is valid. Live `PATCH /api/candidates/:id` and `POST /api/candidates/:id/decision` return 200 |
+| 429 | `DATA_ENGINE_BUSY` | Whatever answers at `DATA_ENGINE_URL` (a proxy, tunnel or host, never the engine itself) refused with 429, also after one retry |
 | 502 | `DATA_ENGINE_UNAVAILABLE` | The data engine did not answer (down or timed out) |
 | 500 | `INTERNAL_ERROR` | Anything else (no stack trace in the response) |
 
-Engine errors (for example `NOT_FOUND`, `SQL_ERROR`, `UNKNOWN_TOOL`, or `VALIDATION_ERROR` on an override) are passed through with the engine's status, `code`, `message` and `field`.
+Engine errors (for example `NOT_FOUND`, `SQL_ERROR`, `UNKNOWN_TOOL`, or `VALIDATION_ERROR` on an override) are passed through with the engine's status, `code`, `message` and `field`. Any other non-2xx without the engine's error body keeps its status with code `DATA_ENGINE_ERROR`, and the backend logs the method, address and status. Reads (and the chat's read-only tools) are retried once on 429 or 503; overrides and ingests are never retried.
 
 ## Shared objects
 

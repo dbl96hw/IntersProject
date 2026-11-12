@@ -7,6 +7,14 @@ export const HEALTH_CHECK_TIMEOUT_MS = 2000;
 // Ingesting records or a document makes the engine rebuild its model, which takes far longer than a read.
 export const DEFAULT_DATA_ENGINE_INGEST_TIMEOUT_MS = 120000;
 export const MIN_DATA_ENGINE_INGEST_TIMEOUT_MS = 60000;
+// The engine never sends 429 itself; a proxy, tunnel or host in front of DATA_ENGINE_URL can.
+// Reads are retried once after Retry-After (capped) or the default delay.
+export const DATA_ENGINE_RETRY_DELAY_MS = 500;
+export const DATA_ENGINE_MAX_RETRY_DELAY_MS = 2000;
+// GET /tools and GET /overrides/reasons only change when the engine is redeployed.
+export const DATA_ENGINE_STATIC_CACHE_TTL_MS = 5 * 60 * 1000;
+// Candidates loaded at once after an upload (2 engine reads each); unbounded, 150 candidates meant 300 requests at once.
+export const MAX_PARALLEL_CANDIDATE_LOADS = 8;
 
 export const DATA_ENGINE_PATHS = {
   HEALTH: '/health',

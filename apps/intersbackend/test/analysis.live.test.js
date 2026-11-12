@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { createApp } from '../src/app.js';
 import { parseEnv } from '../src/config/env.js';
+import { MAX_PARALLEL_CANDIDATE_LOADS } from '../src/constants/index.js';
 import { createMemoryDb } from '../src/db/memory.js';
 import { emptyUsage } from '../src/llm/claude.client.js';
 import { engineFallback } from '../src/llm/evidence.check.js';
@@ -94,7 +95,7 @@ function claudeOk(contexts) {
   };
 }
 
-function analysisService({ rows, explainAll, db, ingest }) {
+function analysisService({ rows, explainAll, db, ingest, dataEngine }) {
   const calls = [];
   return {
     calls,
@@ -117,11 +118,33 @@ function analysisService({ rows, explainAll, db, ingest }) {
           return (explainAll ?? claudeOk)(contexts, text);
         },
       },
-      dataEngine: fakeDataEngine(rows),
+      dataEngine: dataEngine ?? fakeDataEngine(rows),
       db: db ?? createMemoryDb(),
     }),
   };
 }
+
+test('candidates are loaded from the engine a few at a time, in order', async () => {
+  const rows = rowsOf(30);
+  const inner = fakeDataEngine(rows);
+  let inFlight = 0;
+  let maxInFlight = 0;
+  const tracked = (method) => async (id) => {
+    inFlight += 1;
+    maxInFlight = Math.max(maxInFlight, inFlight);
+    await new Promise((resolve) => { setTimeout(resolve, 1); });
+    inFlight -= 1;
+    return inner[method](id);
+  };
+  const dataEngine = { getCandidate: tracked('getCandidate'), getLlmContext: tracked('getLlmContext') };
+  const { service } = analysisService({ rows, dataEngine });
+
+  const result = await service.handleMessage({ files: [{ name: 'lines.csv' }] });
+
+  assert.equal(result.candidates.length, 30);
+  assert.deepEqual(result.candidates.map((c) => c.candidate_id), rows.map((row) => row.candidate_id));
+  assert.ok(maxInFlight <= 2 * MAX_PARALLEL_CANDIDATE_LOADS, `max in flight ${maxInFlight}`);
+});
 
 test('evidence hash ignores instructions and tokens and does not depend on key order', () => {
   const row = candidateRow('SYN-MZ-00001', 'RED');
