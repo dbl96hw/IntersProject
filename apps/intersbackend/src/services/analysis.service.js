@@ -9,6 +9,7 @@ import {
   ERROR_CODES,
   EXPLAIN_MAX_SYNC,
   HTTP_STATUS,
+  MAX_PARALLEL_CANDIDATE_LOADS,
   MESSAGE_KINDS,
   MESSAGE_STATUS,
   WARNING_CODES,
@@ -169,6 +170,27 @@ function toStoredCandidate(row, explanation, hash) {
   };
 }
 
+// Results keep the order of items. After one call throws, the workers take no new items.
+async function mapWithLimit(items, limit, fn) {
+  const results = new Array(items.length);
+  let next = 0;
+  let hasFailed = false;
+  async function worker() {
+    while (next < items.length && !hasFailed) {
+      const index = next;
+      next += 1;
+      try {
+        results[index] = await fn(items[index]);
+      } catch (err) {
+        hasFailed = true;
+        throw err;
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
 async function loadCandidate(dataEngine, id, warnings) {
   try {
     const [row, context] = await Promise.all([
@@ -212,8 +234,10 @@ async function liveAnalysis({ text, files, ingest, claude, dataEngine, db, model
   const warnings = [...ingested.warnings];
   let loaded;
   try {
-    loaded = (await Promise.all(
-      ingested.touchedCandidateIds.map((id) => loadCandidate(dataEngine, id, warnings)),
+    loaded = (await mapWithLimit(
+      ingested.touchedCandidateIds,
+      MAX_PARALLEL_CANDIDATE_LOADS,
+      (id) => loadCandidate(dataEngine, id, warnings),
     )).filter(Boolean);
   } catch (err) {
     if (isEngineDown(err)) return engineDown(err);
